@@ -68,4 +68,3 @@ circuit o0:
             node a20 = a1
             node a21 = a2
             o8 <= a20
-        o8 <= o8

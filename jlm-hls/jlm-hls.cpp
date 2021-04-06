@@ -30,14 +30,14 @@
 #include <jlm/opt/dne.hpp>
 #include <jive/rvsdg/control.hpp>
 #include <jive/types/bitstring.hpp>
+#include <jlm/ir/operators.hpp>
 #include "../tests/test-operation.hpp"
 #include "../tests/test-types.hpp"
 
 class cmdflags {
 public:
     inline
-    cmdflags()
-    {}
+    cmdflags() {}
 
     std::string file;
     jlm::stats_descriptor sd;
@@ -45,8 +45,7 @@ public:
 };
 
 static void
-print_usage(const std::string & app)
-{
+print_usage(const std::string &app) {
     std::cerr << "Usage: " << app << " [OPTIONS]\n";
     std::cerr << "OPTIONS:\n";
     std::cerr << "--l2j: Print program after LLVM to JLM pass.\n";
@@ -62,19 +61,21 @@ print_usage(const std::string & app)
 }
 
 static void
-parse_cmdflags(int argc, char ** argv, cmdflags & flags)
-{
+parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     static constexpr size_t file = 1;
 
     static struct option options[] = {
-              {"file", required_argument, NULL, file}
-            , {NULL, 0, NULL, 0}
+            {"file", required_argument, NULL, file},
+            {NULL, 0,                   NULL, 0}
     };
 
     int opt;
     while ((opt = getopt_long_only(argc, argv, "", options, NULL)) != -1) {
         switch (opt) {
-            case file: { flags.file = optarg; break; }
+            case file: {
+                flags.file = optarg;
+                break;
+            }
 
             default:
                 print_usage(argv[0]);
@@ -89,9 +90,8 @@ parse_cmdflags(int argc, char ** argv, cmdflags & flags)
 }
 
 static inline bool
-is_identity_mapping(const jive::match_op & op)
-{
-    for (const auto & pair : op) {
+is_identity_mapping(const jive::match_op &op) {
+    for (const auto &pair : op) {
         if (pair.first != pair.second)
             return false;
     }
@@ -101,149 +101,213 @@ is_identity_mapping(const jive::match_op & op)
 
 class SimpleHLS {
 public:
-    SimpleHLS(){
+    SimpleHLS() {
     }
-    void run(jlm::rvsdg_module & rm){
+
+    void run(jlm::rvsdg_module &rm) {
         auto region = rm.graph()->root();
-        for (const auto & node : region->nodes) {
-            if(auto ln = dynamic_cast<const jlm::lambda::node*>(&node)){
+        for (const auto &node : region->nodes) {
+            if (auto ln = dynamic_cast<const jlm::lambda::node *>(&node)) {
                 std::cout << hls_lambda(ln);
-            } else{
+            } else {
                 std::cerr << "unknown node " << node.operation().debug_string() << "\n";
             }
         }
     }
 
 private:
-    std::unordered_map<jive::output*, std::string> port_map;
-    std::unordered_set<jive::output*> port_declared;
+    std::unordered_map<jive::output *, std::string> port_map;
+    std::unordered_set<jive::output *> port_declared;
+
     std::string
-    create_port_name(jive::output * port)
-    {
-        std::string name = dynamic_cast<const jive::argument*>(port) ? "a" : "o";
+    create_port_name(jive::output *port) {
+        std::string name = dynamic_cast<const jive::argument *>(port) ? "a" : "o";
         name += jive::detail::strfmt(port_map.size());
         port_map[port] = name;
         return name;
     }
+
     std::string
-    get_port_name(jive::output * port)
-    {
+    get_port_name(jive::output *port) {
         auto tmp = port_map.find(port);
         std::string name;
-        if(tmp!=port_map.end()){
+        if (tmp != port_map.end()) {
             name = tmp->second;
-        } else{
+        } else {
             name = create_port_name(port);
         }
         return name;
     }
 
     std::string
-    to_firrtl_type(const jive::type * type){
-        if(auto t = dynamic_cast<const jive::bittype*>(type)){
+    to_firrtl_type(const jive::type *type) {
+        if (auto t = dynamic_cast<const jive::bittype *>(type)) {
             // TODO: somehow handle SInt
-            return "UInt<"+jive::detail::strfmt(t->nbits())+">";
-        } else if(auto t = dynamic_cast<const jive::statetype*>(type)){
+            return "UInt<" + jive::detail::strfmt(t->nbits()) + ">";
+        } else if (auto t = dynamic_cast<const jive::statetype *>(type)) {
             return "UInt<1>";
         }
     }
 
-    std::string
-    node_to_string(const jive::node * node){
+    std::string simple_node_to_string(const int depth, const jive::simple_node *n) {
         std::string result;
-        if(auto n = dynamic_cast<const jive::simple_node*>(node)){
-//            return "simple node "+node->operation().debug_string()+"\n";
-            auto out = n->output(0);
-            if(port_declared.find(out)==port_declared.end()){
-                result += "node "+get_port_name(out)+"=";
-                port_declared.insert(out);
-            } else{
-                result += get_port_name(out)+"<=";
-            }
-            if(auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))){
-                auto in0 = n->input(0)->origin();
-                if(is_identity_mapping(*o)){
-                    result += get_port_name(in0);
-                } else{
-                    throw std::logic_error("non-identity mapping not implemented!");
-                }
-            } else if (auto o = dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))){
-                auto in0 = n->input(0)->origin();
-                auto in1 = n->input(1)->origin();
-                // TODO: handle sign stuff - maybe tmp nodes with cast?
-                result += "gt("+get_port_name(in0)+", "+ get_port_name(in1)+")";
-            }else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))){
-                auto in0 = n->input(0)->origin();
-                auto in1 = n->input(1)->origin();
-                result += "eq("+get_port_name(in0)+", "+ get_port_name(in1)+")";
-            }else if (auto o = dynamic_cast<const jive::bitadd_op *>(&(n->operation()))){
-                auto in0 = n->input(0)->origin();
-                auto in1 = n->input(1)->origin();
-                result += "add("+get_port_name(in0)+", "+ get_port_name(in1)+")";
-            }else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))){
-                auto value = o->value();
-                result += "UInt<"+jive::detail::strfmt(value.nbits())+">("+value.str()+")";
-            } else{
-                throw std::logic_error(n->operation().debug_string()+"not implemented!");
-            }
-            result+=" ; "+n->operation().debug_string()+"\n";
-        } else if(auto n = dynamic_cast<const jive::gamma_node*>(node)){
-            for (int i = 0; i < n->noutputs(); ++i) {
-                auto out = n->output(i);
-                if(port_declared.find(out)==port_declared.end()) {
-                    result += "wire " + get_port_name(out) + ": " + to_firrtl_type(&out->type())+"\n";
-                    port_declared.insert(out);
-                }
-            }
-            for (int i = 0; i < n->nsubregions(); ++i) {
-                auto sr = n->subregion(i);
-                if(i != 0){
-                    result += "else ";
-                }
-                // TODO: width
-                result += "when eq("+get_port_name(n->predicate()->origin())+", UInt<32>("+jive::detail::strfmt(i)+"):\n";
-                for (int j = 0; j < sr->narguments(); ++j) {
-                    result += "node "+get_port_name(sr->argument(j))+" = "+get_port_name(sr->argument(j)->input()->origin())+"\n";
-                }
-                for(const auto & node : sr->nodes){
-                    result+=node_to_string(&node);
-                }
-                for (int j = 0; j < sr->nresults(); ++j) {
-                    result += get_port_name(sr->result(j)->output())+" <= "+get_port_name(sr->result(j)->origin())+"\n";
-                }
-
-            }
-
-        }else{
-            throw std::logic_error(n->operation().debug_string()+"not implemented!");
+        auto out = n->output(0);
+        if (port_declared.find(out) == port_declared.end()) {
+            result += indent(depth) + "node " + get_port_name(out) + " = ";
+            port_declared.insert(out);
+        } else {
+            result += indent(depth) + get_port_name(out) + " <= ";
         }
+        if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            if (is_identity_mapping(*o)) {
+                result += get_port_name(in0);
+            } else {
+                throw std::logic_error("non-identity mapping not implemented!");
+            }
+        } else if (auto o = dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "gt(asSInt(" + get_port_name(in0) + "), asSInt(" + get_port_name(in1) + "))";
+        } else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "gt(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+        } else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "eq(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+        } else if (auto o = dynamic_cast<const jive::bitadd_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "add(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+        }else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "sub(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+        } else if (auto o = dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            result += "neq(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+        } else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
+            auto value = o->value();
+            result += "UInt<" + jive::detail::strfmt(value.nbits()) + ">(" + value.str() + ")";
+        } else if (auto o = dynamic_cast<const jlm::undef_constant_op *>(&(n->operation()))) {
+            result += "UInt<1>(0) ; TODO: Fix?";
+        } else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
+            result += "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
+        } else {
+            throw std::logic_error(n->operation().debug_string() + " not implemented!");
+        }
+        result += " ; " + n->operation().debug_string() + "\n";
+        return result;
+    }
+
+    std::string gamma_node_to_string(const int depth, const jive::gamma_node *n) {
+        std::string result;
+        result += indent(depth) + " ; " + n->operation().debug_string() + "\n";
+        for (int i = 0; i < n->noutputs(); ++i) {
+            auto out = n->output(i);
+            if (port_declared.find(out) == port_declared.end()) {
+                result += indent(depth) + "wire " + get_port_name(out) + ": " + to_firrtl_type(&out->type()) + "\n";
+                port_declared.insert(out);
+            }
+        }
+        for (int i = 0; i < n->nsubregions(); ++i) {
+            auto sr = n->subregion(i);
+            result += indent(depth);
+            if (i != 0) {
+                result += "else ";
+            }
+            // TODO: width
+            result += "when eq(" + get_port_name(n->predicate()->origin()) + ", UInt<32>(" + jive::detail::strfmt(i) +
+                    "):\n";
+            for (int j = 0; j < sr->narguments(); ++j) {
+                result += indent(depth + 1) + "node " + get_port_name(sr->argument(j)) + " = " +
+                          get_port_name(sr->argument(j)->input()->origin()) + "\n";
+            }
+            for (const auto &node : sr->nodes) {
+                result += node_to_string(&node, depth + 1);
+            }
+            for (int j = 0; j < sr->nresults(); ++j) {
+                result += indent(depth + 1) + get_port_name(sr->result(j)->output()) + " <= " +
+                          get_port_name(sr->result(j)->origin()) + "\n";
+            }
+        }
+        result += indent(depth) + " ; end " + n->operation().debug_string() + "\n";
+        return result;
+    }
+
+    std::string theta_node_to_string(const int depth, const jive::theta_node *n) {
+        std::string result;
+        result += indent(depth) + " ; " + n->operation().debug_string() + "\n";
+        for (int i = 0; i < n->noutputs(); ++i) {
+            auto out = n->output(i);
+            if (port_declared.find(out) == port_declared.end()) {
+                result += indent(depth) + "wire " + get_port_name(out) + ": " + to_firrtl_type(&out->type()) + "\n";
+                port_declared.insert(out);
+            }
+        }
+        auto sr = n->subregion();
+        for (int j = 0; j < sr->narguments(); ++j) {
+            result += indent(depth + 1) + "node " + get_port_name(sr->argument(j)) + " = " +
+                      get_port_name(sr->argument(j)->input()->origin()) + "\n";
+        }
+        for (const auto &node : sr->nodes) {
+            result += node_to_string(&node, depth + 1);
+        }
+        for (int j = 0; j < sr->nresults(); ++j) {
+            result += indent(depth + 1) + get_port_name(sr->result(j)->output()) + " <= " +
+                      get_port_name(sr->result(j)->origin()) + "\n";
+        }
+        result += indent(depth) + " ; end " + n->operation().debug_string() + "\n";
         return result;
     }
 
     std::string
-    hls_lambda(const jlm::lambda::node * ln){
+    node_to_string(const jive::node *node, const int depth) {
+        if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
+            return simple_node_to_string(depth, n);
+        } else if (auto n = dynamic_cast<const jive::gamma_node *>(node)){
+            return gamma_node_to_string(depth, n);
+        } else if (auto n = dynamic_cast<const jive::theta_node *>(node)) {
+            return theta_node_to_string(depth, n);
+        } else {
+            throw std::logic_error(node->operation().debug_string() + " not implemented!");
+        }
+    }
+
+    static inline std::string
+    indent(size_t depth) {
+        return std::string(depth * 4, ' ');
+    }
+
+    std::string
+    hls_lambda(const jlm::lambda::node *ln) {
         std::string result;
+        auto name = get_port_name(ln->output());
         auto sr = ln->subregion();
+        result += indent(0) + "circuit " + name + ":\n";
+        result += indent(1) + "module " + name + ":\n";
         for (size_t i = 0; i < sr->narguments(); ++i) {
             auto a = sr->argument(i);
-            result += "input "+get_port_name(a)+": "+to_firrtl_type(&a->type())+"\n";
+            result += indent(2) + "input " + get_port_name(a) + ": " + to_firrtl_type(&a->type()) + "\n";
             port_declared.insert(a);
         }
         for (size_t i = 0; i < sr->nresults(); ++i) {
             auto o = sr->result(i);
-            result += "output "+get_port_name(o->origin())+": "+to_firrtl_type(&o->type())+"\n";
+            result += indent(2) + "output " + get_port_name(o->origin()) + ": " + to_firrtl_type(&o->type()) + "\n";
             port_declared.insert(o->origin());
         }
-        for(const auto & node : sr->nodes){
-            result += node_to_string(&node);
+        for (const auto &node : sr->nodes) {
+            result += node_to_string(&node, 2);
         }
         return result;
     }
 };
 
 int
-main (int argc, char ** argv)
-{
+main(int argc, char **argv) {
     cmdflags flags;
     parse_cmdflags(argc, argv, flags);
 
