@@ -25,6 +25,7 @@
 #include <llvm/Support/SourceMgr.h>
 
 #include <iostream>
+#include <fstream>
 
 #include <getopt.h>
 #include <jlm/opt/dne.hpp>
@@ -104,20 +105,32 @@ public:
     SimpleHLS() {
     }
 
-    void run(jlm::rvsdg_module &rm) {
+    void run(jlm::rvsdg_module &rm, llvm::Module *lm) {
+        std::string firrtl;
         auto region = rm.graph()->root();
         for (const auto &node : region->nodes) {
             if (auto ln = dynamic_cast<const jlm::lambda::node *>(&node)) {
-                std::cout << hls_lambda(ln);
+                auto module_name = lambda_node_to_string(ln);
+                firrtl += indent(0) + "circuit " + module_name + ":\n";
             } else {
                 std::cerr << "unknown node " << node.operation().debug_string() << "\n";
             }
         }
+        for (auto module: modules) {
+            firrtl += module;
+        }
+        auto source_file_name = lm->getSourceFileName();
+        std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + ".fir";
+        std::ofstream firrtl_file;
+        firrtl_file.open(file_name);
+        firrtl_file << firrtl;
+        firrtl_file.close();
     }
 
 private:
     std::unordered_map<jive::output *, std::string> port_map;
     std::unordered_set<jive::output *> port_declared;
+    std::vector<std::string> modules;
 
     std::string
     create_port_name(jive::output *port) {
@@ -129,147 +142,320 @@ private:
 
     std::string
     get_port_name(jive::output *port) {
-        auto tmp = port_map.find(port);
-        std::string name;
-        if (tmp != port_map.end()) {
-            name = tmp->second;
-        } else {
-            name = create_port_name(port);
+//        auto tmp = port_map.find(port);
+//        std::string name;
+//        if (tmp != port_map.end()) {
+//            name = tmp->second;
+//        } else {
+//            name = create_port_name(port);
+//        }
+//        return name;
+        if (port == nullptr) {
+            throw std::logic_error("nullptr!");
         }
-        return name;
+        std::string result;
+        if (auto p = dynamic_cast<const jive::node_input *>(port)) {
+            result += "i";
+        } else if (auto p = dynamic_cast<const jive::argument *>(port)) {
+            result += "i";
+        } else if (auto p = dynamic_cast<const jive::node_output *>(port)) {
+            result += "o";
+        } else if (auto p = dynamic_cast<const jive::structural_output *>(port)) {
+            result += "so";
+        } else {
+            throw std::logic_error(port->debug_string() + " not implemented!");
+        }
+        result += jive::detail::strfmt(port->index());
+        return result;
     }
 
     std::string
     to_firrtl_type(const jive::type *type) {
         if (auto t = dynamic_cast<const jive::bittype *>(type)) {
-            // TODO: somehow handle SInt
             return "UInt<" + jive::detail::strfmt(t->nbits()) + ">";
         } else if (auto t = dynamic_cast<const jive::statetype *>(type)) {
             return "UInt<1>";
+        } else {
+            throw std::logic_error(type->debug_string() + " not implemented!");
         }
     }
 
-    std::string simple_node_to_string(const int depth, const jive::simple_node *n) {
-        std::string result;
-        auto out = n->output(0);
-        if (port_declared.find(out) == port_declared.end()) {
-            result += indent(depth) + "node " + get_port_name(out) + " = ";
-            port_declared.insert(out);
+    std::string simple_node_to_string(const jive::simple_node *n) {
+        std::string module_name;
+        // ugly hack because debug string contains illegal symbols
+        if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
+            module_name += "MATCH_mod" + jive::detail::strfmt(modules.size());
         } else {
-            result += indent(depth) + get_port_name(out) + " <= ";
+            module_name += n->operation().debug_string() + "_mod" + jive::detail::strfmt(modules.size());
         }
+        std::string module = indent(1) + "module " + module_name + ":\n";
+        // io
+        module += indent(2) + "; io" + "\n";
+        module += indent(2) + "input clk: Clock" + "\n";
+        module += indent(2) + "input reset: UInt<1>" + "\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module +=
+                    indent(2) + "input i" + jive::detail::strfmt(i) + ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
+                    to_firrtl_type(&n->input(i)->type()) + "}" + "\n";
+        }
+        for (size_t i = 0; i < n->noutputs(); ++i) {
+            module += indent(2) + "output o" + jive::detail::strfmt(i) +
+                      ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
+                      to_firrtl_type(&n->output(i)->type()) + "}" + "\n";
+        }
+        // registers
+        module += indent(2) + "; registers" + "\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module += indent(2) + "reg i" + jive::detail::strfmt(i) +
+                      "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
+            module += indent(2) + "reg i" + jive::detail::strfmt(i) + "_data_reg: " +
+                      to_firrtl_type(&n->input(i)->type()) + ", clk" + "\n";
+        }
+        // logic
+        assert(n->noutputs() == 1);
+        auto out = n->output(0);
+        module += indent(2) + "; logic" + "\n";
+        module += indent(2) + get_port_name(out) + ".data <=";
         if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
+            //TODO: this could be a pure pass through?
             if (is_identity_mapping(*o)) {
-                result += get_port_name(in0);
+                // TODO: figure out why this hack is needed
+//                module += get_port_name(in0) + "_data_reg";
+                module += "i0_data_reg";
             } else {
                 throw std::logic_error("non-identity mapping not implemented!");
             }
         } else if (auto o = dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "gt(asSInt(" + get_port_name(in0) + "), asSInt(" + get_port_name(in1) + "))";
+            module +=
+                    "gt(asSInt(" + get_port_name(in0) + "_data_reg" + "), asSInt(" + get_port_name(in1) + "_data_reg" +
+                    "))";
         } else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "gt(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+            module += "gt(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+        } else if (auto o = dynamic_cast<const jive::bitult_op *>(&(n->operation()))) {
+            auto in0 = n->input(0)->origin();
+            auto in1 = n->input(1)->origin();
+            module += "lt(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
         } else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "eq(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+            module += "eq(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
         } else if (auto o = dynamic_cast<const jive::bitadd_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "add(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
-        }else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
+            module += "add(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+        } else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "sub(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+            module += "sub(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
         } else if (auto o = dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
             auto in0 = n->input(0)->origin();
             auto in1 = n->input(1)->origin();
-            result += "neq(" + get_port_name(in0) + ", " + get_port_name(in1) + ")";
+            module += "neq(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
         } else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
             auto value = o->value();
-            result += "UInt<" + jive::detail::strfmt(value.nbits()) + ">(" + value.str() + ")";
+            module += "UInt<" + jive::detail::strfmt(value.nbits()) + ">(" + value.str() + ")";
         } else if (auto o = dynamic_cast<const jlm::undef_constant_op *>(&(n->operation()))) {
-            result += "UInt<1>(0) ; TODO: Fix?";
+            module += "UInt<1>(0) ; TODO: Fix?";
         } else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
-            result += "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
+            module += "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
         } else {
             throw std::logic_error(n->operation().debug_string() + " not implemented!");
         }
-        result += " ; " + n->operation().debug_string() + "\n";
-        return result;
+        module += " ; " + n->operation().debug_string() + "\n";
+        // handshaking
+        module += indent(2) + "; handshaking" + "\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module += indent(2) + "i" + jive::detail::strfmt(i) + ".ready <= not(i" + jive::detail::strfmt(i) +
+                      "_valid_reg)" + "\n";
+        }
+        module += indent(2) + "node inputs_valid = ";
+        std::string inputs_valids = "UInt<1>(1)"; // True by default
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            inputs_valids = "and(" + inputs_valids + ", i" + jive::detail::strfmt(i) + "_valid_reg)";
+        }
+        module += inputs_valids + "\n";
+        for (size_t i = 0; i < n->noutputs(); ++i) {
+            module += indent(2) + "o" + jive::detail::strfmt(i) + ".valid <= and(o" + jive::detail::strfmt(i) +
+                      ".ready, inputs_valid)" + "\n";
+        }
+        if (n->ninputs()) {
+            module += indent(2) + "when o0.valid:" + "\n";
+            for (size_t i = 0; i < n->ninputs(); ++i) {
+                module += indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(0)" + "\n";
+            }
+        }
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module += indent(2) + "when i" + jive::detail::strfmt(i) + ".valid:" + "\n";
+            module += indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
+            module += indent(3) + "i" + jive::detail::strfmt(i) + "_data_reg <= i" + jive::detail::strfmt(i) + ".data" +
+                      "\n";
+        }
+
+        modules.push_back(module);
+//        std::cerr << module;
+        return module_name;
     }
 
-    std::string gamma_node_to_string(const int depth, const jive::gamma_node *n) {
-        std::string result;
-        result += indent(depth) + " ; " + n->operation().debug_string() + "\n";
+    std::string gamma_node_to_string(const jive::gamma_node *n) {
+        auto module_name = "gamma_mod" + jive::detail::strfmt(modules.size());
+        auto module_index = modules.size();
+        modules.emplace_back(); // need to preserve spot to avoid name collisions
+        std::ostringstream module;
+        module << indent(1) << "module " << module_name << ":\n";
+        // io
+        module << indent(2) + "; io" + "\n";
+        module << indent(2) + "input clk: Clock" + "\n";
+        module << indent(2) + "input reset: UInt<1>" + "\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module << indent(2) << "input i" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
+                   to_firrtl_type(&n->input(i)->type()) + "}" + "\n";
+        }
+        for (size_t i = 0; i < n->noutputs(); ++i) {
+            module << indent(2) << "output o" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
+                   to_firrtl_type(&n->output(i)->type()) << "}" << "\n";
+        }
+        // registers
+        module << indent(2) << "; registers\n";
+        module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+        module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->predicate()->type()) << ", clk\n";
+        module << indent(2) + "i0.ready <= not(pred_valid_reg)\n";
+        for (size_t i = 0; i < n->nentryvars(); ++i) {
+            module << indent(2) << "reg e" << i << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+            module << indent(2) << "reg  e" << i << "_data_reg: " << to_firrtl_type(&n->entryvar(i)->type())
+                   << ", clk\n";
+//            module << indent(2) << "wire e" << i <<"_ready\n";
+//            module << indent(2) << "e" << i <<"_ready <= UInt<1>(0)\n";
+            module << indent(2) + "i" << (i + 1) << ".ready <= not(e" << i << "_valid_reg)\n";
+        }
         for (int i = 0; i < n->noutputs(); ++i) {
-            auto out = n->output(i);
-            if (port_declared.find(out) == port_declared.end()) {
-                result += indent(depth) + "wire " + get_port_name(out) + ": " + to_firrtl_type(&out->type()) + "\n";
-                port_declared.insert(out);
+            module << indent(2) + "reg o" << i << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+            module << indent(2) + "o" << i << ".valid <= " << "UInt<1>(0) ; off by default\n";
+            module << indent(2) + "o" << i << ".data is invalid ; off by default\n";
+        }
+
+        module << indent(2) << "; instances\n";
+        for (size_t k = 0; k < n->nsubregions(); ++k) {
+            auto sr = n->subregion(k);
+            auto sr_module_name = subregion_to_string(sr);
+            module << indent(2) << "inst sr" << k << " of " + sr_module_name << "\n";
+            module << indent(2) << "sr" << k << ".clk <= clk\n";
+            module << indent(2) << "sr" << k << ".reset <= reset\n";
+            module << indent(2) << "node pred_match_" << k << " = and(eq(pred_data_reg, UInt<32>(" << k
+                   << ")), pred_valid_reg)\n";
+            for (size_t i = 0; i < sr->narguments(); ++i) {
+                module << indent(2) << "sr" << k << ".i" << i << ".valid <= and(e" << i << "_valid_reg, pred_match_"
+                       << k << ")\n";
+                module << indent(2) << "sr" << k << ".i" << i << ".data <= e" << i << "_data_reg\n";
+            }
+
+            for (int i = 0; i < n->noutputs(); ++i) {
+                module << indent(2) << "sr" << (k) << ".o" << (i) << ".ready <= o" << (i) << ".ready\n";
+            }
+            module << indent(2) << "when pred_match_" << k << ":\n";
+//            for (size_t i = 0; i < sr->narguments(); ++i) {
+//                module << indent(3) << "e" << i <<"_ready <= sr" << k << ".i" << i << ".ready\n";
+//            }
+            for (int i = 0; i < n->noutputs(); ++i) {
+                module << indent(3) << "o" << (i) << ".data <= sr" << (k) << ".o" << (i) << ".data\n";
+                module << indent(3) << "o" << (i) << ".valid <= sr" << (k) << ".o" << (i) << ".valid\n";
             }
         }
-        for (int i = 0; i < n->nsubregions(); ++i) {
-            auto sr = n->subregion(i);
-            result += indent(depth);
-            if (i != 0) {
-                result += "else ";
-            }
-            // TODO: width
-            result += "when eq(" + get_port_name(n->predicate()->origin()) + ", UInt<32>(" + jive::detail::strfmt(i) +
-                    "):\n";
-            for (int j = 0; j < sr->narguments(); ++j) {
-                result += indent(depth + 1) + "node " + get_port_name(sr->argument(j)) + " = " +
-                          get_port_name(sr->argument(j)->input()->origin()) + "\n";
-            }
-            for (const auto &node : sr->nodes) {
-                result += node_to_string(&node, depth + 1);
-            }
-            for (int j = 0; j < sr->nresults(); ++j) {
-                result += indent(depth + 1) + get_port_name(sr->result(j)->output()) + " <= " +
-                          get_port_name(sr->result(j)->origin()) + "\n";
-            }
+        for (int i = 0; i < n->noutputs(); ++i) {
+            module << indent(2) << "when o" << (i) << ".valid:\n";
+            module << indent(3) << "o" << (i) << "_processed_reg <= UInt<1>(1)\n";
         }
-        result += indent(depth) + " ; end " + n->operation().debug_string() + "\n";
-        return result;
+
+        module << indent(2) << "when i0.valid:\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
+        module << indent(3) << "pred_data_reg <= i0.data\n";
+
+        for (size_t i = 0; i < n->nentryvars(); ++i) {
+            module << indent(2) << "when i" << (i + 1) << ".valid:\n";
+            module << indent(3) << "e" << i << "_valid_reg <= UInt<1>(1)\n";
+            module << indent(3) << "e" << i << "_data_reg <= i" << (i + 1) << ".data\n";
+        }
+
+        std::string all_processed = "UInt<1>(1)"; // True by default
+        for (size_t i = 0; i < n->nexitvars(); ++i) {
+            all_processed = "and(" + all_processed + ", o" + jive::detail::strfmt(i) + "_processed_reg)";
+        }
+        module << indent(2) << "node all_processed = " << all_processed << "\n";
+        module << indent(2) << "when all_processed:\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
+        for (size_t i = 0; i < n->nentryvars(); ++i) {
+            module << indent(3) << "e" << i << "_valid_reg <= UInt<1>(0)\n";
+        }
+        for (int i = 0; i < n->noutputs(); ++i) {
+            module << indent(3) << "o" << (i) << "_processed_reg <= UInt<1>(0)\n";
+        }
+
+        // TODO: set pred and processed
+
+        modules[module_index] = module.str();
+        return module_name;
     }
 
     std::string theta_node_to_string(const int depth, const jive::theta_node *n) {
-        std::string result;
-        result += indent(depth) + " ; " + n->operation().debug_string() + "\n";
-        for (int i = 0; i < n->noutputs(); ++i) {
-            auto out = n->output(i);
-            if (port_declared.find(out) == port_declared.end()) {
-                result += indent(depth) + "wire " + get_port_name(out) + ": " + to_firrtl_type(&out->type()) + "\n";
-                port_declared.insert(out);
-            }
-        }
+        auto module_name = "theta_mod" + jive::detail::strfmt(modules.size());
+        auto module_index = modules.size();
+        modules.emplace_back(); // need to preserve spot to avoid name collisions
+        std::ostringstream module;
         auto sr = n->subregion();
-        for (int j = 0; j < sr->narguments(); ++j) {
-            result += indent(depth + 1) + "node " + get_port_name(sr->argument(j)) + " = " +
-                      get_port_name(sr->argument(j)->input()->origin()) + "\n";
+        module << indent(1) << "module " << module_name << ":\n";
+        // io
+        module << indent(2) + "; io" + "\n";
+        module << indent(2) + "input clk: Clock" + "\n";
+        module << indent(2) + "input reset: UInt<1>" + "\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module << indent(2) << "input i" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
+                   to_firrtl_type(&n->input(i)->type()) + "}" + "\n";
         }
-        for (const auto &node : sr->nodes) {
-            result += node_to_string(&node, depth + 1);
+        for (size_t i = 0; i < n->noutputs(); ++i) {
+            module << indent(2) << "output o" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
+                   to_firrtl_type(&n->output(i)->type()) << "}" << "\n";
         }
-        for (int j = 0; j < sr->nresults(); ++j) {
-            result += indent(depth + 1) + get_port_name(sr->result(j)->output()) + " <= " +
-                      get_port_name(sr->result(j)->origin()) + "\n";
+        // registers
+        module << indent(2) << "; registers\n";
+        module << indent(2) << "reg looping_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module << indent(2) << "reg i" << i << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+            module << indent(2) << "i" << i << ".ready <= " << i << "_processed_reg\n";
         }
-        result += indent(depth) + " ; end " + n->operation().debug_string() + "\n";
-        return result;
+        for (int i = 0; i < sr->nresults(); ++i) {
+            module << indent(2) + "reg o" << i << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+            module << indent(2) + "reg o" << i << "_data_reg: "<< to_firrtl_type(&sr->result(i)->type()) <<", clk\n";
+        }
+        // instances
+        module << indent(2) << "; instances" << "\n";
+        auto sr_module_name = subregion_to_string(sr);
+        module << indent(2) << "inst sr of " << sr_module_name << "\n";
+        module << indent(2) << "sr.clk <= clk\n";
+        module << indent(2) << "sr.reset <= reset\n";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            module << indent(2) << "sr.i" << (i) << ".valid <= i.valid\n";
+            module << indent(2) << "sr.i" << (i) << ".data <= i.data" << jive::detail::strfmt(i) << "\n";
+        }
+
+        for (size_t i = 0; i < n->ninputs(); ++i) {
+            module << indent(2) << "when i" << (i) << ".valid:\n";
+            module << indent(3) << "e" << i << "_valid_reg <= UInt<1>(1)\n";
+            module << indent(3) << "e" << i << "_data_reg <= i" << (i) << ".data\n";
+        }
+        modules[module_index] = module.str();
+        return module_name;
     }
 
     std::string
     node_to_string(const jive::node *node, const int depth) {
         if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
-            return simple_node_to_string(depth, n);
-        } else if (auto n = dynamic_cast<const jive::gamma_node *>(node)){
-            return gamma_node_to_string(depth, n);
+            return simple_node_to_string(n);
+        } else if (auto n = dynamic_cast<const jive::gamma_node *>(node)) {
+            return gamma_node_to_string(n);
         } else if (auto n = dynamic_cast<const jive::theta_node *>(node)) {
             return theta_node_to_string(depth, n);
         } else {
@@ -283,26 +469,150 @@ private:
     }
 
     std::string
-    hls_lambda(const jlm::lambda::node *ln) {
-        std::string result;
-        auto name = get_port_name(ln->output());
-        auto sr = ln->subregion();
-        result += indent(0) + "circuit " + name + ":\n";
-        result += indent(1) + "module " + name + ":\n";
+    subregion_to_string(const jive::region *sr) {
+        auto module_name = "subregion_mod" + jive::detail::strfmt(modules.size());
+        auto module_index = modules.size();
+        modules.emplace_back(); // need to preserve spot to avoid name collisions
+        std::string module = indent(1) + "module " + module_name + ":\n";
+        // io
+        module += indent(2) + "; io" + "\n";
+        module += indent(2) + "input clk: Clock" + "\n";
+        module += indent(2) + "input reset: UInt<1>" + "\n";
         for (size_t i = 0; i < sr->narguments(); ++i) {
-            auto a = sr->argument(i);
-            result += indent(2) + "input " + get_port_name(a) + ": " + to_firrtl_type(&a->type()) + "\n";
-            port_declared.insert(a);
+            module +=
+                    indent(2) + "input i" + jive::detail::strfmt(i) + ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
+                    to_firrtl_type(&sr->argument(i)->type()) + "}" + "\n";
         }
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            auto o = sr->result(i);
-            result += indent(2) + "output " + get_port_name(o->origin()) + ": " + to_firrtl_type(&o->type()) + "\n";
-            port_declared.insert(o->origin());
+            module += indent(2) + "output o" + jive::detail::strfmt(i) +
+                      ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
+                      to_firrtl_type(&sr->result(i)->type()) + "}" + "\n";
+        }
+        module += indent(2) + "; instances" + "\n";
+        std::unordered_map<jive::output *, std::string> out_port_map;
+        std::unordered_map<std::string, std::vector<std::string>> handshake_map;
+        for (int i = 0; i < sr->narguments(); ++i) {
+            out_port_map[sr->argument(i)] = "i" + jive::detail::strfmt(i);
         }
         for (const auto &node : sr->nodes) {
-            result += node_to_string(&node, 2);
+            auto node_module = node_to_string(&node, 2);
+            auto inst_name = node_module + "_inst";
+            module += indent(2) + "inst " + inst_name + " of " + node_module + "\n";
+            module += indent(2) + inst_name + ".clk <= clk\n";
+            module += indent(2) + inst_name + ".reset <= reset\n";
+            for (int i = 0; i < node.ninputs(); ++i) {
+                auto in_name = inst_name + ".i" + jive::detail::strfmt(i);
+                auto origin = out_port_map[node.input(i)->origin()];
+                module += indent(2) + in_name + ".data <= " + origin + ".data\n";
+                module += indent(2) + in_name + ".valid <= " + origin + ".valid\n";
+                auto f = handshake_map.find(origin);
+                if (f == handshake_map.end()) {
+                    handshake_map[origin] = std::vector<std::string>(1, in_name);
+                } else {
+                    f->second.push_back(in_name);
+                }
+            }
+            for (int i = 0; i < node.noutputs(); ++i) {
+                out_port_map[node.output(i)] = inst_name + ".o" + jive::detail::strfmt(i);
+            }
         }
-        return result;
+        for (int i = 0; i < sr->nresults(); ++i) {
+            auto origin = out_port_map[sr->result(i)->origin()];
+            auto result = "o" + jive::detail::strfmt(i);
+            auto f = handshake_map.find(origin);
+            if (f == handshake_map.end()) {
+                handshake_map[origin] = std::vector<std::string>(1, result);
+            } else {
+                f->second.push_back(result);
+            }
+            module += indent(2) + result + ".data <= " + origin + ".data\n";
+            module += indent(2) + result + ".valid <= " + origin + ".valid\n";
+        }
+        for (auto pair: handshake_map) {
+            auto origin = pair.first;
+            std::string users_ready = "UInt<1>(1)";
+            for (auto user: pair.second) {
+                users_ready = "and(" + users_ready + ", " + user + ".ready)";
+            }
+            module += indent(2) + origin + ".ready <= " + users_ready + "\n";
+        }
+
+        modules[module_index] = module;
+        return module_name;
+    }
+
+    std::string
+    lambda_node_to_string(const jlm::lambda::node *ln) {
+        auto module_name = ln->name() + "_lambda_mod";
+        auto sr = ln->subregion();
+        std::string module = indent(1) + "module " + module_name + ":\n";
+        // io
+        module += indent(2) + "; io" + "\n";
+        module += indent(2) + "input clk: Clock" + "\n";
+        module += indent(2) + "input reset: UInt<1>" + "\n";
+        module += indent(2) + "input i: {flip ready: UInt<1>, valid: UInt<1>";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            module += ", data" + jive::detail::strfmt(i) + ": " +
+                      to_firrtl_type(&sr->argument(i)->type());
+        }
+        module += "}\n";
+        module += indent(2) + "output o: {flip ready: UInt<1>, valid: UInt<1>";
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += ", data" + jive::detail::strfmt(i) + ": " +
+                      to_firrtl_type(&sr->result(i)->type());
+        }
+        module += "}\n";
+        // registers
+        module += indent(2) + "; registers" + "\n";
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += indent(2) + "reg o" + jive::detail::strfmt(i) +
+                      "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
+            module += indent(2) + "reg o" + jive::detail::strfmt(i) + "_data_reg: " +
+                      to_firrtl_type(&sr->result(i)->type()) + ", clk" + "\n";
+        }
+        module += indent(2) + "; instances" + "\n";
+        auto sr_module_name = subregion_to_string(sr);
+        module += indent(2) + "inst sr of " + sr_module_name + "\n";
+        module += indent(2) + "sr.clk <= clk\n";
+        module += indent(2) + "sr.reset <= reset\n";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            module += indent(2) + "sr.i" + jive::detail::strfmt(i) + ".valid <= i.valid\n";
+            module += indent(2) + "sr.i" + jive::detail::strfmt(i) + ".data <= i.data" + jive::detail::strfmt(i) + "\n";
+        }
+        // logic
+        module += indent(2) + "; logic" + "\n";
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += indent(2) + "sr.o" + jive::detail::strfmt(i) + ".ready <= not(o" + jive::detail::strfmt(i) +
+                      "_valid_reg)" + "\n";
+        }
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += indent(2) + "when sr.o" + jive::detail::strfmt(i) + ".valid:" + "\n";
+            module += indent(3) + "o" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
+            module += indent(3) + "o" + jive::detail::strfmt(i) + "_data_reg <= sr.o" + jive::detail::strfmt(i) +
+                      ".data" + "\n";
+        }
+        std::string outputs_valids = "UInt<1>(1)"; // True by default
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            outputs_valids = "and(" + outputs_valids + ", o" + jive::detail::strfmt(i) + "_valid_reg)";
+        }
+        module += indent(2) + "node outputs_valid = " + outputs_valids + "\n";
+        module += indent(2) + "o.valid <= outputs_valid\n";
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += indent(2) + "o.data" + jive::detail::strfmt(i) + " <= sr.o" + jive::detail::strfmt(i) +
+                      ".data" + "\n";
+        }
+        module += indent(2) + "when and(o.valid, o.ready):\n";
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            module += indent(3) + "o" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(0)" + "\n";
+        }
+        std::string inputs_ready = "UInt<1>(1)"; // True by default
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            inputs_ready = "and(" + inputs_ready + ", sr.i" + jive::detail::strfmt(i) + ".ready)";
+        }
+        module += indent(2) + "node inputs_ready = " + inputs_ready + "\n";
+        module += indent(2) + "i.ready <= inputs_ready\n";
+        modules.push_back(module);
+        return module_name;
     }
 };
 
@@ -314,7 +624,6 @@ main(int argc, char **argv) {
     llvm::LLVMContext ctx;
     llvm::SMDiagnostic err;
     auto lm = llvm::parseIRFile(flags.file, err, ctx);
-
     if (!lm) {
         err.print(argv[0], llvm::errs());
         exit(1);
@@ -330,6 +639,6 @@ main(int argc, char **argv) {
     dne.run(*rm, sd);
     jive::view(rm->graph()->root(), stdout);
     SimpleHLS hls;
-    hls.run(*rm);
+    hls.run(*rm, lm.get());
     return 0;
 }

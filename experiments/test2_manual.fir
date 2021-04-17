@@ -49,3 +49,83 @@ circuit lambda0:
         output o1: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
         output o2: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
         output o3: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+
+    module neq0:
+        ; io
+        input clk: Clock
+        input reset: UInt<1>
+        input i0: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        input i1: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        output o0: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        ; registers
+        reg i0_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))
+        reg i0_data_reg: UInt<32>, clk ; no need for reset for data?
+        reg i1_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))
+        reg i1_data_reg: UInt<32>, clk ; no need for reset for data?
+        ; logic
+        o0.data <= neq(i0_data_reg, i1_data_reg)
+        ; handshaking
+        i0.ready <= not(i0_valid_reg)
+        i1.ready <= not(i1_valid_reg)
+        node inputs_valid = and(i0_valid_reg, i1_valid_reg)
+        o0.valid <= and(inputs_valid, o0.ready)
+        when o0.valid:
+            i0_valid_reg <= UInt<1>(0)
+            i1_valid_reg <= UInt<1>(0)
+        when i0.valid:
+            i0_valid_reg <= UInt<1>(1)
+            i0_data_reg <= i0.data
+        when i1.valid:
+            i1_valid_reg <= UInt<1>(1)
+            i1_data_reg <= i1.data
+
+    module theta0:
+        ; io
+        input clk: Clock
+        input reset: UInt<1>
+        input i0: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        input i1: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        input i2: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        input i3: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        input i4: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        input i5: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        output o0: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        output o1: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        output o2: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<32>}
+        output o3: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        output o4: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        output o5: {flip ready: UInt<1>, valid: UInt<1>, data: UInt<1>}
+        ; instances
+        inst neq0_0 of neq0
+        neq0_0.clk <= clk
+        neq0_0.reset <= reset
+        neq0_0.i0.data <= i0.data
+        neq0_0.i0.valid <= i0.valid
+        neq0_0.i1.data <= i1.data
+        neq0_0.i1.valid <= i1.valid
+        inst gamma0_0 of gamma0
+        gamma0_0.clk <= clk
+        gamma0_0.reset <= reset
+        gamma0_0.i0.data <= neq0_0.o0.data
+        gamma0_0.i0.valid <= neq0_0.o0.valid
+        gamma0_0.i1.data <= i0.data
+        gamma0_0.i1.valid <= i0.valid
+        gamma0_0.i2.data <= i1.data
+        gamma0_0.i2.valid <= i1.valid
+        gamma0_0.i3.data <= i2.data
+        gamma0_0.i3.valid <= i2.valid
+        gamma0_0.i4.data <= i3.data
+        gamma0_0.i4.valid <= i3.valid
+        gamma0_0.i5.data <= i4.data
+        gamma0_0.i5.valid <= i4.valid
+        gamma0_0.i6.data <= i5.data
+        gamma0_0.i6.valid <= i5.valid
+        ; handshaking
+        i0.ready <= and(neq0_0.i0.ready, gamma0_0.i1.ready)
+        i1.ready <= and(neq0_0.i1.ready, gamma0_0.i2.ready)
+        i2.ready <= UInt<1>(1)
+        i3.ready <= and(gamma0_0.i3.ready, )
+
+
+
+
