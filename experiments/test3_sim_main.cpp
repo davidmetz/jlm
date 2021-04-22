@@ -9,6 +9,8 @@
 #include <verilated.h>
 #include "verilated_fst_c.h"
 
+#define V_NAME Vtest3
+#define TIMEOUT 300
 // Include model header, generated from Verilating "top.v"
 #include "Vtest3.h"
 #include <cassert>
@@ -27,7 +29,7 @@ vluint64_t main_time = 0;
 double sc_time_stamp() {
     return main_time;  // Note does conversion to real, to match SystemC
 }
-Vtest3* top;
+V_NAME* top;
 VerilatedFstC* tfp;
 bool terminate = false;
 void term(int signum)
@@ -51,7 +53,7 @@ void verilator_init(int argc, char** argv){
     Verilated::commandArgs(argc, argv);
 
     // Construct the Verilated model, from Vtop.h generated from Verilating "top.v"
-    top = new Vtest3;  // Or use a const unique_ptr, or the VL_UNIQUE_PTR wrapper
+    top = new V_NAME;  // Or use a const unique_ptr, or the VL_UNIQUE_PTR wrapper
     tfp = new VerilatedFstC;
     top->trace(tfp, 99);   // Trace 99 levels of hierarchy
     tfp->open("trace.fst");
@@ -126,21 +128,29 @@ int hls_verilator_test_func(int a, int b){
     top->i_data0 = a;
     top->i_data1 = b;
     int start = main_time;
-    while(!top->i_ready){
-        std::cout << "i_ready not set\n";
+    for(int i=0; i<TIMEOUT && !top->i_ready; i++){
         clock_cycle();
-    };
+    }
+    if(!top->i_ready){
+        std::cout << "i_ready not set\n";
+        verilator_finish();
+        exit(-1);
+    }
     top->i_valid = 1;
     top->o_ready = 1;
     clock_cycle();
     top->i_valid = 0;
     top->i_data0 = 0;
     top->i_data1 = 0;
-    while (!top->o_valid){
-        std::cout << "o_valid not set\n";
+    for(int i=0; i<TIMEOUT && !top->o_valid; i++){
         clock_cycle();
     }
-    std::cout << "finished - took " << (main_time-start) << "half-cycles\n";
+    if(!top->o_valid){
+        std::cout << "o_valid not set\n";
+        verilator_finish();
+        exit(-1);
+    }
+    std::cout << "finished - took " << (main_time-start) << "cycles\n";
     int result = top->o_data0;
     assert(result==test(a,b));
 //    clock_cycle();

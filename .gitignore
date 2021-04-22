@@ -1,7 +1,10 @@
 *.la
 *.a
 *.o
+*.ll
+*.fst
 utests.log
+.idea
 ctests.log
 check.log
 /bin

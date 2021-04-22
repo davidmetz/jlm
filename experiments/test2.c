@@ -10,5 +10,8 @@ unsigned int test(unsigned int a, unsigned int b){
         else
             b -= a;
     }
+//    do{
+//        a--;
+//    } while (a!=0);
     return a;
 }
