@@ -3,6 +3,7 @@
 *.o
 *.ll
 *.fst
+*.v
 utests.log
 .idea
 ctests.log
