@@ -12,3 +12,4 @@ check.log
 tests/test-runner
 .Makefile.override
 libjlc/include/jlc/llvmpaths.hpp
+/experiments/obj_dir
