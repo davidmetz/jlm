@@ -34,6 +34,10 @@
 #include <jlm/ir/operators.hpp>
 #include <jive/arch/load.hpp>
 #include <jive/arch/store.hpp>
+#include <jive/rvsdg/traverser.hpp>
+#include <set>
+#include <jlm/opt/inversion.hpp>
+#include <jlm/opt/cne.hpp>
 #include "../tests/test-operation.hpp"
 #include "../tests/test-types.hpp"
 
@@ -113,9 +117,574 @@ isForbiddenChar(char c) {
     return true;
 }
 
-class SimpleHLS {
+namespace hls {
+namespace loop {
+
+}
+
+    class branch_op final : public jive::simple_op {
+    public:
+        virtual
+        ~branch_op() {}
+
+        branch_op(size_t nalternatives, const jive::type &type)
+                : jive::simple_op({jive::ctltype(nalternatives), type}, std::vector<jive::port>(nalternatives, type)) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const branch_op *>(&other);
+            // check predicate and value
+            return ot
+                   && ot->argument(0).type() == argument(0).type()
+                   && ot->result(0).type() == result(0).type();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_BRANCH";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new branch_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &predicate,
+                jive::output &value
+        ) {
+            auto ctl = dynamic_cast<const jive::ctltype *>(&predicate.type());
+            if (!ctl)
+                throw jlm::error("Predicate needs to be a ctltype.");
+
+            auto region = predicate.region();
+            branch_op op(ctl->nalternatives(), value.type());
+            return jive::simple_node::create_normalized(region, op, {&predicate, &value});
+        }
+    };
+
+    class fork_op final : public jive::simple_op {
+    public:
+        virtual
+        ~fork_op() {}
+
+        fork_op(size_t nalternatives, const jive::type &type)
+                : jive::simple_op({type}, std::vector<jive::port>(nalternatives, type)) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const branch_op *>(&other);
+            // check predicate and value
+            return ot
+                   && ot->argument(0).type() == argument(0).type()
+                   && ot->narguments() == narguments();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_FORK";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new fork_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                size_t nalternatives,
+                jive::output &value
+        ) {
+
+            auto region = value.region();
+            fork_op op(nalternatives, value.type());
+            return jive::simple_node::create_normalized(region, op, {&value});
+        }
+    };
+
+    class merge_op final : public jive::simple_op {
+    public:
+        virtual
+        ~merge_op() {}
+
+        merge_op(size_t nalternatives, const jive::type &type)
+                : jive::simple_op(std::vector<jive::port>(nalternatives, type), {type}) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const merge_op *>(&other);
+            return ot
+                   && ot->narguments() == narguments()
+                   && ot->argument(0).type() == argument(0).type();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_MERGE";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new merge_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                const std::vector<jive::output *> &alternatives
+        ) {
+            if (alternatives.empty())
+                throw jlm::error("Insufficient number of operands.");
+
+
+            auto region = alternatives.front()->region();
+            merge_op op(alternatives.size(), alternatives.front()->type());
+            return jive::simple_node::create_normalized(region, op, alternatives);
+        }
+    };
+
+    class mux_op final : public jive::simple_op {
+    public:
+        virtual
+        ~mux_op() {}
+
+        mux_op(size_t nalternatives, const jive::type &type, bool discarding)
+                : jive::simple_op(create_portvector(nalternatives, type), {type}), discarding(discarding) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const mux_op *>(&other);
+            // check predicate and value
+            return ot
+                   && ot->argument(0).type() == argument(0).type()
+                   && ot->result(0).type() == result(0).type()
+                   && ot->discarding == discarding;
+        }
+
+        std::string
+        debug_string() const override {
+            return discarding ? "HLS_DMUX" : "HLS_NDMUX";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new mux_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &predicate,
+                const std::vector<jive::output *> &alternatives,
+                bool discarding
+        ) {
+            if (alternatives.empty())
+                throw jlm::error("Insufficient number of operands.");
+            auto ctl = dynamic_cast<const jive::ctltype *>(&predicate.type());
+            if (!ctl)
+                throw jlm::error("Predicate needs to be a ctltype.");
+            if (alternatives.size() != ctl->nalternatives())
+                throw jlm::error("Alternatives and predicate do not match.");
+
+
+            auto region = predicate.region();
+            auto operands = std::vector<jive::output *>();
+            operands.push_back(&predicate);
+            operands.insert(operands.end(), alternatives.begin(), alternatives.end());
+            mux_op op(alternatives.size(), alternatives.front()->type(), discarding);
+            return jive::simple_node::create_normalized(region, op, operands);
+        }
+
+    private:
+        bool discarding;
+
+        static std::vector<jive::port>
+        create_portvector(size_t nalternatives, const jive::type &type) {
+            auto vec = std::vector<jive::port>(nalternatives + 1, type);
+            vec[0] = jive::ctltype(nalternatives);
+            return vec;
+        }
+    };
+
+    class sink_op final : public jive::simple_op {
+    public:
+        virtual
+        ~sink_op() {}
+
+        sink_op(const jive::type &type)
+                : jive::simple_op({type}, {}) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const sink_op *>(&other);
+            return ot && ot->argument(0).type() == argument(0).type();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_SINK";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new sink_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &value
+        ) {
+            auto region = value.region();
+            sink_op op(value.type());
+            return jive::simple_node::create_normalized(region, op, {&value});
+        }
+    };
+
+    class dummy_op final : public jive::simple_op {
+    public:
+        virtual
+        ~dummy_op() {}
+
+        dummy_op(const jive::type &type)
+                : jive::simple_op({}, {type}) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const dummy_op *>(&other);
+            return ot && ot->result(0).type() == result(0).type();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_DUMMY";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new dummy_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &value,
+                jive::region *region
+        ) {
+            dummy_op op(value.type());
+            return jive::simple_node::create_normalized(region, op, {});
+        }
+    };
+
+    class predicate_buffer_op final : public jive::simple_op {
+    public:
+        virtual
+        ~predicate_buffer_op() {}
+
+        predicate_buffer_op(const jive::ctltype &type)
+                : jive::simple_op({type}, {type}) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const predicate_buffer_op *>(&other);
+            return ot;
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_PRED_BUF";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new predicate_buffer_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &predicate
+        ) {
+            auto region = predicate.region();
+            auto ctl = dynamic_cast<const jive::ctltype *>(&predicate.type());
+            if (!ctl)
+                throw jlm::error("Predicate needs to be a ctltype.");
+            predicate_buffer_op op(*ctl);
+            return jive::simple_node::create_normalized(region, op, {&predicate});
+        }
+    };
+}
+
+
+static void hls_gamma_conv_nonspec(jive::gamma_node *gamma) {
+    jive::substitution_map smap;
+    // create a branch for each entryvar and map the corresponding argument of each subregion to an output of the branch
+    auto pro = gamma->predicate()->origin();
+    for (size_t i = 0; i < gamma->nentryvars(); i++) {
+        auto envo = gamma->entryvar(i)->origin();
+        auto bros = hls::branch_op::create(*pro, *envo);
+        for (size_t s = 0; s < gamma->nsubregions(); s++) {
+            smap.insert(gamma->subregion(s)->argument(i), bros[s]);
+        }
+    }
+    // copy each of the subregions
+    for (size_t s = 0; s < gamma->nsubregions(); s++) {
+        gamma->subregion(s)->copy(gamma->region(), smap, false, false);
+    }
+    for (size_t i = 0; i < gamma->nexitvars(); i++) {
+        std::vector<jive::output *> alternatives;
+        for (size_t s = 0; s < gamma->nsubregions(); s++) {
+            alternatives.push_back(smap.lookup(gamma->subregion(s)->result(i)->origin()));
+        }
+        // create merge nodes for each exitvar
+        auto merge = hls::merge_op::create(alternatives);
+        // divert users of exitvars to merge instead
+        gamma->exitvar(i)->divert_users(merge[0]);
+    }
+    remove(gamma);
+}
+
+
+static void
+hls_gamma_conv(jive::region *region) {
+    for (auto &node : jive::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+            for (size_t n = 0; n < structnode->nsubregions(); n++)
+                hls_gamma_conv(structnode->subregion(n));
+            auto gamma = dynamic_cast<jive::gamma_node *>(node);
+            if (gamma) {
+                // TODO: add speculative branch
+                hls_gamma_conv_nonspec(gamma);
+            }
+        }
+    }
+}
+
+static void
+hls_gamma_conv(jlm::rvsdg_module &rm) {
+    auto &graph = *rm.graph();
+    auto root = graph.root();
+    hls_gamma_conv(root);
+}
+
+static void hls_theta_conv(jive::theta_node *theta) {
+    jive::substitution_map smap;
+    // create a ndmux for each entryvar with a dummy_op and map the corresponding argument of each subregion to an output of the branch
+    std::vector<jive::output *> dummys;
+    auto dummy_pred = hls::dummy_op::create(*theta->predicate()->origin(), theta->region())[0];
+    auto pred_buffer = hls::predicate_buffer_op::create(*dummy_pred)[0];
+    auto pro = theta->predicate()->origin();
+    for (size_t i = 0; i < theta->ninputs(); i++) {
+        auto envo = theta->input(i)->origin();
+        auto dummy = hls::dummy_op::create(*theta->output(i), theta->region())[0];
+        dummys.push_back(dummy);
+        auto muxos = hls::mux_op::create(*pred_buffer, {envo, dummy}, false);
+        smap.insert(theta->subregion()->argument(i), muxos[0]);
+    }
+    // copy the subregion
+    theta->subregion()->copy(theta->region(), smap, false, false);
+
+    // replace dummy_pred with origin of predicate
+    dummy_pred->divert_users(smap.lookup(pro));
+    remove(producer(dummy_pred));
+    assert(theta->ninputs() == theta->noutputs());
+    for (size_t i = 0; i < theta->noutputs(); i++) {
+        // create branch node for each output
+        auto branch = hls::branch_op::create(*smap.lookup(pro),
+                                             *smap.lookup(theta->subregion()->result(i + 1)->origin()));
+        // divert users of outputs to branch instead
+        theta->output(i)->divert_users(branch[0]);
+        // replace dummy node with branch
+        std::cout << "branch type " << branch[1]->type().debug_string() << "\n";
+        std::cout << "dummy type " << dummys[i]->type().debug_string() << "\n";
+        dummys[i]->divert_users(branch[1]);
+        remove(producer(dummys[i]));
+    }
+    remove(theta);
+}
+
+
+static void
+hls_theta_conv(jive::region *region) {
+    for (auto &node : jive::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+            for (size_t n = 0; n < structnode->nsubregions(); n++)
+                hls_theta_conv(structnode->subregion(n));
+            auto theta = dynamic_cast<jive::theta_node *>(node);
+            if (theta) {
+                // TODO: add speculative branch
+                hls_theta_conv(theta);
+            }
+        }
+    }
+}
+
+static void
+hls_theta_conv(jlm::rvsdg_module &rm) {
+    auto &graph = *rm.graph();
+    auto root = graph.root();
+    hls_theta_conv(root);
+}
+
+
+static void
+hls_add_sinks(jive::region *region) {
+    for (int i = 0; i < region->narguments(); ++i) {
+        auto arg = region->argument(i);
+        if (!arg->nusers()) {
+            hls::sink_op::create(*arg);
+        }
+    }
+    for (auto &node : jive::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+            for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                hls_add_sinks(structnode->subregion(n));
+            }
+        }
+
+        for (int i = 0; i < node->noutputs(); ++i) {
+            auto out = node->output(i);
+            if (!out->nusers()) {
+                hls::sink_op::create(*out);
+            }
+        }
+    }
+}
+
+static void
+hls_add_sinks(jlm::rvsdg_module &rm) {
+    auto &graph = *rm.graph();
+    auto root = graph.root();
+    hls_add_sinks(root);
+}
+
+static void
+hls_add_forks(jive::region *region) {
+    for (size_t i = 0; i < region->narguments(); ++i) {
+        auto arg = region->argument(i);
+        if (arg->nusers() > 1) {
+            std::vector<jive::input *> users;
+            users.insert(users.begin(), arg->begin(), arg->end());
+            auto fork = hls::fork_op::create(arg->nusers(), *arg);
+            for (size_t j = 0; j < users.size(); j++) {
+                users[j]->divert_to(fork[j]);
+            }
+        }
+    }
+    for (auto &node : jive::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+            for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                hls_add_forks(structnode->subregion(n));
+            }
+        }
+        // TODO: simplify if forks depend on a fork
+        for (size_t i = 0; i < node->noutputs(); ++i) {
+            auto out = node->output(i);
+            if (out->nusers() > 1) {
+                std::vector<jive::input *> users;
+                users.insert(users.begin(), out->begin(), out->end());
+                auto fork = hls::fork_op::create(out->nusers(), *out);
+                for (size_t j = 0; j < users.size(); j++) {
+                    users[j]->divert_to(fork[j]);
+                }
+            }
+        }
+    }
+}
+
+static void
+hls_add_forks(jlm::rvsdg_module &rm) {
+    auto &graph = *rm.graph();
+    auto root = graph.root();
+    hls_add_forks(root);
+}
+
+
+static bool is_passthrough(const jive::argument *arg) {
+    if (arg->nusers() == 1) {
+        auto res = dynamic_cast<jive::result *>(*arg->begin());
+        // used only by a result
+        if (res) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void remove_passthrough(const jive::argument *arg) {
+    auto res = dynamic_cast<jive::result *>(*arg->begin());
+    std::cout << arg->region()->node()->operation().debug_string() <<"\n";
+    std::cout << arg->region()->node()->ninputs() <<"\n";
+    if(!is<jlm::lambda::operation>(arg->region()->node())) {
+        auto origin = arg->input()->origin();
+        // divert users of output to origin of input
+        arg->region()->node()->output(res->output()->index())->divert_users(origin);
+        arg->region()->node()->remove_input(arg->input()->index());
+        arg->region()->node()->remove_output(res->output()->index());
+    }
+    // TODO: handle lambda properly
+    arg->region()->remove_result(res->index());
+    arg->region()->remove_argument(arg->index());
+}
+
+static void
+hls_remove_unused_state(jive::region *region, bool can_remove_arguments = true) {
+    // process children first so that unnecessary users get removed
+    for (auto &node : jive::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+            if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
+                // process subnodes first
+                for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                    hls_remove_unused_state(structnode->subregion(n), false);
+                }
+                // remove inputs in reverse
+                for (int i = gn->nentryvars() - 1; i >= 0; --i) {
+                    bool can_remove = true;
+                    for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                        auto sr = structnode->subregion(n);
+                        can_remove &= is_passthrough(sr->argument(i));
+                    }
+                    if (can_remove) {
+                        auto origin = gn->entryvar(i)->origin();
+                        // remove input
+                        gn->remove_input(i+1);
+                        // divert users of output to origin of input
+                        auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(i)->begin())->index();
+                        gn->output(res_index)->divert_users(origin);
+                        gn->remove_output(res_index);
+                        for (int j = 0; j < gn->nsubregions(); ++j) {
+                            gn->subregion(j)->remove_result(res_index);
+                            gn->subregion(j)->remove_argument(i);
+                        }
+                    }
+                }
+            } else {
+                assert(structnode->nsubregions() == 1);
+                hls_remove_unused_state(structnode->subregion(0));
+            }
+        }
+    }
+    if (can_remove_arguments) {
+        // check if an input is passed through unnecessarily
+        for (int i = region->narguments()-1; i >= 0 ; --i) {
+            auto arg = region->argument(i);
+            if (is_passthrough(arg)) {
+                std::cout << "region:\n";
+                jive::view(region, stdout);
+                std::cout << "removing arg " << i <<  " of type " << arg->type().debug_string() << "\n";
+                remove_passthrough(arg);
+            }
+        }
+    }
+}
+
+static void
+hls_remove_unused_state(jlm::rvsdg_module &rm) {
+    auto &graph = *rm.graph();
+    auto root = graph.root();
+    hls_remove_unused_state(root);
+}
+
+
+class FirrtlHLS {
 public:
-    SimpleHLS() {
+    FirrtlHLS() {
     }
 
     void run(jlm::rvsdg_module &rm, llvm::Module *lm) {
@@ -431,7 +1000,8 @@ private:
                    "))";
         } else if (auto o = dynamic_cast<const jlm::sext_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
-            module << "asUInt(pad(asSInt(" + get_port_name(in0) + "_data_reg" + "), " + jive::detail::strfmt(o->ndstbits()) +"))";
+            module << "asUInt(pad(asSInt(" + get_port_name(in0) + "_data_reg" + "), " +
+                      jive::detail::strfmt(o->ndstbits()) + "))";
         } else if (auto o = dynamic_cast<const jlm::trunc_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             module << get_port_name(in0) + "_data_reg";
@@ -446,7 +1016,8 @@ private:
         } else if (auto o = dynamic_cast<const jive::bitslt_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "lt(asSInt(" + get_port_name(in0) + "_data_reg)" + ", asSInt(" + get_port_name(in1) + "_data_reg)" + ")";
+            module << "lt(asSInt(" + get_port_name(in0) + "_data_reg)" + ", asSInt(" + get_port_name(in1) +
+                      "_data_reg)" + ")";
         } else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
@@ -480,17 +1051,18 @@ private:
             auto in1 = n->input(1);
 //            std::cerr << in0->type().debug_string();
 //            std::cerr << in1->type().debug_string();
-            const auto* pt = &o->pointee_type();
+            const auto *pt = &o->pointee_type();
             int bits;
-            if(auto bt = dynamic_cast<const jive::bittype*>(pt)){
+            if (auto bt = dynamic_cast<const jive::bittype *>(pt)) {
                 bits = bt->nbits();
-            } else{
+            } else {
                 throw std::logic_error(pt->debug_string() + " pointer not implemented!");
             }
-            int bytes = bits/8;
+            int bytes = bits / 8;
             // TODO: fix
-            module << "add(" + get_port_name(in0) + "_data_reg" + ", mul(" + get_port_name(in1) + "_data_reg, UInt<64>(" + jive::detail::strfmt(bytes) +")))";
-        }else {
+            module << "add(" + get_port_name(in0) + "_data_reg" + ", mul(" + get_port_name(in1) +
+                      "_data_reg, UInt<64>(" + jive::detail::strfmt(bytes) + ")))";
+        } else {
             throw std::logic_error(n->operation().debug_string() + " not implemented!");
         }
         module << " ; " + n->operation().debug_string() + "\n";
@@ -582,10 +1154,11 @@ private:
                    << ")), pred_valid_reg)\n";
             for (size_t i = 0; i < sr->narguments(); ++i) {
                 module << indent(2) << "sr" << k << ".i" << i << ".valid <= and(and(and(e" << i
-                       << "_valid_reg, pred_match_" << k << "), sr" << k << ".i" << i << ".ready), not(e"<< i <<"_processed_reg))\n";
+                       << "_valid_reg, pred_match_" << k << "), sr" << k << ".i" << i << ".ready), not(e" << i
+                       << "_processed_reg))\n";
                 module << indent(2) << "sr" << k << ".i" << i << ".data <= e" << i << "_data_reg\n";
                 module << indent(2) << "when sr" << k << ".i" << i << ".valid:\n";
-                module << indent(3) << "e"<< i <<"_processed_reg <= UInt<1>(1)\n";
+                module << indent(3) << "e" << i << "_processed_reg <= UInt<1>(1)\n";
             }
 
             for (int i = 0; i < n->noutputs(); ++i) {
@@ -632,7 +1205,7 @@ private:
 
         std::vector<std::string> mem_nodes;
         for (size_t k = 0; k < n->nsubregions(); ++k) {
-            mem_nodes.push_back("sr"+jive::detail::strfmt(k));
+            mem_nodes.push_back("sr" + jive::detail::strfmt(k));
         }
         module << mux_mem(mem_nodes);
 
@@ -666,7 +1239,7 @@ private:
         for (size_t i = 0; i < n->ninputs(); ++i) {
             module << indent(2) << "reg i" << i
                    << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-//            module << indent(2) + "reg i" << i << "_data_reg: "<< to_firrtl_type(&n->input(i)->type()) <<", clk\n";
+//            module << indent(2) + "reg i" << i << "_data_reg: "<< to_dot_width(&n->input(i)->type()) <<", clk\n";
         }
         for (size_t i = 0; i < n->noutputs(); ++i) {
             module << indent(2) << "reg o" << i
@@ -1003,6 +1576,15 @@ private:
     }
 };
 
+
+void
+dump_xml(const std::string &source_file_name, std::unique_ptr<jlm::rvsdg_module> &rm, const std::string &suffix = "") {
+    std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + suffix + ".rvsdg";
+    auto xml_file = fopen(file_name.c_str(), "w");
+    jive::view_xml(rm->graph()->root(), xml_file);
+    fclose(xml_file);
+}
+
 int
 main(int argc, char **argv) {
     cmdflags flags;
@@ -1015,6 +1597,7 @@ main(int argc, char **argv) {
         err.print(argv[0], llvm::errs());
         exit(1);
     }
+    auto source_file_name = lm->getSourceFileName();
 
     /* LLVM to JLM pass */
     auto jm = jlm::convert_module(*lm);
@@ -1022,10 +1605,25 @@ main(int argc, char **argv) {
     auto rm = jlm::construct_rvsdg(*jm, flags.sd);
 
     jlm::dne dne;
+    jlm::cne cne;
+    jlm::tginversion tgi;
     jlm::stats_descriptor sd;
+    tgi.run(*rm, sd);
     dne.run(*rm, sd);
+    cne.run(*rm, sd);
+
+    dump_xml(source_file_name, rm);
     jive::view(rm->graph()->root(), stdout);
-    SimpleHLS hls;
-    hls.run(*rm, lm.get());
+    hls_remove_unused_state(*rm);
+//    hls_gamma_conv(*rm);
+
+//    hls_theta_conv(*rm);
+//    hls_add_sinks(*rm);
+//    hls_add_forks(*rm);
+    jive::view(rm->graph()->root(), stdout);
+    dump_xml(source_file_name, rm, "_hls");
+
+//    FirrtlHLS hls;
+//    hls.run(*rm, lm.get());
     return 0;
 }
