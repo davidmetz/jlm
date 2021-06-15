@@ -118,10 +118,6 @@ isForbiddenChar(char c) {
 }
 
 namespace hls {
-namespace loop {
-
-}
-
     class branch_op final : public jive::simple_op {
     public:
         virtual
@@ -294,8 +290,9 @@ namespace loop {
             return jive::simple_node::create_normalized(region, op, operands);
         }
 
-    private:
+
         bool discarding;
+    private:
 
         static std::vector<jive::port>
         create_portvector(size_t nalternatives, const jive::type &type) {
@@ -384,7 +381,7 @@ namespace loop {
         bool
         operator==(const jive::operation &other) const noexcept override {
             auto ot = dynamic_cast<const predicate_buffer_op *>(&other);
-            return ot;
+            return ot && ot->result(0).type() == result(0).type();
         }
 
         std::string
@@ -409,278 +406,357 @@ namespace loop {
             return jive::simple_node::create_normalized(region, op, {&predicate});
         }
     };
-}
 
+    class buffer_op final : public jive::simple_op {
+    public:
+        virtual
+        ~buffer_op() {}
 
-static void hls_gamma_conv_nonspec(jive::gamma_node *gamma) {
-    jive::substitution_map smap;
-    // create a branch for each entryvar and map the corresponding argument of each subregion to an output of the branch
-    auto pro = gamma->predicate()->origin();
-    for (size_t i = 0; i < gamma->nentryvars(); i++) {
-        auto envo = gamma->entryvar(i)->origin();
-        auto bros = hls::branch_op::create(*pro, *envo);
-        for (size_t s = 0; s < gamma->nsubregions(); s++) {
-            smap.insert(gamma->subregion(s)->argument(i), bros[s]);
-        }
-    }
-    // copy each of the subregions
-    for (size_t s = 0; s < gamma->nsubregions(); s++) {
-        gamma->subregion(s)->copy(gamma->region(), smap, false, false);
-    }
-    for (size_t i = 0; i < gamma->nexitvars(); i++) {
-        std::vector<jive::output *> alternatives;
-        for (size_t s = 0; s < gamma->nsubregions(); s++) {
-            alternatives.push_back(smap.lookup(gamma->subregion(s)->result(i)->origin()));
-        }
-        // create merge nodes for each exitvar
-        auto merge = hls::merge_op::create(alternatives);
-        // divert users of exitvars to merge instead
-        gamma->exitvar(i)->divert_users(merge[0]);
-    }
-    remove(gamma);
-}
+        buffer_op(const jive::type &type, size_t capacity)
+                : jive::simple_op({type}, {type}), capacity(capacity) {}
 
-
-static void
-hls_gamma_conv(jive::region *region) {
-    for (auto &node : jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-            for (size_t n = 0; n < structnode->nsubregions(); n++)
-                hls_gamma_conv(structnode->subregion(n));
-            auto gamma = dynamic_cast<jive::gamma_node *>(node);
-            if (gamma) {
-                // TODO: add speculative branch
-                hls_gamma_conv_nonspec(gamma);
-            }
-        }
-    }
-}
-
-static void
-hls_gamma_conv(jlm::rvsdg_module &rm) {
-    auto &graph = *rm.graph();
-    auto root = graph.root();
-    hls_gamma_conv(root);
-}
-
-static void hls_theta_conv(jive::theta_node *theta) {
-    jive::substitution_map smap;
-    // create a ndmux for each entryvar with a dummy_op and map the corresponding argument of each subregion to an output of the branch
-    std::vector<jive::output *> dummys;
-    auto dummy_pred = hls::dummy_op::create(*theta->predicate()->origin(), theta->region())[0];
-    auto pred_buffer = hls::predicate_buffer_op::create(*dummy_pred)[0];
-    auto pro = theta->predicate()->origin();
-    for (size_t i = 0; i < theta->ninputs(); i++) {
-        auto envo = theta->input(i)->origin();
-        auto dummy = hls::dummy_op::create(*theta->output(i), theta->region())[0];
-        dummys.push_back(dummy);
-        auto muxos = hls::mux_op::create(*pred_buffer, {envo, dummy}, false);
-        smap.insert(theta->subregion()->argument(i), muxos[0]);
-    }
-    // copy the subregion
-    theta->subregion()->copy(theta->region(), smap, false, false);
-
-    // replace dummy_pred with origin of predicate
-    dummy_pred->divert_users(smap.lookup(pro));
-    remove(producer(dummy_pred));
-    assert(theta->ninputs() == theta->noutputs());
-    for (size_t i = 0; i < theta->noutputs(); i++) {
-        // create branch node for each output
-        auto branch = hls::branch_op::create(*smap.lookup(pro),
-                                             *smap.lookup(theta->subregion()->result(i + 1)->origin()));
-        // divert users of outputs to branch instead
-        theta->output(i)->divert_users(branch[0]);
-        // replace dummy node with branch
-        std::cout << "branch type " << branch[1]->type().debug_string() << "\n";
-        std::cout << "dummy type " << dummys[i]->type().debug_string() << "\n";
-        dummys[i]->divert_users(branch[1]);
-        remove(producer(dummys[i]));
-    }
-    remove(theta);
-}
-
-
-static void
-hls_theta_conv(jive::region *region) {
-    for (auto &node : jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-            for (size_t n = 0; n < structnode->nsubregions(); n++)
-                hls_theta_conv(structnode->subregion(n));
-            auto theta = dynamic_cast<jive::theta_node *>(node);
-            if (theta) {
-                // TODO: add speculative branch
-                hls_theta_conv(theta);
-            }
-        }
-    }
-}
-
-static void
-hls_theta_conv(jlm::rvsdg_module &rm) {
-    auto &graph = *rm.graph();
-    auto root = graph.root();
-    hls_theta_conv(root);
-}
-
-
-static void
-hls_add_sinks(jive::region *region) {
-    for (int i = 0; i < region->narguments(); ++i) {
-        auto arg = region->argument(i);
-        if (!arg->nusers()) {
-            hls::sink_op::create(*arg);
-        }
-    }
-    for (auto &node : jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-            for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                hls_add_sinks(structnode->subregion(n));
-            }
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const buffer_op *>(&other);
+            return ot && ot->result(0).type() == result(0).type();
         }
 
-        for (int i = 0; i < node->noutputs(); ++i) {
-            auto out = node->output(i);
-            if (!out->nusers()) {
-                hls::sink_op::create(*out);
-            }
+        std::string
+        debug_string() const override {
+            return "HLS_BUF";
         }
-    }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new buffer_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &value,
+                size_t capacity
+        ) {
+            auto region = value.region();
+            buffer_op op(value.type(), capacity);
+            return jive::simple_node::create_normalized(region, op, {&value});
+        }
+
+    private:
+        size_t capacity;
+    };
 }
 
-static void
-hls_add_sinks(jlm::rvsdg_module &rm) {
-    auto &graph = *rm.graph();
-    auto root = graph.root();
-    hls_add_sinks(root);
-}
-
-static void
-hls_add_forks(jive::region *region) {
-    for (size_t i = 0; i < region->narguments(); ++i) {
-        auto arg = region->argument(i);
-        if (arg->nusers() > 1) {
-            std::vector<jive::input *> users;
-            users.insert(users.begin(), arg->begin(), arg->end());
-            auto fork = hls::fork_op::create(arg->nusers(), *arg);
-            for (size_t j = 0; j < users.size(); j++) {
-                users[j]->divert_to(fork[j]);
-            }
-        }
-    }
-    for (auto &node : jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-            for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                hls_add_forks(structnode->subregion(n));
-            }
-        }
-        // TODO: simplify if forks depend on a fork
-        for (size_t i = 0; i < node->noutputs(); ++i) {
-            auto out = node->output(i);
-            if (out->nusers() > 1) {
-                std::vector<jive::input *> users;
-                users.insert(users.begin(), out->begin(), out->end());
-                auto fork = hls::fork_op::create(out->nusers(), *out);
-                for (size_t j = 0; j < users.size(); j++) {
-                    users[j]->divert_to(fork[j]);
+namespace hls {
+    namespace passes {
+        static void hls_gamma_conv_nonspec(jive::gamma_node *gamma) {
+            jive::substitution_map smap;
+            // create a branch for each entryvar and map the corresponding argument of each subregion to an output of the branch
+            auto pro = gamma->predicate()->origin();
+            for (size_t i = 0; i < gamma->nentryvars(); i++) {
+                auto envo = gamma->entryvar(i)->origin();
+                auto bros = hls::branch_op::create(*pro, *envo);
+                for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                    smap.insert(gamma->subregion(s)->argument(i), bros[s]);
                 }
             }
-        }
-    }
-}
-
-static void
-hls_add_forks(jlm::rvsdg_module &rm) {
-    auto &graph = *rm.graph();
-    auto root = graph.root();
-    hls_add_forks(root);
-}
-
-
-static bool is_passthrough(const jive::argument *arg) {
-    if (arg->nusers() == 1) {
-        auto res = dynamic_cast<jive::result *>(*arg->begin());
-        // used only by a result
-        if (res) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void remove_passthrough(const jive::argument *arg) {
-    auto res = dynamic_cast<jive::result *>(*arg->begin());
-    std::cout << arg->region()->node()->operation().debug_string() <<"\n";
-    std::cout << arg->region()->node()->ninputs() <<"\n";
-    if(!is<jlm::lambda::operation>(arg->region()->node())) {
-        auto origin = arg->input()->origin();
-        // divert users of output to origin of input
-        arg->region()->node()->output(res->output()->index())->divert_users(origin);
-        arg->region()->node()->remove_input(arg->input()->index());
-        arg->region()->node()->remove_output(res->output()->index());
-    }
-    // TODO: handle lambda properly
-    arg->region()->remove_result(res->index());
-    arg->region()->remove_argument(arg->index());
-}
-
-static void
-hls_remove_unused_state(jive::region *region, bool can_remove_arguments = true) {
-    // process children first so that unnecessary users get removed
-    for (auto &node : jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-            if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
-                // process subnodes first
-                for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                    hls_remove_unused_state(structnode->subregion(n), false);
+            // copy each of the subregions
+            for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                gamma->subregion(s)->copy(gamma->region(), smap, false, false);
+            }
+            for (size_t i = 0; i < gamma->nexitvars(); i++) {
+                std::vector<jive::output *> alternatives;
+                for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                    alternatives.push_back(smap.lookup(gamma->subregion(s)->result(i)->origin()));
                 }
-                // remove inputs in reverse
-                for (int i = gn->nentryvars() - 1; i >= 0; --i) {
-                    bool can_remove = true;
-                    for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                        auto sr = structnode->subregion(n);
-                        can_remove &= is_passthrough(sr->argument(i));
+                // create merge nodes for each exitvar
+                auto merge = hls::merge_op::create(alternatives);
+                // divert users of exitvars to merge instead
+                gamma->exitvar(i)->divert_users(merge[0]);
+            }
+            remove(gamma);
+        }
+
+
+        static void
+        hls_gamma_conv(jive::region *region) {
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    for (size_t n = 0; n < structnode->nsubregions(); n++)
+                        hls_gamma_conv(structnode->subregion(n));
+                    auto gamma = dynamic_cast<jive::gamma_node *>(node);
+                    if (gamma) {
+                        // TODO: add speculative branch
+                        hls_gamma_conv_nonspec(gamma);
                     }
-                    if (can_remove) {
-                        auto origin = gn->entryvar(i)->origin();
-                        // remove input
-                        gn->remove_input(i+1);
-                        // divert users of output to origin of input
-                        auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(i)->begin())->index();
-                        gn->output(res_index)->divert_users(origin);
-                        gn->remove_output(res_index);
-                        for (int j = 0; j < gn->nsubregions(); ++j) {
-                            gn->subregion(j)->remove_result(res_index);
-                            gn->subregion(j)->remove_argument(i);
+                }
+            }
+        }
+
+        static void
+        hls_gamma_conv(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_gamma_conv(root);
+        }
+
+        static void hls_theta_conv(jive::theta_node *theta) {
+            jive::substitution_map smap;
+            // create a ndmux for each entryvar with a dummy_op and map the corresponding argument of each subregion to an output of the branch
+            std::vector<jive::output *> dummys;
+            auto dummy_pred = hls::dummy_op::create(*theta->predicate()->origin(), theta->region())[0];
+            auto pred_buffer = hls::predicate_buffer_op::create(*dummy_pred)[0];
+            auto pro = theta->predicate()->origin();
+            for (size_t i = 0; i < theta->ninputs(); i++) {
+                auto envo = theta->input(i)->origin();
+                auto dummy = hls::dummy_op::create(*theta->output(i), theta->region())[0];
+                dummys.push_back(dummy);
+                auto muxos = hls::mux_op::create(*pred_buffer, {envo, dummy}, false);
+                // use double buffers after mux
+                auto bufos = hls::buffer_op::create(*muxos[0], 2);
+                smap.insert(theta->subregion()->argument(i), bufos[0]);
+            }
+            // copy the subregion
+            theta->subregion()->copy(theta->region(), smap, false, false);
+
+            // replace dummy_pred with origin of predicate
+            dummy_pred->divert_users(smap.lookup(pro));
+            remove(producer(dummy_pred));
+            assert(theta->ninputs() == theta->noutputs());
+            for (size_t i = 0; i < theta->noutputs(); i++) {
+                // create branch node for each output
+                auto branch = hls::branch_op::create(*smap.lookup(pro),
+                                                     *smap.lookup(theta->subregion()->result(i + 1)->origin()));
+                // divert users of outputs to branch instead
+                theta->output(i)->divert_users(branch[0]);
+                // replace dummy node with branch
+//                std::cout << "branch type " << branch[1]->type().debug_string() << "\n";
+//                std::cout << "dummy type " << dummys[i]->type().debug_string() << "\n";
+                dummys[i]->divert_users(branch[1]);
+                remove(producer(dummys[i]));
+            }
+            remove(theta);
+        }
+
+
+        static void
+        hls_theta_conv(jive::region *region) {
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    for (size_t n = 0; n < structnode->nsubregions(); n++)
+                        hls_theta_conv(structnode->subregion(n));
+                    auto theta = dynamic_cast<jive::theta_node *>(node);
+                    if (theta) {
+                        // TODO: add speculative branch
+                        hls_theta_conv(theta);
+                    }
+                }
+            }
+        }
+
+        static void
+        hls_theta_conv(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_theta_conv(root);
+        }
+
+
+        static void
+        hls_add_sinks(jive::region *region) {
+            for (int i = 0; i < region->narguments(); ++i) {
+                auto arg = region->argument(i);
+                if (!arg->nusers()) {
+                    hls::sink_op::create(*arg);
+                }
+            }
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                        hls_add_sinks(structnode->subregion(n));
+                    }
+                }
+
+                for (int i = 0; i < node->noutputs(); ++i) {
+                    auto out = node->output(i);
+                    if (!out->nusers()) {
+                        hls::sink_op::create(*out);
+                    }
+                }
+            }
+        }
+
+        static void
+        hls_add_sinks(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_add_sinks(root);
+        }
+
+        static void
+        hls_add_forks(jive::region *region) {
+            for (size_t i = 0; i < region->narguments(); ++i) {
+                auto arg = region->argument(i);
+                if (arg->nusers() > 1) {
+                    std::vector<jive::input *> users;
+                    users.insert(users.begin(), arg->begin(), arg->end());
+                    auto fork = hls::fork_op::create(arg->nusers(), *arg);
+                    for (size_t j = 0; j < users.size(); j++) {
+                        users[j]->divert_to(fork[j]);
+                    }
+                }
+            }
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                        hls_add_forks(structnode->subregion(n));
+                    }
+                }
+                // TODO: simplify if forks depend on a fork
+                for (size_t i = 0; i < node->noutputs(); ++i) {
+                    auto out = node->output(i);
+                    if (out->nusers() > 1) {
+                        std::vector<jive::input *> users;
+                        users.insert(users.begin(), out->begin(), out->end());
+                        auto fork = hls::fork_op::create(out->nusers(), *out);
+                        for (size_t j = 0; j < users.size(); j++) {
+                            users[j]->divert_to(fork[j]);
                         }
                     }
                 }
-            } else {
-                assert(structnode->nsubregions() == 1);
-                hls_remove_unused_state(structnode->subregion(0));
             }
         }
-    }
-    if (can_remove_arguments) {
-        // check if an input is passed through unnecessarily
-        for (int i = region->narguments()-1; i >= 0 ; --i) {
-            auto arg = region->argument(i);
-            if (is_passthrough(arg)) {
-                std::cout << "region:\n";
-                jive::view(region, stdout);
-                std::cout << "removing arg " << i <<  " of type " << arg->type().debug_string() << "\n";
-                remove_passthrough(arg);
+
+        static void
+        hls_add_forks(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_add_forks(root);
+        }
+
+
+        static bool is_passthrough(const jive::argument *arg) {
+            if (arg->nusers() == 1) {
+                auto res = dynamic_cast<jive::result *>(*arg->begin());
+                // used only by a result
+                if (res) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static void remove_passthrough(const jive::argument *arg) {
+            auto res = dynamic_cast<jive::result *>(*arg->begin());
+//            std::cout << arg->region()->node()->operation().debug_string() << "\n";
+//            std::cout << arg->region()->node()->ninputs() << "\n";
+            if (!is<jlm::lambda::operation>(arg->region()->node())) {
+                auto origin = arg->input()->origin();
+                // divert users of output to origin of input
+                arg->region()->node()->output(res->output()->index())->divert_users(origin);
+                arg->region()->node()->remove_input(arg->input()->index());
+                arg->region()->node()->remove_output(res->output()->index());
+            }
+            // TODO: handle lambda properly
+            arg->region()->remove_result(res->index());
+            arg->region()->remove_argument(arg->index());
+        }
+
+        static void
+        hls_remove_unused_state(jive::region *region, bool can_remove_arguments = true) {
+            // process children first so that unnecessary users get removed
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
+                        // process subnodes first
+                        for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                            hls_remove_unused_state(structnode->subregion(n), false);
+                        }
+                        // remove inputs in reverse
+                        for (int i = gn->nentryvars() - 1; i >= 0; --i) {
+                            bool can_remove = true;
+                            for (size_t n = 0; n < structnode->nsubregions(); n++) {
+                                auto sr = structnode->subregion(n);
+                                can_remove &= is_passthrough(sr->argument(i));
+                            }
+                            if (can_remove) {
+                                auto origin = gn->entryvar(i)->origin();
+                                // remove input
+                                gn->remove_input(i + 1);
+                                // divert users of output to origin of input
+                                auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(
+                                        i)->begin())->index();
+                                gn->output(res_index)->divert_users(origin);
+                                gn->remove_output(res_index);
+                                for (int j = 0; j < gn->nsubregions(); ++j) {
+                                    gn->subregion(j)->remove_result(res_index);
+                                    gn->subregion(j)->remove_argument(i);
+                                }
+                            }
+                        }
+                    } else {
+                        assert(structnode->nsubregions() == 1);
+                        hls_remove_unused_state(structnode->subregion(0));
+                    }
+                }
+            }
+            if (can_remove_arguments) {
+                // check if an input is passed through unnecessarily
+                for (int i = region->narguments() - 1; i >= 0; --i) {
+                    auto arg = region->argument(i);
+                    if (is_passthrough(arg)) {
+//                        std::cout << "region:\n";
+//                        jive::view(region, stdout);
+//                        std::cout << "removing arg " << i << " of type " << arg->type().debug_string() << "\n";
+                        remove_passthrough(arg);
+                    }
+                }
+            }
+        }
+
+        static void
+        hls_remove_unused_state(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_remove_unused_state(root);
+        }
+
+        static void
+        hls_check_graph(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            if (root->nodes.size() != 1) {
+                throw jlm::error("Root should have only one node now");
+            }
+            auto ln = dynamic_cast<const jlm::lambda::node *>(root->nodes.begin().ptr());
+            if (!ln) {
+                throw jlm::error("Node needs to be a lambda");
+            }
+            for (auto &node : jive::topdown_traverser(ln->subregion())) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    throw jlm::error("There should be only simple nodes");
+                }
+                for (size_t i = 0; i < node->noutputs(); i++) {
+                    if (node->output(i)->nusers() == 0) {
+                        throw jlm::error("Output has no users");
+                    } else if (node->output(i)->nusers() > 1) {
+                        throw jlm::error("Output has more than one user");
+                    }
+                }
             }
         }
     }
 }
 
-static void
-hls_remove_unused_state(jlm::rvsdg_module &rm) {
-    auto &graph = *rm.graph();
-    auto root = graph.root();
-    hls_remove_unused_state(root);
-}
+class FirrtlModule {
+public:
+    FirrtlModule(const std::string &name, const std::string &firrtl, bool hasMem) : has_mem(hasMem), name(name),
+                                                                                    firrtl(firrtl) {}
 
+public:
+    bool has_mem;
+    std::string name;
+    std::string firrtl;
+};
 
 class FirrtlHLS {
 public:
@@ -690,16 +766,14 @@ public:
     void run(jlm::rvsdg_module &rm, llvm::Module *lm) {
         std::string firrtl;
         auto region = rm.graph()->root();
-        for (const auto &node : region->nodes) {
-            if (auto ln = dynamic_cast<const jlm::lambda::node *>(&node)) {
-                auto module_name = lambda_node_to_string(ln);
-                firrtl += indent(0) + "circuit " + module_name + ":\n";
-            } else {
-                std::cerr << "unknown node " << node.operation().debug_string() << "\n";
-            }
+        if (auto ln = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr())) {
+            auto module = lambda_node_to_firrtl(ln);
+            firrtl += indent(0) + "circuit " + module.name + ":\n";
+        } else {
+            throw jlm::error("Root should have only one lambda node now");
         }
         for (auto module: modules) {
-            firrtl += module;
+            firrtl += module.firrtl;
         }
         auto source_file_name = lm->getSourceFileName();
         std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + ".fir";
@@ -710,23 +784,42 @@ public:
     }
 
 private:
-    std::unordered_map<jive::output *, std::string> port_map;
-    std::unordered_set<jive::output *> port_declared;
-    std::vector<std::string> modules;
+    std::unordered_map<const jive::node *, std::string> node_map;
+    std::vector<FirrtlModule> modules;
+
 
     std::string
-    create_port_name(jive::output *port) {
-        std::string name = dynamic_cast<const jive::argument *>(port) ? "a" : "o";
-        name += jive::detail::strfmt(port_map.size());
-        port_map[port] = name;
-        return name;
+    get_node_name(const jive::node *node) {
+        auto found = node_map.find(node);
+        if (found != node_map.end()) {
+            return found->second;
+        }
+        auto new_name = jive::detail::strfmt("node_", node->operation().debug_string(), node_map.size());
+        // remove chars that are not valid in firrtl module names
+        std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');
+        node_map[node] = new_name;
+        return new_name;
     }
+
+//    std::string
+//    get_node_port_name(jive::node_input *port){
+//        return get_node_name(port->node())+"."+ get_port_name(port);
+//    }
+//
+//    std::string
+//    get_node_port_name(jive::node_output *port){
+//        return get_node_name(port->node())+"."+ get_port_name(port);
+//    }
 
     std::string
     get_port_name(jive::input *port) {
         std::string result;
         if (auto p = dynamic_cast<const jive::node_input *>(port)) {
             result += "i";
+        } else if (auto p = dynamic_cast<const jive::result *>(port)) {
+            result += "r";
+        } else {
+            throw std::logic_error(port->debug_string() + " not implemented!");
         }
         result += jive::detail::strfmt(port->index());
         return result;
@@ -734,20 +827,12 @@ private:
 
     std::string
     get_port_name(jive::output *port) {
-//        auto tmp = port_map.find(port);
-//        std::string name;
-//        if (tmp != port_map.end()) {
-//            name = tmp->second;
-//        } else {
-//            name = create_port_name(port);
-//        }
-//        return name;
         if (port == nullptr) {
             throw std::logic_error("nullptr!");
         }
         std::string result;
         if (auto p = dynamic_cast<const jive::argument *>(port)) {
-            result += "i";
+            result += "a";
         } else if (auto p = dynamic_cast<const jive::node_output *>(port)) {
             result += "o";
         } else if (auto p = dynamic_cast<const jive::structural_output *>(port)) {
@@ -771,28 +856,6 @@ private:
             throw std::logic_error(type->debug_string() + " not implemented!");
         }
     }
-
-    std::string
-    firrtl_assert(const std::string &condition, int depth = 2) {
-        std::string result;
-        result += indent(depth) + "when not(or(" + condition + ",reset)):\n";
-        result += indent(depth + 1) + "stop(clk, UInt<1>(1), -1)\n";
-        result += indent(depth + 1) + "printf(clk, UInt<1>(1), \"" + condition + "\")\n";
-        return result;
-    }
-
-//    bool
-//    has_mem(const jive::node *n){
-//        if (auto s = dynamic_cast<const jive::simple_node *>(n)) {
-//            if (auto o = dynamic_cast<const jlm::load_op *>(&(n->operation()))) {
-//                return true;
-//            } else if (auto o = dynamic_cast<const jlm::store_op *>(&(n->operation()))) {
-//                return true;
-//            }
-//            return false;
-//        }
-//        return true;
-//    }
 
     std::string mem_io() {
         std::ostringstream module;
@@ -828,30 +891,41 @@ private:
         return mem.str();
     }
 
-    std::string mem_node_to_string(const jive::simple_node *n) {
-        std::string module_name = n->operation().debug_string() + "_mod" + jive::detail::strfmt(modules.size());
+    std::string module_header(const jive::node *node, bool has_mem_io = false) {
         std::ostringstream module;
-        bool store = dynamic_cast<const jlm::store_op *>(&(n->operation()));
-        module << indent(1) + "module " + module_name + ":\n";
+
+        module << indent(1) + "module " + get_node_name(node) + ":\n";
         // io
         module << indent(2) + "; io" + "\n";
         module << indent(2) + "input clk: Clock" + "\n";
         module << indent(2) + "input reset: UInt<1>" + "\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
+        for (size_t i = 0; i < node->ninputs(); ++i) {
             module << indent(2) << "input i" << (i) << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->input(i)->type()) << "}\n";
+                   to_firrtl_type(&node->input(i)->type()) << "}\n";
         }
-        for (size_t i = 0; i < n->noutputs(); ++i) {
+        for (size_t i = 0; i < node->noutputs(); ++i) {
             module << indent(2) + "output o" + jive::detail::strfmt(i) +
                       ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
-                      to_firrtl_type(&n->output(i)->type()) + "}" + "\n";
+                      to_firrtl_type(&node->output(i)->type()) + "}" + "\n";
         }
-        module << mem_io();
-        for (size_t i = 0; i < n->ninputs(); ++i) {
+        if (has_mem_io) {
+            module << mem_io();
+        }
+        for (size_t i = 0; i < node->ninputs(); ++i) {
             module << indent(2) << "assert(clk, not(and(i" << i << ".valid, not(i" << i
                    << ".ready))), not(reset), \"valid only when ready\")\n";
-//            module << firrtl_assert("not(and(i"+jive::detail::strfmt(i)+".valid, not(i"+jive::detail::strfmt(i)+".ready)))");
         }
+
+        return module.str();
+    }
+
+
+    FirrtlModule &mem_node_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n, true);
+
+        bool store = dynamic_cast<const jlm::store_op *>(&(n->operation()));
         // registers
         module << indent(2) + "; registers" + "\n";
         for (size_t i = 0; i < n->ninputs(); ++i) {
@@ -931,63 +1005,174 @@ private:
                       "\n";
         }
 
-        modules.push_back(module.str());
-//        std::cerr << module;
-        return module_name;
-
+        modules.emplace_back(module_name, module.str(), true);
+        return modules.back();
     }
 
-    std::string simple_node_to_string(const jive::simple_node *n) {
-        // ugly hack because debug string contains illegal symbols
-        if (auto o = dynamic_cast<const jlm::load_op *>(&(n->operation()))) {
-            return mem_node_to_string(n);
-        } else if (auto o = dynamic_cast<const jlm::store_op *>(&(n->operation()))) {
-            return mem_node_to_string(n);
-        }
-        std::string module_name = n->operation().debug_string() + "_mod" + jive::detail::strfmt(modules.size());
-        std::replace_if(module_name.begin(), module_name.end(), isForbiddenChar, '_');
+
+    FirrtlModule &pred_buffer_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
         std::ostringstream module;
-        module << indent(1) + "module " + module_name + ":\n";
-        // io
-        module << indent(2) + "; io" + "\n";
-        module << indent(2) + "input clk: Clock" + "\n";
-        module << indent(2) + "input reset: UInt<1>" + "\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "input i" << (i) << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->input(i)->type()) << "}\n";
+        module << module_header(n);
+        module << indent(2) << "; registers\n";
+        // TODO: double buffer?
+        // start initialized with a valid pred 0
+        module << indent(2) << "reg buf_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(1)))\n";
+        module << indent(2) << "reg buf_data_reg: " << to_firrtl_type(&n->output(0)->type())
+               << ", clk  with: (reset => (reset, UInt<1>(0)))\n";
+        auto o0 = get_port_name(n->output(0));
+        module << indent(2) << o0 << ".valid <= and(" << o0 << ".ready, buf_valid_reg)\n";
+        module << indent(2) << o0 << ".data <= buf_data_reg\n";
+        auto i0 = get_port_name(n->input(0));
+        module << indent(2) << i0 << ".ready <= not(buf_valid_reg)\n";
+        module << indent(2) << "when " << i0 << ".valid:\n";
+        module << indent(3) << "buf_valid_reg <= UInt<1>(1)\n";
+        module << indent(3) << "buf_data_reg <= " << i0 << ".data\n";
+        module << indent(2) << "when " << o0 << ".valid:\n";
+        module << indent(3) << "buf_valid_reg <= UInt<1>(0)\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &ndmux_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        module << indent(2) << "; registers\n";
+        // we need a buffer here in order to always be ready for the predicate
+        module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+        module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
+
+        auto ipred = get_port_name(n->input(0));
+        auto o0 = get_port_name(n->output(0));
+
+        module << indent(2) << o0 << ".valid <= UInt<1>(0)\n";
+        module << indent(2) << o0 << ".data is invalid\n";
+
+        module << "node pred_valid = or(pred_valid_reg, " << ipred << ".valid)\n";
+        module << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << ipred << ".data)\n";
+        for (int i = 1; i < n->ninputs(); ++i) {
+            auto in = get_port_name(n->input(i));
+            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>("<<i-1<<"))):\n";
+            module << indent(3) << o0 << ".valid <= " << in << ".valid\n";
+            module << indent(3) << o0 << ".data <= " << in << ".data\n";
         }
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) + "output o" + jive::detail::strfmt(i) +
-                      ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
-                      to_firrtl_type(&n->output(i)->type()) + "}" + "\n";
+        module << indent(2) << ipred << ".ready <= not(buf_valid_reg)\n";
+        module << indent(2) << "when and(" << ipred << ".valid), not(" << o0 << ".valid)):\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
+        module << indent(3) << "pred_data_reg <= " << ipred << ".data\n";
+        module << indent(2) << "when " << o0 << ".valid:\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &merge_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        auto o0 = get_port_name(n->output(0));
+
+        module << indent(2) << o0 << ".valid <= UInt<1>(0)\n";
+        module << indent(2) << o0 << ".data is invalid\n";
+
+
+        for (int i = 0; i < n->ninputs(); ++i) {
+            auto in = get_port_name(n->input(i));
+            module << indent(2) << in << ".ready <= " << o0 << ".ready\n";
+            module << indent(2) << "when " << in << ".valid:\n";
+            module << indent(3) << o0 << ".valid <= " << in << ".valid\n";
+            module << indent(3) << o0 << ".data <= " << in << ".data\n";
         }
-        module << mem_io();
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "assert(clk, not(and(i" << i << ".valid, not(i" << i
-                   << ".ready))), not(reset), \"valid only when ready\")\n";
-//            module << firrtl_assert("not(and(i"+jive::detail::strfmt(i)+".valid, not(i"+jive::detail::strfmt(i)+".ready)))");
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &fork_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        auto i0 = get_port_name(n->input(0));
+
+
+        std::string all_ready = "UInt<1>(1)"; // True by default
+
+        for (int i = 0; i < n->noutputs(); ++i) {
+            auto out = get_port_name(n->output(i));
+            module << indent(2) << out << ".valid <= " << i0 << ".valid\n";
+            module << indent(2) << out << ".data <= " << i0 << ".data\n";
+            all_ready = "and(" + all_ready + ", "+out+".ready)";
         }
-        // registers
-        module << indent(2) + "; registers" + "\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) + "reg i" + jive::detail::strfmt(i) +
-                      "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
-            module << indent(2) + "reg i" + jive::detail::strfmt(i) + "_data_reg: " +
-                      to_firrtl_type(&n->input(i)->type()) + ", clk" + "\n";
+        module << indent(2) << i0 << ".ready <= " << all_ready << "\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &sink_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        auto i0 = get_port_name(n->input(0));
+        module << indent(2) << i0 << ".ready <= UInt<1>(1)\n";
+
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &branch_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        module << indent(2) << "; registers\n";
+        // we need a buffer here in order to always be ready for the predicate
+        module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+        module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
+
+        auto ipred = get_port_name(n->input(0));
+        auto ival = get_port_name(n->input(1));
+
+        module << indent(2) << "wire out_valid: UInt<1>\n";
+        module << indent(2) << "out_valid <= UInt<1>(0)\n";
+        module << indent(2) << "node pred_valid = or(pred_valid_reg, " << ipred << ".valid)\n";
+        module << indent(2) << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << ipred << ".data)\n";
+        module << indent(2) << ival << ".ready <= UInt<1>(0)\n";
+        for (int i = 0; i < n->noutputs(); ++i) {
+            auto out = get_port_name(n->output(i));
+            module << indent(2) << out << ".valid <= UInt<1>(0)\n";
+            module << indent(2) << out << ".data is invalid\n";
+            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>("<<i<<"))):\n";
+            module << indent(3) << ival << ".ready <= " << out << ".ready\n";
+            module << indent(3) << out << ".valid <= " << ival << ".valid\n";
+            module << indent(3) << out << ".data <= " << ival << ".data\n";
+            module << indent(3) << "out_valid <= UInt<1>(1)\n";
         }
-        // logic
-//        std::cerr << n->operation().debug_string() << "\n";
-        assert(n->noutputs() == 1);
+        module << indent(2) << ipred << ".ready <= not(pred_valid_reg)\n";
+        module << indent(2) << "when and(" << ipred << ".valid, not(out_valid)):\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
+        module << indent(3) << "pred_data_reg <= " << ipred << ".data\n";
+        module << indent(2) << "when " << ival << ".valid:\n";
+        module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &single_out_simple_node_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+
+        module << module_header(n);
+
+        if(n->noutputs() != 1){
+            throw std::logic_error(n->operation().debug_string() + " has more than 1 output");
+        }
         auto out = n->output(0);
         module << indent(2) + "; logic" + "\n";
         module << indent(2) + get_port_name(out) + ".data <=";
         if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
-            //TODO: this could be a pure pass through?
             if (is_identity_mapping(*o)) {
                 // TODO: figure out why this hack is needed
-//                module << get_port_name(in0) + "_data_reg";
-                module << "i0_data_reg";
+                module << get_port_name(in0) << ".data";
             } else {
                 throw std::logic_error("non-identity mapping not implemented!");
             }
@@ -995,49 +1180,49 @@ private:
             auto in0 = n->input(0);
             auto in1 = n->input(1);
             module <<
-                   "gt(asSInt(" + get_port_name(in0) + "_data_reg" + "), asSInt(" + get_port_name(in1) +
-                   "_data_reg" +
+                   "gt(asSInt(" + get_port_name(in0) + ".data" + "), asSInt(" + get_port_name(in1) +
+                   ".data" +
                    "))";
         } else if (auto o = dynamic_cast<const jlm::sext_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
-            module << "asUInt(pad(asSInt(" + get_port_name(in0) + "_data_reg" + "), " +
+            module << "asUInt(pad(asSInt(" + get_port_name(in0) + ".data" + "), " +
                       jive::detail::strfmt(o->ndstbits()) + "))";
         } else if (auto o = dynamic_cast<const jlm::trunc_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
-            module << get_port_name(in0) + "_data_reg";
+            module << get_port_name(in0) + ".data";
         } else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "gt(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "gt(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitult_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "lt(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "lt(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitslt_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "lt(asSInt(" + get_port_name(in0) + "_data_reg)" + ", asSInt(" + get_port_name(in1) +
-                      "_data_reg)" + ")";
+            module << "lt(asSInt(" + get_port_name(in0) + ".data)" + ", asSInt(" + get_port_name(in1) +
+                      ".data)" + ")";
         } else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "eq(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "eq(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitadd_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "add(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "add(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitmul_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "mul(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "mul(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "sub(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "sub(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
             auto in0 = n->input(0);
             auto in1 = n->input(1);
-            module << "neq(" + get_port_name(in0) + "_data_reg" + ", " + get_port_name(in1) + "_data_reg" + ")";
+            module << "neq(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
         } else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
             auto value = o->value();
             module << "UInt<" << value.nbits() << ">(" << value.to_uint() << ")";
@@ -1047,10 +1232,6 @@ private:
             module << "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
         } else if (auto o = dynamic_cast<const jlm::getelementptr_op *>(&(n->operation()))) {
             assert(n->ninputs() == 2);
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-//            std::cerr << in0->type().debug_string();
-//            std::cerr << in1->type().debug_string();
             const auto *pt = &o->pointee_type();
             int bits;
             if (auto bt = dynamic_cast<const jive::bittype *>(pt)) {
@@ -1060,8 +1241,8 @@ private:
             }
             int bytes = bits / 8;
             // TODO: fix
-            module << "add(" + get_port_name(in0) + "_data_reg" + ", mul(" + get_port_name(in1) +
-                      "_data_reg, UInt<64>(" + jive::detail::strfmt(bytes) + ")))";
+            module << "add(" + get_port_name(n->input(0)) + ".data" + ", mul(" + get_port_name(n->input(1)) +
+                      ".data, UInt<64>(" + jive::detail::strfmt(bytes) + ")))";
         } else {
             throw std::logic_error(n->operation().debug_string() + " not implemented!");
         }
@@ -1069,267 +1250,48 @@ private:
         // handshaking
         module << indent(2) + "; handshaking" + "\n";
         for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) + "i" + jive::detail::strfmt(i) + ".ready <= not(i" + jive::detail::strfmt(i) +
-                      "_valid_reg)" + "\n";
+            module << indent(2) + "i" + jive::detail::strfmt(i) + ".ready <= o0.ready\n";
         }
         module << indent(2) + "node inputs_valid = ";
         std::string inputs_valids = "UInt<1>(1)"; // True by default
         for (size_t i = 0; i < n->ninputs(); ++i) {
-            inputs_valids = "and(" + inputs_valids + ", i" + jive::detail::strfmt(i) + "_valid_reg)";
+            inputs_valids = "and(" + inputs_valids + ", " + get_port_name(n->input(i)) + ".valid)";
         }
         module << inputs_valids + "\n";
         for (size_t i = 0; i < n->noutputs(); ++i) {
             module << indent(2) + "o" + jive::detail::strfmt(i) + ".valid <= and(o" + jive::detail::strfmt(i) +
                       ".ready, inputs_valid)" + "\n";
         }
-        if (n->ninputs()) {
-            module << indent(2) + "when o0.valid:" + "\n";
-            for (size_t i = 0; i < n->ninputs(); ++i) {
-                module << indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(0)" + "\n";
-            }
-        }
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) + "when i" + jive::detail::strfmt(i) + ".valid:" + "\n";
-            module << indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
-            module << indent(3) + "i" + jive::detail::strfmt(i) + "_data_reg <= i" + jive::detail::strfmt(i) +
-                      ".data" +
-                      "\n";
-        }
 
-        modules.push_back(module.str());
-//        std::cerr << module;
-        return module_name;
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
     }
 
-    std::string gamma_node_to_string(const jive::gamma_node *n) {
-        auto module_name = "gamma_mod" + jive::detail::strfmt(modules.size());
-        auto module_index = modules.size();
-        modules.emplace_back(); // need to preserve spot to avoid name collisions
-        std::ostringstream module;
-        module << indent(1) << "module " << module_name << ":\n";
-        // io
-        module << indent(2) + "; io" + "\n";
-        module << indent(2) + "input clk: Clock" + "\n";
-        module << indent(2) + "input reset: UInt<1>" + "\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "input i" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->input(i)->type()) + "}" + "\n";
-        }
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) << "output o" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->output(i)->type()) << "}" << "\n";
-        }
-        module << mem_io();
-        // registers
-        module << indent(2) << "; registers\n";
-        module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-        module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->predicate()->type()) << ", clk\n";
-        module << indent(2) + "i0.ready <= not(pred_valid_reg)\n";
-        for (size_t i = 0; i < n->nentryvars(); ++i) {
-            module << indent(2) << "reg e" << i
-                   << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-            module << indent(2) << "reg e" << i
-                   << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-            module << indent(2) << "reg  e" << i << "_data_reg: " << to_firrtl_type(&n->entryvar(i)->type())
-                   << ", clk\n";
-//            module << indent(2) << "wire e" << i <<"_ready\n";
-//            module << indent(2) << "e" << i <<"_ready <= UInt<1>(0)\n";
-            module << indent(2) + "i" << (i + 1) << ".ready <= not(e" << i << "_valid_reg)\n";
-        }
-        for (int i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) + "reg o" << i
-                   << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-            module << indent(2) + "o" << i << ".valid <= " << "UInt<1>(0) ; off by default\n";
-            module << indent(2) + "o" << i << ".data is invalid ; off by default\n";
-        }
-
-        module << indent(2) << "; instances\n";
-        for (size_t k = 0; k < n->nsubregions(); ++k) {
-            auto sr = n->subregion(k);
-            auto sr_module_name = subregion_to_string(sr);
-            module << indent(2) << "inst sr" << k << " of " + sr_module_name << "\n";
-            module << indent(2) << "sr" << k << ".clk <= clk\n";
-            module << indent(2) << "sr" << k << ".reset <= reset\n";
-            module << indent(2) << "node pred_match_" << k << " = and(eq(pred_data_reg, UInt<32>(" << k
-                   << ")), pred_valid_reg)\n";
-            for (size_t i = 0; i < sr->narguments(); ++i) {
-                module << indent(2) << "sr" << k << ".i" << i << ".valid <= and(and(and(e" << i
-                       << "_valid_reg, pred_match_" << k << "), sr" << k << ".i" << i << ".ready), not(e" << i
-                       << "_processed_reg))\n";
-                module << indent(2) << "sr" << k << ".i" << i << ".data <= e" << i << "_data_reg\n";
-                module << indent(2) << "when sr" << k << ".i" << i << ".valid:\n";
-                module << indent(3) << "e" << i << "_processed_reg <= UInt<1>(1)\n";
-            }
-
-            for (int i = 0; i < n->noutputs(); ++i) {
-                module << indent(2) << "sr" << (k) << ".o" << (i) << ".ready <= o" << (i) << ".ready\n";
-            }
-            module << indent(2) << "when pred_match_" << k << ":\n";
-//            for (size_t i = 0; i < sr->narguments(); ++i) {
-//                module << indent(3) << "e" << i <<"_ready <= sr" << k << ".i" << i << ".ready\n";
-//            }
-            for (int i = 0; i < n->noutputs(); ++i) {
-                module << indent(3) << "o" << (i) << ".data <= sr" << (k) << ".o" << (i) << ".data\n";
-                module << indent(3) << "o" << (i) << ".valid <= sr" << (k) << ".o" << (i) << ".valid\n";
-            }
-        }
-        for (int i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) << "when o" << (i) << ".valid:\n";
-            module << indent(3) << "o" << (i) << "_processed_reg <= UInt<1>(1)\n";
-        }
-
-        module << indent(2) << "when i0.valid:\n";
-        module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
-        module << indent(3) << "pred_data_reg <= i0.data\n";
-
-        for (size_t i = 0; i < n->nentryvars(); ++i) {
-            module << indent(2) << "when i" << (i + 1) << ".valid:\n";
-            module << indent(3) << "e" << i << "_valid_reg <= UInt<1>(1)\n";
-            module << indent(3) << "e" << i << "_data_reg <= i" << (i + 1) << ".data\n";
-        }
-
-        std::string all_processed = "UInt<1>(1)"; // True by default
-        for (size_t i = 0; i < n->nexitvars(); ++i) {
-            all_processed = "and(" + all_processed + ", o" + jive::detail::strfmt(i) + "_processed_reg)";
-        }
-        module << indent(2) << "node all_processed = " << all_processed << "\n";
-        module << indent(2) << "when all_processed:\n";
-        module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
-        for (size_t i = 0; i < n->nentryvars(); ++i) {
-            module << indent(3) << "e" << i << "_valid_reg <= UInt<1>(0)\n";
-            module << indent(3) << "e" << i << "_processed_reg <= UInt<1>(0)\n";
-        }
-        for (int i = 0; i < n->noutputs(); ++i) {
-            module << indent(3) << "o" << (i) << "_processed_reg <= UInt<1>(0)\n";
-        }
-
-        std::vector<std::string> mem_nodes;
-        for (size_t k = 0; k < n->nsubregions(); ++k) {
-            mem_nodes.push_back("sr" + jive::detail::strfmt(k));
-        }
-        module << mux_mem(mem_nodes);
-
-        modules[module_index] = module.str();
-        return module_name;
-    }
-
-    std::string theta_node_to_string(const int depth, const jive::theta_node *n) {
-        auto module_name = "theta_mod" + jive::detail::strfmt(modules.size());
-        auto module_index = modules.size();
-        modules.emplace_back(); // need to preserve spot to avoid name collisions
-        std::ostringstream module;
-        auto sr = n->subregion();
-        module << indent(1) << "module " << module_name << ":\n";
-        // io
-        module << indent(2) + "; io" + "\n";
-        module << indent(2) + "input clk: Clock" + "\n";
-        module << indent(2) + "input reset: UInt<1>" + "\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "input i" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->input(i)->type()) + "}" + "\n";
-        }
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) << "output o" << i << ": {flip ready: UInt<1>, valid: UInt<1>, data: " <<
-                   to_firrtl_type(&n->output(i)->type()) << "}\n";
-        }
-        module << mem_io();
-        // registers
-        module << indent(2) << "; registers\n";
-//        module << indent(2) << "reg looping_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "reg i" << i
-                   << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-//            module << indent(2) + "reg i" << i << "_data_reg: "<< to_dot_width(&n->input(i)->type()) <<", clk\n";
-        }
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) << "reg o" << i
-                   << "_processed_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-        }
-        for (int i = 0; i < sr->nresults(); ++i) {
-            module << indent(2) + "reg o" << i << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-            module << indent(2) + "reg o" << i << "_data_reg: " << to_firrtl_type(&sr->result(i)->type())
-                   << ", clk\n";
-        }
-        // instances
-        module << indent(2) << "; instances" << "\n";
-        auto sr_module_name = subregion_to_string(sr, true);
-        module << indent(2) << "inst sr of " << sr_module_name << "\n";
-        module << indent(2) << "sr.clk <= clk\n";
-        module << indent(2) << "sr.reset <= reset\n";
-        for (size_t i = 0; i < sr->narguments(); ++i) {
-            module << indent(2) << "sr.i" << (i) << ".valid <= i" << i << ".valid\n";
-            module << indent(2) << "sr.i" << (i) << ".data <= i" << i << ".data\n";
-            module << indent(2) << "i" << i << ".ready <= and(not(i" << i << "_processed_reg), sr.i" << i
-                   << ".ready)\n";
-        }
-
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) << "when i" << (i) << ".valid:\n";
-            module << indent(3) << "i" << i << "_processed_reg <= UInt<1>(1)\n";
-        }
-
-        for (size_t i = 0; i < sr->nresults(); ++i) {
-            module << indent(2) << "when sr.o" << (i) << ".valid:\n";
-            module << indent(3) << "o" << i << "_valid_reg <= UInt<1>(1)\n";
-            if (i >= 1)
-                module << indent(3) << "o" << i - 1 << "_processed_reg <= UInt<1>(1)\n";
-            module << indent(3) << "o" << i << "_data_reg <= sr.o" << (i) << ".data\n";
-            module << indent(2) << "sr.o" << i << ".ready <= not(o" << (i) << "_valid_reg)\n";
-        }
-
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) << "o" << i << ".data is invalid\n";
-            module << indent(2) << "o" << i << ".valid <= UInt<1>(0)\n";
-        }
-        module << indent(2) << "when and(o0_valid_reg, not(o0_data_reg)): ; loop finished\n";
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(3) << "o" << i << ".data <= o" << (i + 1) << "_data_reg\n";
-            module << indent(3) << "o" << i << ".valid <= and(o" << (i) << ".ready, o" << (i + 1)
-                   << "_valid_reg)\n";
-            module << indent(3) << "when o" << i << ".valid:\n";
-            module << indent(4) << "o" << (i + 1) << "_valid_reg <= UInt<1>(0)\n";
-        }
-        module << indent(2) << "when and(o0_valid_reg, o0_data_reg): ; loop continuing\n";
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(3) << "sr.i" << i << ".data <= o" << (i + 1) << "_data_reg\n";
-            module << indent(3) << "sr.i" << i << ".valid <= and(and(sr.i" << (i) << ".ready, o" << (i + 1)
-                   << "_valid_reg), not(o" << i << "_processed_reg))\n";
-            module << indent(3) << "when sr.i" << (i) << ".valid:\n";
-            module << indent(4) << "o" << (i + 1) << "_valid_reg <= UInt<1>(0)\n";
-        }
-
-        std::string all_processed = "UInt<1>(1)"; // True by default
-        for (size_t i = 0; i < n->noutputs(); ++i) {
-            all_processed = "and(" + all_processed + ", o" + jive::detail::strfmt(i) + "_processed_reg)";
-        }
-        module << indent(2) << "node all_processed = " << all_processed << "\n";
-        module << indent(2) << "when all_processed:\n";
-        for (int i = 0; i < n->noutputs(); ++i) {
-            module << indent(3) << "o" << (i) << "_processed_reg <= UInt<1>(0)\n";
-        }
-        module << indent(2) << "when and(all_processed, and(o0_valid_reg, not(o0_data_reg))):\n";
-        for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(3) << "i" << i << "_processed_reg <= UInt<1>(0)\n";
-        }
-        module << indent(2) << "reg next_all_processed: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-        module << indent(2) << "next_all_processed <= all_processed\n";
-        module << indent(2) << "when next_all_processed:\n";
-        module << indent(3) << "o0_valid_reg <= UInt<1>(0)\n";
-
-        module << mux_mem({"sr",});
-
-        modules[module_index] = module.str();
-        return module_name;
-    }
-
-    std::string
-    node_to_string(const jive::node *node, const int depth) {
+    FirrtlModule
+    node_to_firrtl(const jive::node *node, const int depth) {
         if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
-            return simple_node_to_string(n);
-        } else if (auto n = dynamic_cast<const jive::gamma_node *>(node)) {
-            return gamma_node_to_string(n);
-        } else if (auto n = dynamic_cast<const jive::theta_node *>(node)) {
-            return theta_node_to_string(depth, n);
+            if (auto o = dynamic_cast<const jlm::load_op *>(&(n->operation()))) {
+                return mem_node_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const jlm::store_op *>(&(n->operation()))) {
+                return mem_node_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::predicate_buffer_op *>(&(n->operation()))) {
+                return pred_buffer_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::branch_op *>(&(n->operation()))) {
+                return branch_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::sink_op *>(&(n->operation()))) {
+                return sink_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::fork_op *>(&(n->operation()))) {
+                return fork_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::merge_op *>(&(n->operation()))) {
+                return merge_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::mux_op *>(&(n->operation()))) {
+                if (o->discarding) {
+
+                } else {
+                    return ndmux_to_firrtl(n);
+                }
+            }
+            return single_out_simple_node_to_firrtl(n);
         } else {
             throw std::logic_error(node->operation().debug_string() + " not implemented!");
         }
@@ -1340,42 +1302,9 @@ private:
         return std::string(depth * 4, ' ');
     }
 
-    std::string
-    create_dummy_module(const jive::type *type) {
-        std::string module_name = "dummy_mod" + jive::detail::strfmt(modules.size());
-        std::string module = indent(1) + "module " + module_name + ":\n";
-        // io
-        module += indent(2) + "; io" + "\n";
-        module += indent(2) + "input clk: Clock" + "\n";
-        module += indent(2) + "input reset: UInt<1>" + "\n";
-        module += indent(2) + "input i0: {flip ready: UInt<1>, valid: UInt<1>, data: " +
-                  to_firrtl_type(type) + "}" + "\n";
-        module += indent(2) + "output o0: {flip ready: UInt<1>, valid: UInt<1>, data: " +
-                  to_firrtl_type(type) + "}" + "\n";
-        // registers
-        module += indent(2) + "; registers" + "\n";
-        module += indent(2) + "reg i0_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
-        module += indent(2) + "reg i0_data_reg: " + to_firrtl_type(type) + ", clk" + "\n";
-        module += indent(2) + "; logic" + "\n";
-        module += indent(2) + "o0.data <= i0_data_reg";
-        module += indent(2) + "; handshaking" + "\n";
-        module += indent(2) + "i0.ready <= not(i0_valid_reg)" + "\n";
-        module += indent(2) + "node inputs_valid = i0_valid_reg";
-        module += indent(2) + "o0.valid <= and(o0.ready, inputs_valid)" + "\n";
-        module += indent(2) + "when o0.valid:" + "\n";
-        module += indent(3) + "i0_valid_reg <= UInt<1>(0)" + "\n";
-        module += indent(2) + "when i0.valid:" + "\n";
-        module += indent(3) + "i0_valid_reg <= UInt<1>(1)" + "\n";
-        module += indent(3) + "i0_data_reg <= i0.data" + "\n";
-        modules.push_back(module);
-        return module_name;
-    }
-
-    std::string
-    subregion_to_string(const jive::region *sr, bool register_comb = false) {
+    FirrtlModule
+    subregion_to_firrtl(const jive::region *sr, bool register_comb = false) {
         auto module_name = "subregion_mod" + jive::detail::strfmt(modules.size());
-        auto module_index = modules.size();
-        modules.emplace_back(); // need to preserve spot to avoid name collisions
         std::string module = indent(1) + "module " + module_name + ":\n";
         // io
         module += indent(2) + "; io" + "\n";
@@ -1383,31 +1312,33 @@ private:
         module += indent(2) + "input reset: UInt<1>" + "\n";
         for (size_t i = 0; i < sr->narguments(); ++i) {
             module +=
-                    indent(2) + "input i" + jive::detail::strfmt(i) +
+                    indent(2) + "input " + get_port_name(sr->argument(i)) +
                     ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
                     to_firrtl_type(&sr->argument(i)->type()) + "}" + "\n";
         }
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "output o" + jive::detail::strfmt(i) +
+            module += indent(2) + "output " + get_port_name(sr->result(i)) +
                       ": {flip ready: UInt<1>, valid: UInt<1>, data: " +
                       to_firrtl_type(&sr->result(i)->type()) + "}" + "\n";
         }
         module += mem_io();
         module += indent(2) + "; instances" + "\n";
         std::unordered_map<jive::output *, std::string> out_port_map;
-        std::unordered_set<jive::output *> used_outputs;
-        std::unordered_map<std::string, std::vector<std::string>> handshake_map;
         std::unordered_map<const jive::node *, std::string> node_inst_map;
+        std::vector<std::string> mem_nodes;
         for (int i = 0; i < sr->narguments(); ++i) {
-            out_port_map[sr->argument(i)] = "i" + jive::detail::strfmt(i);
+            out_port_map[sr->argument(i)] = get_port_name(sr->argument(i));
         }
         // create node modules and ios first
         for (const auto &node : sr->nodes) {
-            auto node_module = node_to_string(&node, 2);
-            std::string inst_name = node_module + "_inst";
-            module += indent(2) + "inst " + inst_name + " of " + node_module + "\n";
+            auto node_module = node_to_firrtl(&node, 2);
+            std::string inst_name = node_module.name + "_inst";
+            if(node_module.has_mem){
+                mem_nodes.push_back(inst_name);
+            }
+            module += indent(2) + "inst " + inst_name + " of " + node_module.name + "\n";
             for (int i = 0; i < node.noutputs(); ++i) {
-                out_port_map[node.output(i)] = inst_name + ".o" + jive::detail::strfmt(i);
+                out_port_map[node.output(i)] = inst_name + "." + get_port_name(node.output(i));
             }
             node_inst_map[&node] = inst_name;
         }
@@ -1416,90 +1347,31 @@ private:
             module += indent(2) + inst_name + ".clk <= clk\n";
             module += indent(2) + inst_name + ".reset <= reset\n";
             for (int i = 0; i < node.ninputs(); ++i) {
-                auto in_name = inst_name + ".i" + jive::detail::strfmt(i);
+                auto in_name = inst_name + "." + get_port_name(node.input(i));
                 assert(out_port_map.count(node.input(i)->origin()));
                 auto origin = out_port_map[node.input(i)->origin()];
-                used_outputs.insert(node.input(i)->origin());
+                module += indent(2) + origin + ".ready <= " + in_name + ".ready\n";
                 module += indent(2) + in_name + ".data <= " + origin + ".data\n";
                 module += indent(2) + in_name + ".valid <= " + origin + ".valid\n";
-                auto f = handshake_map.find(origin);
-                if (f == handshake_map.end()) {
-                    handshake_map[origin] = std::vector<std::string>(1, in_name);
-                } else {
-                    f->second.push_back(in_name);
-                }
-            }
-        }
-        if (register_comb) {
-            // TODO: this should really be done at IR level...
-            // insert dummy nodes that ensures there are no comb paths
-            for (int i = 0; i < sr->nresults(); ++i) {
-                if (dynamic_cast<jive::argument *>(sr->result(i)->origin())) {
-                    auto node_module = create_dummy_module(&sr->result(i)->type());
-                    auto inst_name = node_module + "_inst";
-                    module += indent(2) + "inst " + inst_name + " of " + node_module + "\n";
-                    module += indent(2) + inst_name + ".clk <= clk\n";
-                    module += indent(2) + inst_name + ".reset <= reset\n";
-                    auto origin = out_port_map[sr->result(i)->origin()];
-                    auto in_name = inst_name + ".i0";
-                    auto out_name = inst_name + ".o0";
-                    module += indent(2) + in_name + ".data <= " + origin + ".data\n";
-                    module += indent(2) + in_name + ".valid <= " + origin + ".valid\n";
-                    auto f = handshake_map.find(origin);
-                    if (f == handshake_map.end()) {
-                        handshake_map[origin] = std::vector<std::string>(1, in_name);
-                    } else {
-                        f->second.push_back(in_name);
-                    }
-                    // overwrite origin string mapping to dummy output - only output comes after this
-                    out_port_map[sr->result(i)->origin()] = out_name;
-                }
             }
         }
         for (int i = 0; i < sr->nresults(); ++i) {
             auto origin = out_port_map[sr->result(i)->origin()];
-            used_outputs.insert(sr->result(i)->origin());
-            auto result = "o" + jive::detail::strfmt(i);
-            auto f = handshake_map.find(origin);
-            if (f == handshake_map.end()) {
-                handshake_map[origin] = std::vector<std::string>(1, result);
-            } else {
-                f->second.push_back(result);
-            }
+            auto result = get_port_name(sr->result(i));
+            module += indent(2) + origin + ".ready <= " + result + ".ready\n";
             module += indent(2) + result + ".data <= " + origin + ".data\n";
             module += indent(2) + result + ".valid <= " + origin + ".valid\n";
         }
-        for (auto pair: handshake_map) {
-            auto origin = pair.first;
-            std::string users_ready = "UInt<1>(1)";
-            for (auto user: pair.second) {
-                users_ready = "and(" + users_ready + ", " + user + ".ready)";
-            }
-            module += indent(2) + origin + ".ready <= " + users_ready + "\n";
-        }
-        for (auto pair: out_port_map) {
-            auto origin = pair.first;
-            if (used_outputs.count(origin) == 0) {
-                module += indent(2) + pair.second + ".ready <= UInt<1>(1) ; unused\n";
-            }
-        }
 
-        std::vector<std::string> mem_nodes;
-        for (auto pair: node_inst_map) {
-            auto node_name = pair.second;
-            mem_nodes.push_back(node_name);
-        }
         module += mux_mem(mem_nodes);
 
-        modules[module_index] = module;
-        return module_name;
+        modules.emplace_back(module_name, module, true);
+        return modules.back();
     }
 
-    std::string
-    lambda_node_to_string(const jlm::lambda::node *ln) {
+    FirrtlModule
+    lambda_node_to_firrtl(const jlm::lambda::node *ln) {
         auto module_name = ln->name() + "_lambda_mod";
-        auto module_index = modules.size();
-        modules.emplace_back(); // preserve spot
         auto sr = ln->subregion();
         std::string module = indent(1) + "module " + module_name + ":\n";
         // io
@@ -1528,25 +1400,25 @@ private:
                       to_firrtl_type(&sr->result(i)->type()) + ", clk" + "\n";
         }
         module += indent(2) + "; instances" + "\n";
-        auto sr_module_name = subregion_to_string(sr);
-        module += indent(2) + "inst sr of " + sr_module_name + "\n";
+        auto sr_firrtl = subregion_to_firrtl(sr);
+        module += indent(2) + "inst sr of " + sr_firrtl.name + "\n";
         module += indent(2) + "sr.clk <= clk\n";
         module += indent(2) + "sr.reset <= reset\n";
         for (size_t i = 0; i < sr->narguments(); ++i) {
-            module += indent(2) + "sr.i" + jive::detail::strfmt(i) + ".valid <= i.valid\n";
-            module += indent(2) + "sr.i" + jive::detail::strfmt(i) + ".data <= i.data" + jive::detail::strfmt(i) +
+            module += indent(2) + "sr." + get_port_name(sr->argument(i)) + ".valid <= i.valid\n";
+            module += indent(2) + "sr." + get_port_name(sr->argument(i)) + ".data <= i.data" + jive::detail::strfmt(i) +
                       "\n";
         }
         // logic
         module += indent(2) + "; logic" + "\n";
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "sr.o" + jive::detail::strfmt(i) + ".ready <= not(o" + jive::detail::strfmt(i) +
+            module += indent(2) + "sr." + get_port_name(sr->result(i)) + ".ready <= not(o" + jive::detail::strfmt(i) +
                       "_valid_reg)" + "\n";
         }
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "when sr.o" + jive::detail::strfmt(i) + ".valid:" + "\n";
+            module += indent(2) + "when sr." + get_port_name(sr->result(i)) + ".valid:" + "\n";
             module += indent(3) + "o" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
-            module += indent(3) + "o" + jive::detail::strfmt(i) + "_data_reg <= sr.o" + jive::detail::strfmt(i) +
+            module += indent(3) + "o" + jive::detail::strfmt(i) + "_data_reg <= sr." + get_port_name(sr->result(i)) +
                       ".data" + "\n";
         }
         std::string outputs_valids = "UInt<1>(1)"; // True by default
@@ -1556,7 +1428,7 @@ private:
         module += indent(2) + "node outputs_valid = " + outputs_valids + "\n";
         module += indent(2) + "o.valid <= outputs_valid\n";
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "o.data" + jive::detail::strfmt(i) + " <= sr.o" + jive::detail::strfmt(i) +
+            module += indent(2) + "o.data" + jive::detail::strfmt(i) + " <= sr." + get_port_name(sr->result(i)) +
                       ".data" + "\n";
         }
         module += indent(2) + "when and(o.valid, o.ready):\n";
@@ -1565,14 +1437,14 @@ private:
         }
         std::string inputs_ready = "UInt<1>(1)"; // True by default
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            inputs_ready = "and(" + inputs_ready + ", sr.i" + jive::detail::strfmt(i) + ".ready)";
+            inputs_ready = "and(" + inputs_ready + ", sr." + get_port_name(sr->argument(i)) + ".ready)";
         }
         module += indent(2) + "node inputs_ready = " + inputs_ready + "\n";
         module += indent(2) + "i.ready <= inputs_ready\n";
 
         module += mux_mem({"sr",});
-        modules[module_index] = module;
-        return module_name;
+        modules.emplace_back(module_name, module, true);
+        return modules.back();
     }
 };
 
@@ -1614,16 +1486,16 @@ main(int argc, char **argv) {
 
     dump_xml(source_file_name, rm);
     jive::view(rm->graph()->root(), stdout);
-    hls_remove_unused_state(*rm);
-//    hls_gamma_conv(*rm);
+    hls::passes::hls_remove_unused_state(*rm);
+    hls::passes::hls_gamma_conv(*rm);
+    hls::passes::hls_theta_conv(*rm);
+    hls::passes::hls_add_sinks(*rm);
+    hls::passes::hls_add_forks(*rm);
+    hls::passes::hls_check_graph(*rm);
+//    jive::view(rm->graph()->root(), stdout);
+//    dump_xml(source_file_name, rm, "_hls");
 
-//    hls_theta_conv(*rm);
-//    hls_add_sinks(*rm);
-//    hls_add_forks(*rm);
-    jive::view(rm->graph()->root(), stdout);
-    dump_xml(source_file_name, rm, "_hls");
-
-//    FirrtlHLS hls;
-//    hls.run(*rm, lm.get());
+    FirrtlHLS hls;
+    hls.run(*rm, lm.get());
     return 0;
 }
