@@ -441,8 +441,8 @@ namespace hls {
             return jive::simple_node::create_normalized(region, op, {&value});
         }
 
-    private:
         size_t capacity;
+    private:
     };
 }
 
@@ -844,6 +844,38 @@ private:
         return result;
     }
 
+    std::string ready(jive::output *port) {
+        return get_port_name(port) + ".ready";
+    }
+
+    std::string ready(jive::input *port) {
+        return get_port_name(port) + ".ready";
+    }
+
+    std::string valid(jive::output *port) {
+        return get_port_name(port) + ".valid";
+    }
+
+    std::string valid(jive::input *port) {
+        return get_port_name(port) + ".valid";
+    }
+
+    std::string data(jive::output *port) {
+        return get_port_name(port) + ".data";
+    }
+
+    std::string data(jive::input *port) {
+        return get_port_name(port) + ".data";
+    }
+
+    std::string fire(jive::output *port) {
+        return "and(" + valid(port) + ", " + ready(port) + ")";
+    }
+
+    std::string fire(jive::input *port) {
+        return "and(" + valid(port) + ", " + ready(port) + ")";
+    }
+
     std::string
     to_firrtl_type(const jive::type *type) {
         if (auto t = dynamic_cast<const jive::bittype *>(type)) {
@@ -911,14 +943,9 @@ private:
         if (has_mem_io) {
             module << mem_io();
         }
-        for (size_t i = 0; i < node->ninputs(); ++i) {
-            module << indent(2) << "assert(clk, not(and(i" << i << ".valid, not(i" << i
-                   << ".ready))), not(reset), \"valid only when ready\")\n";
-        }
 
         return module.str();
     }
-
 
     FirrtlModule &mem_node_to_firrtl(const jive::simple_node *n) {
         std::string module_name = get_node_name(n);
@@ -1009,7 +1036,6 @@ private:
         return modules.back();
     }
 
-
     FirrtlModule &pred_buffer_to_firrtl(const jive::simple_node *n) {
         std::string module_name = get_node_name(n);
         std::ostringstream module;
@@ -1020,16 +1046,68 @@ private:
         module << indent(2) << "reg buf_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(1)))\n";
         module << indent(2) << "reg buf_data_reg: " << to_firrtl_type(&n->output(0)->type())
                << ", clk  with: (reset => (reset, UInt<1>(0)))\n";
-        auto o0 = get_port_name(n->output(0));
-        module << indent(2) << o0 << ".valid <= and(" << o0 << ".ready, buf_valid_reg)\n";
-        module << indent(2) << o0 << ".data <= buf_data_reg\n";
-        auto i0 = get_port_name(n->input(0));
-        module << indent(2) << i0 << ".ready <= not(buf_valid_reg)\n";
-        module << indent(2) << "when " << i0 << ".valid:\n";
+        auto o0 = n->output(0);
+        module << indent(2) << valid(o0) << " <= and(" << ready(o0) << ", buf_valid_reg)\n";
+        module << indent(2) << data(o0) << " <= buf_data_reg\n";
+        auto i0 = n->input(0);
+        module << indent(2) << ready(i0) << " <= not(buf_valid_reg)\n";
+        // TODO: allow pass-through?
+        module << indent(2) << "when " << fire(i0) << ":\n";
         module << indent(3) << "buf_valid_reg <= UInt<1>(1)\n";
-        module << indent(3) << "buf_data_reg <= " << i0 << ".data\n";
-        module << indent(2) << "when " << o0 << ".valid:\n";
+        module << indent(3) << "buf_data_reg <= " << data(i0) << "\n";
+        module << indent(2) << "when " << fire(o0) << ":\n";
         module << indent(3) << "buf_valid_reg <= UInt<1>(0)\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &buffer_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+        module << indent(2) << "; registers\n";
+        auto o = dynamic_cast<const hls::buffer_op *>(&(n->operation()));
+        auto capacity = o->capacity;
+        for (int i = 0; i < capacity; ++i) {
+            module << indent(2) << "reg buf" << i << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
+            module << indent(2) << "reg buf" << i << "_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
+        }
+        for (int i = 0; i <= capacity; ++i) {
+            module << indent(2) << "wire in_consumed" << i << ": UInt<1>\n";
+            module << indent(2) << "wire shift_out" << i << ": UInt<1>\n";
+        }
+        auto o0 = n->output(0);
+        // connect out to buf0
+        module << indent(2) << valid(o0) << " <= buf0_valid_reg\n";
+        module << indent(2) << data(o0) << " <= buf0_data_reg\n";
+        auto i0 = n->input(0);
+        // buf is ready if last one is empty
+        module << indent(2) << ready(i0) << " <= not(buf" << capacity - 1 << "_valid_reg)\n";
+
+        // shift register with insertion into earliest free slot
+        module << indent(2) << "shift_out0 <= " << fire(o0) << "\n";
+        module << indent(2) << "in_consumed0 <= UInt<1>(0)\n";
+        // invalid pseudo slot so we can use the same logic for the last slot
+        module << indent(2) << "node buf" << capacity << "_valid_reg = UInt<1>(0)\n";
+        module << indent(2) << "node buf" << capacity << "_data_reg = UInt<1>(0)\n";
+        for (int i = 0; i < capacity; ++i) {
+            module << indent(2) << "node will_be_empty" << i << " = or(shift_out" << i << ", not(buf" << i << "_valid_reg))\n";
+            module << indent(2) << "in_consumed" << i+1 << " <= in_consumed" << i << "\n";
+            module << indent(2) << "node in_available" << i << " = and(" << fire(i0) << ", not(in_consumed" << i << "))\n";
+            module << indent(2) << "shift_out" << i+1 << " <= UInt<1>(0)\n";
+            module << indent(2) << "when shift_out" << i << ":\n";
+            module << indent(3) << "buf" << i << "_valid_reg <= UInt<1>(0)\n";
+            module << indent(2) << "when will_be_empty" << i << ":\n";
+            module << indent(3) << "when buf" << i+1 << "_valid_reg:\n";
+            module << indent(4) << "buf" << i << "_valid_reg <= UInt<1>(1)\n";
+            module << indent(4) << "buf" << i << "_data_reg <= buf" << i+1 << "_data_reg\n";
+            module << indent(4) << "shift_out" << i+1 << " <= UInt<1>(1)\n";
+            module << indent(3) << "else when in_available" << i << ":\n";
+            module << indent(4) << "in_consumed" << i+1 << " <= UInt<1>(1)\n";
+            module << indent(4) << "buf" << i << "_valid_reg <= UInt<1>(1)\n";
+            module << indent(4) << "buf" << i << "_data_reg <= " << data(i0) << "\n";
+
+        }
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
     }
@@ -1043,25 +1121,27 @@ private:
         module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
         module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
 
-        auto ipred = get_port_name(n->input(0));
-        auto o0 = get_port_name(n->output(0));
+        auto ipred = n->input(0);
+        auto o0 = n->output(0);
 
-        module << indent(2) << o0 << ".valid <= UInt<1>(0)\n";
-        module << indent(2) << o0 << ".data is invalid\n";
+        module << indent(2) << valid(o0) << " <= UInt<1>(0)\n";
+        module << indent(2) << data(o0) << " is invalid\n";
 
-        module << "node pred_valid = or(pred_valid_reg, " << ipred << ".valid)\n";
-        module << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << ipred << ".data)\n";
+        module << indent(2) << "node pred_valid = or(pred_valid_reg, " << valid(ipred) << ")\n";
+        module << indent(2) << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << data(ipred) << ")\n";
         for (int i = 1; i < n->ninputs(); ++i) {
-            auto in = get_port_name(n->input(i));
-            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>("<<i-1<<"))):\n";
-            module << indent(3) << o0 << ".valid <= " << in << ".valid\n";
-            module << indent(3) << o0 << ".data <= " << in << ".data\n";
+            auto in = n->input(i);
+            module << indent(2) << ready(in) << " <= UInt<1>(0)\n";
+            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>(" << i - 1 << "))):\n";
+            module << indent(3) << valid(o0) << " <= " << valid(in) << "\n";
+            module << indent(3) << data(o0) << " <= " << data(in) << "\n";
+            module << indent(3) << ready(in) << " <= " << ready(o0) << "\n";
         }
-        module << indent(2) << ipred << ".ready <= not(buf_valid_reg)\n";
-        module << indent(2) << "when and(" << ipred << ".valid), not(" << o0 << ".valid)):\n";
+        module << indent(2) << ready(ipred) << " <= not(pred_valid_reg)\n";
+        module << indent(2) << "when and(" << fire(ipred) << ", not(" << valid(o0) << ")):\n";
         module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
-        module << indent(3) << "pred_data_reg <= " << ipred << ".data\n";
-        module << indent(2) << "when " << o0 << ".valid:\n";
+        module << indent(3) << "pred_data_reg <= " << data(ipred) << "\n";
+        module << indent(2) << "when " << fire(o0) << ":\n";
         module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
@@ -1071,18 +1151,18 @@ private:
         std::string module_name = get_node_name(n);
         std::ostringstream module;
         module << module_header(n);
-        auto o0 = get_port_name(n->output(0));
+        auto o0 = n->output(0);
 
-        module << indent(2) << o0 << ".valid <= UInt<1>(0)\n";
-        module << indent(2) << o0 << ".data is invalid\n";
+        module << indent(2) << valid(o0) << " <= UInt<1>(0)\n";
+        module << indent(2) << data(o0) << " is invalid\n";
 
 
         for (int i = 0; i < n->ninputs(); ++i) {
-            auto in = get_port_name(n->input(i));
-            module << indent(2) << in << ".ready <= " << o0 << ".ready\n";
-            module << indent(2) << "when " << in << ".valid:\n";
-            module << indent(3) << o0 << ".valid <= " << in << ".valid\n";
-            module << indent(3) << o0 << ".data <= " << in << ".data\n";
+            auto in = n->input(i);
+            module << indent(2) << ready(in) << " <= " << ready(o0) << "\n";
+            module << indent(2) << "when " << valid(in) << ":\n";
+            module << indent(3) << valid(o0) << " <= " << valid(in) << "\n";
+            module << indent(3) << data(o0) << " <= " << data(in) << "\n";
         }
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
@@ -1092,18 +1172,16 @@ private:
         std::string module_name = get_node_name(n);
         std::ostringstream module;
         module << module_header(n);
-        auto i0 = get_port_name(n->input(0));
-
-
+        auto i0 = n->input(0);
         std::string all_ready = "UInt<1>(1)"; // True by default
 
         for (int i = 0; i < n->noutputs(); ++i) {
-            auto out = get_port_name(n->output(i));
-            module << indent(2) << out << ".valid <= " << i0 << ".valid\n";
-            module << indent(2) << out << ".data <= " << i0 << ".data\n";
-            all_ready = "and(" + all_ready + ", "+out+".ready)";
+            auto out = n->output(i);
+            module << indent(2) << valid(out) << " <= " << valid(i0) << "\n";
+            module << indent(2) << data(out) << " <= " << data(i0) << "\n";
+            all_ready = "and(" + all_ready + ", " + ready(out) + ")";
         }
-        module << indent(2) << i0 << ".ready <= " << all_ready << "\n";
+        module << indent(2) << ready(i0) << " <= " << all_ready << "\n";
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
     }
@@ -1112,8 +1190,8 @@ private:
         std::string module_name = get_node_name(n);
         std::ostringstream module;
         module << module_header(n);
-        auto i0 = get_port_name(n->input(0));
-        module << indent(2) << i0 << ".ready <= UInt<1>(1)\n";
+        auto i0 = n->input(0);
+        module << indent(2) << ready(i0) << " <= UInt<1>(1)\n";
 
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
@@ -1128,108 +1206,70 @@ private:
         module << indent(2) << "reg pred_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
         module << indent(2) << "reg pred_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
 
-        auto ipred = get_port_name(n->input(0));
-        auto ival = get_port_name(n->input(1));
+        auto ipred = n->input(0);
+        auto ival = n->input(1);
 
         module << indent(2) << "wire out_valid: UInt<1>\n";
         module << indent(2) << "out_valid <= UInt<1>(0)\n";
-        module << indent(2) << "node pred_valid = or(pred_valid_reg, " << ipred << ".valid)\n";
-        module << indent(2) << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << ipred << ".data)\n";
-        module << indent(2) << ival << ".ready <= UInt<1>(0)\n";
+        module << indent(2) << "node pred_valid = or(pred_valid_reg, " << valid(ipred) << ")\n";
+        module << indent(2) << "node pred_data = mux(pred_valid_reg, pred_data_reg, " << data(ipred) << ")\n";
+        module << indent(2) << ready(ival) << " <= UInt<1>(0)\n";
         for (int i = 0; i < n->noutputs(); ++i) {
-            auto out = get_port_name(n->output(i));
-            module << indent(2) << out << ".valid <= UInt<1>(0)\n";
-            module << indent(2) << out << ".data is invalid\n";
-            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>("<<i<<"))):\n";
-            module << indent(3) << ival << ".ready <= " << out << ".ready\n";
-            module << indent(3) << out << ".valid <= " << ival << ".valid\n";
-            module << indent(3) << out << ".data <= " << ival << ".data\n";
+            auto out = n->output(i);
+            module << indent(2) << valid(out) << " <= UInt<1>(0)\n";
+            module << indent(2) << data(out) << " is invalid\n";
+            module << indent(2) << "when and(pred_valid, eq(pred_data, UInt<64>(" << i << "))):\n";
+            module << indent(3) << ready(ival) << " <= " << ready(out) << "\n";
+            module << indent(3) << valid(out) << " <= " << valid(ival) << "\n";
+            module << indent(3) << data(out) << " <= " << data(ival) << "\n";
             module << indent(3) << "out_valid <= UInt<1>(1)\n";
         }
-        module << indent(2) << ipred << ".ready <= not(pred_valid_reg)\n";
-        module << indent(2) << "when and(" << ipred << ".valid, not(out_valid)):\n";
+        module << indent(2) << ready(ipred) << " <= not(pred_valid_reg)\n";
+        module << indent(2) << "when and(" << fire(ipred) << ", not(out_valid)):\n";
         module << indent(3) << "pred_valid_reg <= UInt<1>(1)\n";
-        module << indent(3) << "pred_data_reg <= " << ipred << ".data\n";
-        module << indent(2) << "when " << ival << ".valid:\n";
+        module << indent(3) << "pred_data_reg <= " << data(ipred) << "\n";
+        module << indent(2) << "when " << fire(ival) << ":\n";
         module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
     }
 
-    FirrtlModule &single_out_simple_node_to_firrtl(const jive::simple_node *n) {
-        std::string module_name = get_node_name(n);
-        std::ostringstream module;
-
-        module << module_header(n);
-
-        if(n->noutputs() != 1){
-            throw std::logic_error(n->operation().debug_string() + " has more than 1 output");
-        }
-        auto out = n->output(0);
-        module << indent(2) + "; logic" + "\n";
-        module << indent(2) + get_port_name(out) + ".data <=";
+    std::string simple_op_to_firrtl(const jive::simple_node *n) {
         if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
             if (is_identity_mapping(*o)) {
-                // TODO: figure out why this hack is needed
-                module << get_port_name(in0) << ".data";
+                return data(n->input(0));
             } else {
                 throw std::logic_error("non-identity mapping not implemented!");
             }
         } else if (auto o = dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module <<
-                   "gt(asSInt(" + get_port_name(in0) + ".data" + "), asSInt(" + get_port_name(in1) +
-                   ".data" +
-                   "))";
+            return "gt(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
         } else if (auto o = dynamic_cast<const jlm::sext_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            module << "asUInt(pad(asSInt(" + get_port_name(in0) + ".data" + "), " +
-                      jive::detail::strfmt(o->ndstbits()) + "))";
+            return "asUInt(pad(asSInt(" + data(n->input(0)) + "), " + jive::detail::strfmt(o->ndstbits()) + "))";
         } else if (auto o = dynamic_cast<const jlm::trunc_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            module << get_port_name(in0) + ".data";
+            return data(n->input(0));
         } else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "gt(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "gt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitult_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "lt(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "lt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitslt_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "lt(asSInt(" + get_port_name(in0) + ".data)" + ", asSInt(" + get_port_name(in1) +
-                      ".data)" + ")";
+            return "lt(asSInt(" + data(n->input(0)) + ", asSInt(" + data(n->input(1)) + "))";
         } else if (auto o = dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "eq(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "eq(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitadd_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "add(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "add(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitmul_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "mul(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "mul(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "sub(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "sub(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
-            auto in0 = n->input(0);
-            auto in1 = n->input(1);
-            module << "neq(" + get_port_name(in0) + ".data" + ", " + get_port_name(in1) + ".data" + ")";
+            return "neq(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
         } else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
             auto value = o->value();
-            module << "UInt<" << value.nbits() << ">(" << value.to_uint() << ")";
+            return jive::detail::strfmt("UInt<", value.nbits(), ">(", value.to_uint(), ")");
         } else if (auto o = dynamic_cast<const jlm::undef_constant_op *>(&(n->operation()))) {
-            module << "UInt<1>(0) ; TODO: Fix?";
+            return "UInt<1>(0) ; TODO: Fix?";
         } else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
-            module << "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
+            return "UInt<1>(" + jive::detail::strfmt(o->value().alternative()) + ")";
         } else if (auto o = dynamic_cast<const jlm::getelementptr_op *>(&(n->operation()))) {
             assert(n->ninputs() == 2);
             const auto *pt = &o->pointee_type();
@@ -1241,26 +1281,39 @@ private:
             }
             int bytes = bits / 8;
             // TODO: fix
-            module << "add(" + get_port_name(n->input(0)) + ".data" + ", mul(" + get_port_name(n->input(1)) +
-                      ".data, UInt<64>(" + jive::detail::strfmt(bytes) + ")))";
+            return "add(" + data(n->input(0)) + ", mul(" + data(n->input(1)) + ", UInt<64>(" +
+                   jive::detail::strfmt(bytes) + ")))";
         } else {
             throw std::logic_error(n->operation().debug_string() + " not implemented!");
         }
-        module << " ; " + n->operation().debug_string() + "\n";
+    }
+
+    FirrtlModule &single_out_simple_node_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+
+        module << module_header(n);
+
+        if (n->noutputs() != 1) {
+            throw std::logic_error(n->operation().debug_string() + " has more than 1 output");
+        }
+        module << indent(2) << "; logic\n";
+        module << indent(2) << " ; " << n->operation().debug_string() << "\n";
+        auto op = simple_op_to_firrtl(n);
+        module << indent(2) << data(n->output(0)) << " <= " << op;
         // handshaking
         module << indent(2) + "; handshaking" + "\n";
         for (size_t i = 0; i < n->ninputs(); ++i) {
-            module << indent(2) + "i" + jive::detail::strfmt(i) + ".ready <= o0.ready\n";
+            module << indent(2) + ready(n->input(i)) + "<= " << ready(n->output(0)) << "\n";
         }
-        module << indent(2) + "node inputs_valid = ";
+
         std::string inputs_valids = "UInt<1>(1)"; // True by default
         for (size_t i = 0; i < n->ninputs(); ++i) {
-            inputs_valids = "and(" + inputs_valids + ", " + get_port_name(n->input(i)) + ".valid)";
+            inputs_valids = "and(" + inputs_valids + ", " + valid(n->input(i)) + ")";
         }
-        module << inputs_valids + "\n";
+        module << indent(2) << "node inputs_valid = " << inputs_valids << "\n";
         for (size_t i = 0; i < n->noutputs(); ++i) {
-            module << indent(2) + "o" + jive::detail::strfmt(i) + ".valid <= and(o" + jive::detail::strfmt(i) +
-                      ".ready, inputs_valid)" + "\n";
+            module << indent(2) << valid(n->output(0)) << " <= inputs_valid\n";
         }
 
         modules.emplace_back(module_name, module.str(), false);
@@ -1276,6 +1329,8 @@ private:
                 return mem_node_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::predicate_buffer_op *>(&(n->operation()))) {
                 return pred_buffer_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::buffer_op *>(&(n->operation()))) {
+                return buffer_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::branch_op *>(&(n->operation()))) {
                 return branch_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::sink_op *>(&(n->operation()))) {
@@ -1286,7 +1341,7 @@ private:
                 return merge_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::mux_op *>(&(n->operation()))) {
                 if (o->discarding) {
-
+                    throw std::logic_error("not implemented");
                 } else {
                     return ndmux_to_firrtl(n);
                 }
@@ -1333,7 +1388,7 @@ private:
         for (const auto &node : sr->nodes) {
             auto node_module = node_to_firrtl(&node, 2);
             std::string inst_name = node_module.name + "_inst";
-            if(node_module.has_mem){
+            if (node_module.has_mem) {
                 mem_nodes.push_back(inst_name);
             }
             module += indent(2) + "inst " + inst_name + " of " + node_module.name + "\n";
@@ -1393,6 +1448,12 @@ private:
         module += mem_io();
         // registers
         module += indent(2) + "; registers" + "\n";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            module += indent(2) + "reg i" + jive::detail::strfmt(i) +
+                      "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
+            module += indent(2) + "reg i" + jive::detail::strfmt(i) + "_data_reg: " +
+                      to_firrtl_type(&sr->argument(i)->type()) + ", clk" + "\n";
+        }
         for (size_t i = 0; i < sr->nresults(); ++i) {
             module += indent(2) + "reg o" + jive::detail::strfmt(i) +
                       "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))" + "\n";
@@ -1405,18 +1466,19 @@ private:
         module += indent(2) + "sr.clk <= clk\n";
         module += indent(2) + "sr.reset <= reset\n";
         for (size_t i = 0; i < sr->narguments(); ++i) {
-            module += indent(2) + "sr." + get_port_name(sr->argument(i)) + ".valid <= i.valid\n";
-            module += indent(2) + "sr." + get_port_name(sr->argument(i)) + ".data <= i.data" + jive::detail::strfmt(i) +
-                      "\n";
+            module += indent(2) + "sr." + valid(sr->argument(i)) + " <= i" + jive::detail::strfmt(i) + "_valid_reg\n";
+            module += indent(2) + "sr." + data(sr->argument(i)) + " <= i" + jive::detail::strfmt(i) + "_data_reg\n";
+            module += indent(2) + "when and(sr." + valid(sr->argument(i)) + ", sr." + ready(sr->argument(i)) + "):\n";
+            module += indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(0)" + "\n";
         }
         // logic
         module += indent(2) + "; logic" + "\n";
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "sr." + get_port_name(sr->result(i)) + ".ready <= not(o" + jive::detail::strfmt(i) +
+            module += indent(2) + "sr." + ready(sr->result(i)) + " <= not(o" + jive::detail::strfmt(i) +
                       "_valid_reg)" + "\n";
         }
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "when sr." + get_port_name(sr->result(i)) + ".valid:" + "\n";
+            module += indent(2) + "when and(sr." + valid(sr->result(i)) + ", sr." + ready(sr->result(i)) + "):\n";
             module += indent(3) + "o" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
             module += indent(3) + "o" + jive::detail::strfmt(i) + "_data_reg <= sr." + get_port_name(sr->result(i)) +
                       ".data" + "\n";
@@ -1428,19 +1490,27 @@ private:
         module += indent(2) + "node outputs_valid = " + outputs_valids + "\n";
         module += indent(2) + "o.valid <= outputs_valid\n";
         for (size_t i = 0; i < sr->nresults(); ++i) {
-            module += indent(2) + "o.data" + jive::detail::strfmt(i) + " <= sr." + get_port_name(sr->result(i)) +
-                      ".data" + "\n";
+            module +=
+                    indent(2) + "o.data" + jive::detail::strfmt(i) + " <= o" + jive::detail::strfmt(i) + "_data_reg\n";
         }
         module += indent(2) + "when and(o.valid, o.ready):\n";
         for (size_t i = 0; i < sr->nresults(); ++i) {
             module += indent(3) + "o" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(0)" + "\n";
         }
         std::string inputs_ready = "UInt<1>(1)"; // True by default
-        for (size_t i = 0; i < sr->nresults(); ++i) {
-            inputs_ready = "and(" + inputs_ready + ", sr." + get_port_name(sr->argument(i)) + ".ready)";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            inputs_ready = "and(" + inputs_ready + ", not(i" + jive::detail::strfmt(i) + "_valid_reg))";
         }
         module += indent(2) + "node inputs_ready = " + inputs_ready + "\n";
         module += indent(2) + "i.ready <= inputs_ready\n";
+
+
+        module += indent(2) + "when and(i.ready, i.valid):\n";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            module += indent(3) + "i" + jive::detail::strfmt(i) + "_valid_reg <= UInt<1>(1)" + "\n";
+            module +=
+                    indent(3) + "i" + jive::detail::strfmt(i) + "_data_reg <= i.data" + jive::detail::strfmt(i) + "\n";
+        }
 
         module += mux_mem({"sr",});
         modules.emplace_back(module_name, module, true);
