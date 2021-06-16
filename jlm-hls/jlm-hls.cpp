@@ -758,6 +758,236 @@ public:
     std::string firrtl;
 };
 
+class DotHLS {
+public:
+    void run(jlm::rvsdg_module &rm, llvm::Module *lm) {
+        std::string dot;
+        auto region = rm.graph()->root();
+        if (auto ln = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr())) {
+            dot = subregion_to_dot(ln->subregion());
+        } else {
+            throw jlm::error("Root should have only one lambda node now");
+        }
+        auto source_file_name = lm->getSourceFileName();
+        std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + ".dot";
+        std::ofstream dot_file;
+        dot_file.open(file_name);
+        dot_file << dot;
+        dot_file.close();
+    }
+
+private:
+    std::unordered_map<const jive::node *, std::string> node_map;
+
+    std::string
+    get_node_name(const jive::node *node) {
+        auto found = node_map.find(node);
+        if (found != node_map.end()) {
+            return found->second;
+        }
+        auto new_name = jive::detail::strfmt("node_", node->operation().debug_string(), node_map.size());
+        // remove chars that are not valid in firrtl module names
+        std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');
+        node_map[node] = new_name;
+        return new_name;
+    }
+
+    std::string
+    get_port_name(jive::input *port) {
+        std::string result;
+        if (auto p = dynamic_cast<const jive::node_input *>(port)) {
+            result += "i";
+        } else if (auto p = dynamic_cast<const jive::result *>(port)) {
+            result += "r";
+        } else {
+            throw std::logic_error(port->debug_string() + " not implemented!");
+        }
+        result += jive::detail::strfmt(port->index());
+        return result;
+    }
+
+    std::string
+    get_port_name(jive::output *port) {
+        if (port == nullptr) {
+            throw std::logic_error("nullptr!");
+        }
+        std::string result;
+        if (auto p = dynamic_cast<const jive::argument *>(port)) {
+            result += "a";
+        } else if (auto p = dynamic_cast<const jive::node_output *>(port)) {
+            result += "o";
+        } else if (auto p = dynamic_cast<const jive::structural_output *>(port)) {
+            result += "so";
+        } else {
+            throw std::logic_error(port->debug_string() + " not implemented!");
+        }
+        result += jive::detail::strfmt(port->index());
+        return result;
+    }
+
+    std::string argument_to_dot(jive::argument *port){
+        auto name = get_port_name(port);
+
+        auto dot = \
+        "{rank=source; " +
+        name +
+        " [shape=plaintext label=<\n"
+        "            <TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
+        "                <TR>\n"
+        "                    <TD WIDTH=\"20\"></TD>\n"
+        "                    <TD BORDER=\"1\" CELLPADDING=\"1\"><FONT POINT-SIZE=\"10\">" +
+        name +
+        "</FONT></TD>\n"
+        "                    <TD WIDTH=\"10\"></TD>\n"
+        "                </TR>\n"
+        "            </TABLE>\n"
+        ">];}\n";
+        return dot;
+    }
+
+    std::string result_to_dot(jive::result *port){
+        auto name = get_port_name(port);
+
+        auto dot = \
+        "{rank=sink; " +
+        name +
+        " [shape=plaintext label=<\n"
+        "            <TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
+        "                <TR>\n"
+        "                    <TD WIDTH=\"20\"></TD>\n"
+        "                    <TD BORDER=\"1\" CELLPADDING=\"1\"><FONT POINT-SIZE=\"10\">" +
+        name +
+        "</FONT></TD>\n"
+        "                    <TD WIDTH=\"10\"></TD>\n"
+        "                </TR>\n"
+        "            </TABLE>\n"
+        ">];}\n";
+        return dot;
+    }
+
+    std::string node_to_dot(const jive::node *node) {
+        // dot inspired by https://stackoverflow.com/questions/42157650/moving-graphviz-edge-out-of-the-way
+        auto SPACER = "                    <TD WIDTH=\"10\"></TD>\n";
+        auto name = get_node_name(node);
+        auto opname = node->operation().debug_string();
+        std::replace_if(opname.begin(), opname.end(), isForbiddenChar, '_');
+
+        std::string inputs;
+        for (int i = 0; i < node->ninputs(); ++i) {
+            if(i!=0){
+                inputs += SPACER;
+            }
+            auto in = get_port_name(node->input(i));
+            inputs += \
+            "                    <TD PORT=\"" + in + "\" BORDER=\"1\" CELLPADDING=\"1\"><FONT POINT-SIZE=\"10\">" + in +
+            "</FONT></TD>\n";
+        }
+
+        std::string outputs;
+        for (int i = 0; i < node->noutputs(); ++i) {
+            if(i!=0){
+                outputs += SPACER;
+            }
+            auto out = get_port_name(node->output(i));
+            outputs += \
+            "                    <TD PORT=\"" + out + "\" BORDER=\"1\" CELLPADDING=\"1\"><FONT POINT-SIZE=\"10\">" +
+            out + "</FONT></TD>\n";
+        }
+
+        auto dot = \
+        name +
+        " [shape=plaintext label=<\n"
+        "<TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
+        // inputs
+        "    <TR>\n"
+        "        <TD BORDER=\"0\">\n"
+        "            <TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
+        "                <TR>\n"
+        "                    <TD WIDTH=\"20\"></TD>\n" +
+        inputs +
+        "                    <TD WIDTH=\"20\"></TD>\n"
+        "                </TR>\n"
+        "            </TABLE>\n"
+        "        </TD>\n"
+        "    </TR>\n"
+        "    <TR>\n"
+        "        <TD BORDER=\"1\" STYLE=\"ROUNDED\" CELLPADDING=\"4\" COLOR=\"black\">" +
+        opname +
+        "<BR/><FONT POINT-SIZE=\"10\">" +
+        name +
+        "</FONT></TD>\n"
+        "    </TR>\n"
+        "    <TR>\n"
+        "        <TD BORDER=\"0\">\n"
+        "            <TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
+        "                <TR>\n"
+        "                    <TD WIDTH=\"20\"></TD>\n" +
+        outputs +
+        "                    <TD WIDTH=\"20\"></TD>\n"
+        "                </TR>\n"
+        "            </TABLE>\n"
+        "        </TD>\n"
+        "    </TR>\n"
+        "</TABLE>\n"
+        ">];\n";
+        return dot;
+    }
+
+    std::string
+    edge(std::string src, std::string snk, const jive::type & type){
+        auto color = "black";
+        if(dynamic_cast<const jive::ctltype *>(&type)){
+            color = "green";
+        }
+        return src + " -> " + snk + " [style=\"\", arrowhead=\"normal\", color="+color+", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black];\n";
+    }
+
+    std::string
+    subregion_to_dot(const jive::region *sr) {
+        std::ostringstream dot;
+        dot << "digraph G {\n";
+        for (size_t i = 0; i < sr->narguments(); ++i) {
+            dot << argument_to_dot(sr->argument(i));
+        }
+        for (size_t i = 0; i < sr->nresults(); ++i) {
+            dot << result_to_dot(sr->result(i));
+        }
+
+        std::unordered_map<jive::output *, std::string> out_port_map;
+        std::unordered_map<const jive::node *, std::string> node_name_map;
+        std::vector<std::string> mem_nodes;
+        for (int i = 0; i < sr->narguments(); ++i) {
+            out_port_map[sr->argument(i)] = get_port_name(sr->argument(i));
+        }
+        // create node modules and ios first
+        for (const auto &node : sr->nodes) {
+            auto node_dot = node_to_dot(&node);
+            dot << node_dot;
+            auto node_name = get_node_name(&node);
+            for (int i = 0; i < node.noutputs(); ++i) {
+                out_port_map[node.output(i)] = node_name + ":" + get_port_name(node.output(i));
+            }
+            node_name_map[&node] = node_name;
+        }
+        for (const auto &node : sr->nodes) {
+            auto inst_name = node_name_map[&node];
+            for (int i = 0; i < node.ninputs(); ++i) {
+                auto in_name = inst_name + ":" + get_port_name(node.input(i));
+                assert(out_port_map.count(node.input(i)->origin()));
+                auto origin = out_port_map[node.input(i)->origin()];
+                dot << edge(origin, in_name, node.input(i)->type());
+            }
+        }
+        for (int i = 0; i < sr->nresults(); ++i) {
+            auto origin = out_port_map[sr->result(i)->origin()];
+            auto result = get_port_name(sr->result(i));
+            dot << edge(origin, result, sr->result(i)->type());
+        }
+        dot << "}";
+        return dot.str();
+    }
+};
+
 class FirrtlHLS {
 public:
     FirrtlHLS() {
@@ -1070,7 +1300,8 @@ private:
         auto capacity = o->capacity;
         for (int i = 0; i < capacity; ++i) {
             module << indent(2) << "reg buf" << i << "_valid_reg: UInt<1>, clk with: (reset => (reset, UInt<1>(0)))\n";
-            module << indent(2) << "reg buf" << i << "_data_reg: " << to_firrtl_type(&n->output(0)->type()) << ", clk\n";
+            module << indent(2) << "reg buf" << i << "_data_reg: " << to_firrtl_type(&n->output(0)->type())
+                   << ", clk\n";
         }
         for (int i = 0; i <= capacity; ++i) {
             module << indent(2) << "wire in_consumed" << i << ": UInt<1>\n";
@@ -1091,19 +1322,21 @@ private:
         module << indent(2) << "node buf" << capacity << "_valid_reg = UInt<1>(0)\n";
         module << indent(2) << "node buf" << capacity << "_data_reg = UInt<1>(0)\n";
         for (int i = 0; i < capacity; ++i) {
-            module << indent(2) << "node will_be_empty" << i << " = or(shift_out" << i << ", not(buf" << i << "_valid_reg))\n";
-            module << indent(2) << "in_consumed" << i+1 << " <= in_consumed" << i << "\n";
-            module << indent(2) << "node in_available" << i << " = and(" << fire(i0) << ", not(in_consumed" << i << "))\n";
-            module << indent(2) << "shift_out" << i+1 << " <= UInt<1>(0)\n";
+            module << indent(2) << "node will_be_empty" << i << " = or(shift_out" << i << ", not(buf" << i
+                   << "_valid_reg))\n";
+            module << indent(2) << "in_consumed" << i + 1 << " <= in_consumed" << i << "\n";
+            module << indent(2) << "node in_available" << i << " = and(" << fire(i0) << ", not(in_consumed" << i
+                   << "))\n";
+            module << indent(2) << "shift_out" << i + 1 << " <= UInt<1>(0)\n";
             module << indent(2) << "when shift_out" << i << ":\n";
             module << indent(3) << "buf" << i << "_valid_reg <= UInt<1>(0)\n";
             module << indent(2) << "when will_be_empty" << i << ":\n";
-            module << indent(3) << "when buf" << i+1 << "_valid_reg:\n";
+            module << indent(3) << "when buf" << i + 1 << "_valid_reg:\n";
             module << indent(4) << "buf" << i << "_valid_reg <= UInt<1>(1)\n";
-            module << indent(4) << "buf" << i << "_data_reg <= buf" << i+1 << "_data_reg\n";
-            module << indent(4) << "shift_out" << i+1 << " <= UInt<1>(1)\n";
+            module << indent(4) << "buf" << i << "_data_reg <= buf" << i + 1 << "_data_reg\n";
+            module << indent(4) << "shift_out" << i + 1 << " <= UInt<1>(1)\n";
             module << indent(3) << "else when in_available" << i << ":\n";
-            module << indent(4) << "in_consumed" << i+1 << " <= UInt<1>(1)\n";
+            module << indent(4) << "in_consumed" << i + 1 << " <= UInt<1>(1)\n";
             module << indent(4) << "buf" << i << "_valid_reg <= UInt<1>(1)\n";
             module << indent(4) << "buf" << i << "_data_reg <= " << data(i0) << "\n";
 
@@ -1567,5 +1800,7 @@ main(int argc, char **argv) {
 
     FirrtlHLS hls;
     hls.run(*rm, lm.get());
+    DotHLS dhls;
+    dhls.run(*rm, lm.get());
     return 0;
 }
