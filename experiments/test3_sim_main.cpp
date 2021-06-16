@@ -152,9 +152,16 @@ int hls_verilator_test_func(int a, int b){
     }
     std::cout << "finished - took " << (main_time-start) << "cycles\n";
     int result = top->o_data0;
-    assert(result==test(a,b));
-//    clock_cycle();
-//    clock_cycle();
+    int expected = test(a, b);
+    bool match = result == expected;
+    if (!match) {
+        std::cout << "results do not match\n";
+        std::cout << "expected " << expected << " got " << result << "\n";
+//        verilator_finish();
+//        exit(-1);
+    }
+    clock_cycle();
+    clock_cycle();
     return result;
 }
 
