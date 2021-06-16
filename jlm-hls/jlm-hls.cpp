@@ -444,6 +444,76 @@ namespace hls {
         size_t capacity;
     private:
     };
+
+    class triggertype final : public jive::statetype {
+    public:
+        virtual
+        ~triggertype() {}
+
+        triggertype() : jive::statetype() {}
+
+        std::string
+        debug_string() const override{
+            return "trigger";
+        };
+
+        bool
+        operator==(const jive::type & other) const noexcept override{
+            auto type = dynamic_cast<const triggertype*>(&other);
+            return type;
+        };
+
+        virtual std::unique_ptr<jive::type>
+        copy() const override {
+            return std::unique_ptr<jive::type>(new triggertype(*this));
+        }
+
+    private:
+    };
+
+    const triggertype trigger;
+
+
+    class trigger_op final : public jive::simple_op {
+    public:
+        virtual
+        ~trigger_op() {}
+
+        trigger_op(const jive::type &type)
+                : jive::simple_op({trigger, type}, {type}) {}
+
+        bool
+        operator==(const jive::operation &other) const noexcept override {
+            auto ot = dynamic_cast<const branch_op *>(&other);
+            // check predicate and value
+            return ot
+                   && ot->argument(0).type() == argument(0).type()
+                   && ot->result(0).type() == result(0).type();
+        }
+
+        std::string
+        debug_string() const override {
+            return "HLS_TRIGGER";
+        }
+
+        std::unique_ptr<jive::operation>
+        copy() const override {
+            return std::unique_ptr<jive::operation>(new trigger_op(*this));
+        }
+
+        static std::vector<jive::output *>
+        create(
+                jive::output &tg,
+                jive::output &value
+        ) {
+            if (tg.type() != trigger)
+                throw jlm::error("Trigger needs to be a triggertype.");
+
+            auto region = value.region();
+            trigger_op op(value.type());
+            return jive::simple_node::create_normalized(region, op, {&tg, &value});
+        }
+    };
 }
 
 namespace hls {
@@ -475,7 +545,6 @@ namespace hls {
             }
             remove(gamma);
         }
-
 
         static void
         hls_gamma_conv(jive::region *region) {
@@ -721,6 +790,66 @@ namespace hls {
         }
 
         static void
+        hls_add_triggers(jive::region *region) {
+            jive::output * trigger;
+            for (int i = 0; i < region->narguments(); ++i) {
+                if(region->argument(i)->type() == hls::trigger){
+                    trigger = region->argument(i);
+                }
+            }
+            for (auto &node : jive::topdown_traverser(region)) {
+                if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+                    if (auto ln = dynamic_cast<jlm::lambda::node *>(node)) {
+                        // TODO: this is kind of a hack because it uses standard arguments - but without input, similar to fctargument
+                        // instead create new lambda based on extended fcttype and copy nodes in subregion
+                        auto arg = jive::argument::create(ln->subregion(), nullptr, hls::trigger);
+                        ln->subregion()->append_argument(arg);
+                        hls_add_triggers(ln->subregion());
+                    } else if (auto t = dynamic_cast<jive::theta_node *>(node)) {
+                        assert(trigger != nullptr);
+                        t->add_loopvar(trigger);
+                        hls_add_triggers(t->subregion());
+                    } else if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
+                        assert(trigger != nullptr);
+                        auto in = gn->add_entryvar(trigger);
+//                        std::vector<jive::output *> outs;
+//                        for (int i = 0; i < gn->nsubregions(); ++i) {
+//                            outs.push_back(gn->subregion(i)->argument(gn->nentryvars()-1));
+//                        }
+//                        auto out = gn->add_exitvar(outs);
+                        for (int i = 0; i < gn->nsubregions(); ++i) {
+                            hls_add_triggers(gn->subregion(i));
+                        }
+                    } else {
+                        throw jlm::error("Unexpected node type: "+node->operation().debug_string());
+                    }
+                } else if (auto sn = dynamic_cast<jive::simple_node *>(node)){
+                    assert(trigger != nullptr);
+                    if (dynamic_cast<const jive::bitconstant_op *>(&(sn->operation())) ||
+                        dynamic_cast<const jlm::undef_constant_op *>(&(sn->operation())) ||
+                        dynamic_cast<const jive::ctlconstant_op *>(&(sn->operation()))) {
+                        auto orig_out = sn->output(0);
+                        auto gated = hls::trigger_op::create(*trigger, *orig_out)[0];
+                        auto trigger_node = dynamic_cast<jive::simple_output*>(gated)->node();
+                        orig_out->divert_users(gated);
+                        trigger_node->input(1)->divert_to(orig_out);
+//                        std::cout << "adding triggers:\n";
+//                        jive::view(region, stdout);
+                    }
+                } else {
+                    throw jlm::error("Unexpected node type: "+node->operation().debug_string());
+                }
+            }
+        }
+
+        static void
+        hls_add_triggers(jlm::rvsdg_module &rm) {
+            auto &graph = *rm.graph();
+            auto root = graph.root();
+            hls_add_triggers(root);
+        }
+
+        static void
         hls_check_graph(jlm::rvsdg_module &rm) {
             auto &graph = *rm.graph();
             auto root = graph.root();
@@ -735,6 +864,7 @@ namespace hls {
                 if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
                     throw jlm::error("There should be only simple nodes");
                 }
+                // TODO: check if constants have triggers
                 for (size_t i = 0; i < node->noutputs(); i++) {
                     if (node->output(i)->nusers() == 0) {
                         throw jlm::error("Output has no users");
@@ -1407,7 +1537,7 @@ private:
         module << module_header(n);
         auto i0 = n->input(0);
         std::string all_ready = "UInt<1>(1)"; // True by default
-
+        // TODO: this is currently wrong - will repeat tokens for edges that are ready if not all are
         for (int i = 0; i < n->noutputs(); ++i) {
             auto out = n->output(i);
             module << indent(2) << valid(out) << " <= " << valid(i0) << "\n";
@@ -1463,6 +1593,23 @@ private:
         module << indent(3) << "pred_data_reg <= " << data(ipred) << "\n";
         module << indent(2) << "when " << fire(ival) << ":\n";
         module << indent(3) << "pred_valid_reg <= UInt<1>(0)\n";
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &trigger_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+
+        auto itrig = n->input(0);
+        auto ival = n->input(1);
+        auto out = n->output(0);
+        // inputs have to both fire at the same time
+        module << indent(2) << ready(itrig) << " <= and(" << ready(out) << "," << valid(ival) << ")\n";
+        module << indent(2) << ready(ival) << " <= and(" << ready(out) << "," << valid(itrig) << ")\n";
+        module << indent(2) << valid(out) << " <= and(" << valid(ival) << "," << valid(itrig) << ")\n";
+        module << indent(2) << data(out) << " <= " << data(ival) << "\n";
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
     }
@@ -1566,6 +1713,8 @@ private:
                 return buffer_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::branch_op *>(&(n->operation()))) {
                 return branch_to_firrtl(n);
+            } else if (auto o = dynamic_cast<const hls::trigger_op *>(&(n->operation()))) {
+                return trigger_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::sink_op *>(&(n->operation()))) {
                 return sink_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::fork_op *>(&(n->operation()))) {
@@ -1790,6 +1939,7 @@ main(int argc, char **argv) {
     dump_xml(source_file_name, rm);
     jive::view(rm->graph()->root(), stdout);
     hls::passes::hls_remove_unused_state(*rm);
+    hls::passes::hls_add_triggers(*rm);
     hls::passes::hls_gamma_conv(*rm);
     hls::passes::hls_theta_conv(*rm);
     hls::passes::hls_add_sinks(*rm);
