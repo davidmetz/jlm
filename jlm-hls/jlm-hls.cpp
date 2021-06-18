@@ -346,8 +346,10 @@ namespace hls {
 
         bool
         operator==(const jive::operation &other) const noexcept override {
-            auto ot = dynamic_cast<const dummy_op *>(&other);
-            return ot && ot->result(0).type() == result(0).type();
+//            auto ot = dynamic_cast<const dummy_op *>(&other);
+//            return ot && ot->result(0).type() == result(0).type();
+            // dummy nodes should all be distinct and not be reused
+            return false;
         }
 
         std::string
@@ -531,6 +533,8 @@ namespace hls {
             }
             // copy each of the subregions
             for (size_t s = 0; s < gamma->nsubregions(); s++) {
+//                std::cout << "copying gamma subregion:\n";
+//                jive::view(gamma->subregion(s), stdout);
                 gamma->subregion(s)->copy(gamma->region(), smap, false, false);
             }
             for (size_t i = 0; i < gamma->nexitvars(); i++) {
@@ -702,7 +706,6 @@ namespace hls {
             hls_add_forks(root);
         }
 
-
         static bool is_passthrough(const jive::argument *arg) {
             if (arg->nusers() == 1) {
                 auto res = dynamic_cast<jive::result *>(*arg->begin());
@@ -714,20 +717,104 @@ namespace hls {
             return false;
         }
 
-        static void remove_passthrough(const jive::argument *arg) {
-            auto res = dynamic_cast<jive::result *>(*arg->begin());
-//            std::cout << arg->region()->node()->operation().debug_string() << "\n";
-//            std::cout << arg->region()->node()->ninputs() << "\n";
-            if (!is<jlm::lambda::operation>(arg->region()->node())) {
-                auto origin = arg->input()->origin();
-                // divert users of output to origin of input
-                arg->region()->node()->output(res->output()->index())->divert_users(origin);
-                arg->region()->node()->remove_input(arg->input()->index());
-                arg->region()->node()->remove_output(res->output()->index());
+        static bool is_passthrough(const jive::result *res) {
+            auto arg = dynamic_cast<jive::argument *>(res->origin());
+            if (arg) {
+                return true;
             }
-            // TODO: handle lambda properly
+            return false;
+        }
+
+        static jlm::lambda::node *
+        remove_lambda_passthrough(jlm::lambda::node * ln){
+            auto old_fcttype = ln->type();
+            // TODO: add support for cvarguments
+            assert(ln->ncvarguments() == 0);
+            std::vector<const jive::type*> new_argument_types;
+            for (int i = 0; i < old_fcttype.narguments(); ++i) {
+                auto arg = ln->subregion()->argument(i);
+                auto argtype = &old_fcttype.argument_type(i);
+                assert(*argtype == arg->type());
+                if (!is_passthrough(arg)) {
+                    new_argument_types.push_back(argtype);
+                }
+            }
+            std::vector<const jive::type*> new_result_types;
+            for (int i = 0; i < old_fcttype.nresults(); ++i) {
+                auto res = ln->subregion()->result(i);
+                auto restype = &old_fcttype.result_type(i);
+                assert(*restype == res->type());
+                if(!is_passthrough(res)){
+                    new_result_types.push_back(&old_fcttype.result_type(i));
+                }
+            }
+            jive::fcttype new_fcttype(new_argument_types, new_result_types);
+            auto new_lambda = jlm::lambda::node::create(ln->region(), new_fcttype, ln->name(), ln->linkage(), ln->attributes());
+
+            jive::substitution_map smap;
+            int new_i=0;
+            for (int i = 0; i < ln->subregion()->narguments(); ++i) {
+                auto arg = ln->subregion()->argument(i);
+                if (!is_passthrough(arg)) {
+                    smap.insert(arg, new_lambda->subregion()->argument(new_i));
+                    new_i++;
+                }
+            }
+            ln->subregion()->copy(new_lambda->subregion(), smap, false, false);
+
+            std::vector<jive::output*> new_results;
+            for (int i = 0; i < ln->subregion()->nresults(); ++i) {
+                auto res = ln->subregion()->result(i);
+                if(!is_passthrough(res)) {
+                    new_results.push_back(smap.lookup(res->origin()));
+                }
+            }
+            auto new_out = new_lambda->finalize(new_results);
+
+            // TODO handle functions at other levels?
+            assert(ln->region() == ln->region()->graph()->root());
+            assert((*ln->output()->begin())->region() == ln->region()->graph()->root());
+
+//            ln->output()->divert_users(new_out);
+            ln->region()->remove_result((*ln->output()->begin())->index());
+            remove(ln);
+            jive::result::create(new_lambda->region(), new_out, nullptr, new_out->type());
+            return new_lambda;
+        }
+
+        static void remove_region_passthrough(const jive::argument *arg) {
+            auto res = dynamic_cast<jive::result *>(*arg->begin());
+            auto origin = arg->input()->origin();
+            // divert users of output to origin of input
+            arg->region()->node()->output(res->output()->index())->divert_users(origin);
+            arg->region()->node()->remove_input(arg->input()->index());
+            arg->region()->node()->remove_output(res->output()->index());
             arg->region()->remove_result(res->index());
             arg->region()->remove_argument(arg->index());
+        }
+
+        static void remove_gamma_passthrough(jive::gamma_node *gn) {// remove inputs in reverse
+            for (int i = gn->nentryvars() - 1; i >= 0; --i) {
+                bool can_remove = true;
+                for (size_t n = 0; n < gn->nsubregions(); n++) {
+                    auto sr = gn->subregion(n);
+                    can_remove &= is_passthrough(sr->argument(i));
+                }
+                if (can_remove) {
+                    auto origin = gn->entryvar(i)->origin();
+                    // remove input
+                    gn->remove_input(i + 1);
+                    // divert users of output to origin of input
+                    auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(
+                            i)->begin())->index();
+                    gn->output(res_index)->divert_users(origin);
+                    gn->remove_output(res_index);
+                    for (int j = 0; j < gn->nsubregions(); ++j) {
+                        gn->subregion(j)->remove_result(res_index);
+                        gn->subregion(j)->remove_argument(i);
+                    }
+                }
+            }
         }
 
         static void
@@ -737,31 +824,13 @@ namespace hls {
                 if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
                     if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
                         // process subnodes first
-                        for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                            hls_remove_unused_state(structnode->subregion(n), false);
+                        for (size_t n = 0; n < gn->nsubregions(); n++) {
+                            hls_remove_unused_state(gn->subregion(n), false);
                         }
-                        // remove inputs in reverse
-                        for (int i = gn->nentryvars() - 1; i >= 0; --i) {
-                            bool can_remove = true;
-                            for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                                auto sr = structnode->subregion(n);
-                                can_remove &= is_passthrough(sr->argument(i));
-                            }
-                            if (can_remove) {
-                                auto origin = gn->entryvar(i)->origin();
-                                // remove input
-                                gn->remove_input(i + 1);
-                                // divert users of output to origin of input
-                                auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(
-                                        i)->begin())->index();
-                                gn->output(res_index)->divert_users(origin);
-                                gn->remove_output(res_index);
-                                for (int j = 0; j < gn->nsubregions(); ++j) {
-                                    gn->subregion(j)->remove_result(res_index);
-                                    gn->subregion(j)->remove_argument(i);
-                                }
-                            }
-                        }
+                        remove_gamma_passthrough(gn);
+                    } else if (auto ln = dynamic_cast<jlm::lambda::node*>(node)) {
+                        hls_remove_unused_state(structnode->subregion(0), false);
+                        remove_lambda_passthrough(ln);
                     } else {
                         assert(structnode->nsubregions() == 1);
                         hls_remove_unused_state(structnode->subregion(0));
@@ -773,10 +842,7 @@ namespace hls {
                 for (int i = region->narguments() - 1; i >= 0; --i) {
                     auto arg = region->argument(i);
                     if (is_passthrough(arg)) {
-//                        std::cout << "region:\n";
-//                        jive::view(region, stdout);
-//                        std::cout << "removing arg " << i << " of type " << arg->type().debug_string() << "\n";
-                        remove_passthrough(arg);
+                        remove_region_passthrough(arg);
                     }
                 }
             }
@@ -789,34 +855,75 @@ namespace hls {
             hls_remove_unused_state(root);
         }
 
-        static void
-        hls_add_triggers(jive::region *region) {
-            jive::output *trigger;
+        static jlm::lambda::node *
+        add_lambda_argument(jlm::lambda::node * ln, const jive::type * type){
+            auto old_fcttype = ln->type();
+            // TODO: add support for cvarguments
+            assert(ln->ncvarguments() == 0);
+            std::vector<const jive::type*> new_argument_types;
+            for (int i = 0; i < old_fcttype.narguments(); ++i) {
+                new_argument_types.push_back(&old_fcttype.argument_type(i));
+            }
+            new_argument_types.push_back(type);
+            std::vector<const jive::type*> new_result_types;
+            for (int i = 0; i < old_fcttype.nresults(); ++i) {
+                new_result_types.push_back(&old_fcttype.result_type(i));
+            }
+            jive::fcttype new_fcttype(new_argument_types, new_result_types);
+            auto new_lambda = jlm::lambda::node::create(ln->region(), new_fcttype, ln->name(), ln->linkage(), ln->attributes());
+
+            jive::substitution_map smap;
+            for (int i = 0; i < ln->subregion()->narguments(); ++i) {
+                smap.insert(ln->subregion()->argument(i), new_lambda->subregion()->argument(i));
+            }
+            ln->subregion()->copy(new_lambda->subregion(), smap, false, false);
+
+            std::vector<jive::output*> new_results;
+            for (int i = 0; i < ln->subregion()->nresults(); ++i) {
+                new_results.push_back(smap.lookup(ln->subregion()->result(i)->origin()));
+            }
+            auto new_out = new_lambda->finalize(new_results);
+
+            // TODO handle functions at other levels?
+            assert(ln->region() == ln->region()->graph()->root());
+            assert((*ln->output()->begin())->region() == ln->region()->graph()->root());
+
+//            ln->output()->divert_users(new_out);
+            ln->region()->remove_result((*ln->output()->begin())->index());
+            remove(ln);
+            jive::result::create(new_lambda->region(), new_out, nullptr, new_out->type());
+            return new_lambda;
+        }
+
+        static jive::output *
+        get_trigger(jive::region * region){
             for (int i = 0; i < region->narguments(); ++i) {
                 if (region->argument(i)->type() == hls::trigger) {
-                    trigger = region->argument(i);
+                    return region->argument(i);
                 }
             }
+            return nullptr;
+        }
+
+        static void
+        hls_add_triggers(jive::region *region) {
+            auto trigger = get_trigger(region);
             for (auto &node : jive::topdown_traverser(region)) {
                 if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
                     if (auto ln = dynamic_cast<jlm::lambda::node *>(node)) {
-                        // TODO: this is kind of a hack because it uses standard arguments - but without input, similar to fctargument
-                        // instead create new lambda based on extended fcttype and copy nodes in subregion
-                        auto arg = jive::argument::create(ln->subregion(), nullptr, hls::trigger);
-                        ln->subregion()->append_argument(arg);
-                        hls_add_triggers(ln->subregion());
+                        if(!get_trigger(ln->subregion())){
+                            auto new_lambda = add_lambda_argument(ln, &(hls::trigger));
+                            hls_add_triggers(new_lambda->subregion());
+                        }
                     } else if (auto t = dynamic_cast<jive::theta_node *>(node)) {
                         assert(trigger != nullptr);
+                        assert(get_trigger(t->subregion()) == nullptr);
                         t->add_loopvar(trigger);
                         hls_add_triggers(t->subregion());
                     } else if (auto gn = dynamic_cast<jive::gamma_node *>(node)) {
                         assert(trigger != nullptr);
+                        assert(get_trigger(gn->subregion(0)) == nullptr);
                         auto in = gn->add_entryvar(trigger);
-//                        std::vector<jive::output *> outs;
-//                        for (int i = 0; i < gn->nsubregions(); ++i) {
-//                            outs.push_back(gn->subregion(i)->argument(gn->nentryvars()-1));
-//                        }
-//                        auto out = gn->add_exitvar(outs);
                         for (int i = 0; i < gn->nsubregions(); ++i) {
                             hls_add_triggers(gn->subregion(i));
                         }
@@ -829,10 +936,11 @@ namespace hls {
                         dynamic_cast<const jlm::undef_constant_op *>(&(sn->operation())) ||
                         dynamic_cast<const jive::ctlconstant_op *>(&(sn->operation()))) {
                         auto orig_out = sn->output(0);
+                        std::vector<jive::input*> previous_users(orig_out->begin(), orig_out->end());
                         auto gated = hls::trigger_op::create(*trigger, *orig_out)[0];
-                        auto trigger_node = dynamic_cast<jive::simple_output *>(gated)->node();
-                        orig_out->divert_users(gated);
-                        trigger_node->input(1)->divert_to(orig_out);
+                        for (auto user: previous_users) {
+                            user->divert_to(gated);
+                        }
 //                        std::cout << "adding triggers:\n";
 //                        jive::view(region, stdout);
                     }
@@ -1933,6 +2041,7 @@ main(int argc, char **argv) {
     hls::passes::hls_add_triggers(*rm);
     hls::passes::hls_gamma_conv(*rm);
     hls::passes::hls_theta_conv(*rm);
+    dne.run(*rm, sd);
     hls::passes::hls_add_sinks(*rm);
     hls::passes::hls_add_forks(*rm);
     hls::passes::hls_check_graph(*rm);
