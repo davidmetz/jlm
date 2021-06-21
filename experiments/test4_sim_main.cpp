@@ -67,7 +67,6 @@ void verilator_init(int argc, char** argv){
     top->i_data1 = 0;
     top->i_data2 = 0;
     top->i_data3 = 0;
-    top->i_data4 = 0;
     top->reset = 1;
 
     top->mem_req_ready = true;
