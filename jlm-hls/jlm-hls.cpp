@@ -1933,17 +1933,18 @@ private:
         std::ostringstream module;
         module << module_header(n);
         module << indent(2) << "; registers\n";
-        // TODO: double buffer?
         // start initialized with a valid pred 0
         module << indent(2) << "reg buf_valid_reg: UInt<1>, clk with: (reset => (reset, " << UInt(1, 1) << "))\n";
         module << indent(2) << "reg buf_data_reg: " << to_firrtl_type(&n->output(0)->type())
                << ", clk  with: (reset => (reset, " << UInt(1, 0) << "))\n";
         auto o0 = n->output(0);
-        module << indent(2) << valid(o0) << " <= buf_valid_reg\n";
-        module << indent(2) << data(o0) << " <= buf_data_reg\n";
         auto i0 = n->input(0);
-        module << indent(2) << ready(i0) << " <= not(buf_valid_reg)\n";
         // TODO: allow pass-through?
+        module << indent(2) << valid(o0) << " <= or(buf_valid_reg, " << valid(i0) << ")\n";
+        module << indent(2) << data(o0) << " <= mux(buf_valid_reg, buf_data_reg, " << data(i0) << ")\n";
+//        module << indent(2) << valid(o0) << " <= buf_valid_reg\n";
+//        module << indent(2) << data(o0) << " <= buf_data_reg\n";
+        module << indent(2) << ready(i0) << " <= not(buf_valid_reg)\n";
         module << indent(2) << "when " << fire(i0) << ":\n";
         module << indent(3) << "buf_valid_reg <= " << UInt(1, 1) << "\n";
         module << indent(3) << "buf_data_reg <= " << data(i0) << "\n";
