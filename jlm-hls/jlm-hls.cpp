@@ -662,6 +662,33 @@ namespace hls {
 
 namespace hls {
     namespace passes {
+        static bool hls_gamma_can_be_spec(jive::gamma_node *gamma) {
+            for (int i = 0; i < gamma->noutputs(); ++i) {
+                auto out = gamma->output(i);
+                if (is<jive::statetype>(out->type())) {
+                    // don't allow state outputs since they imply operations with side effects
+                    return false;
+                }
+            }
+            for (int i = 0; i < gamma->nsubregions(); ++i) {
+                auto sr = gamma->subregion(i);
+                for (auto &node : jive::topdown_traverser(sr)) {
+                    if (is<jive::theta_op>(node) || is<hls::loop_op>(node)) {
+                        // don't allow thetas or loops since they could potentially block forever
+                        return false;
+                    } else if (auto g = dynamic_cast<jive::gamma_node *>(node)) {
+                        if (!hls_gamma_can_be_spec(g)) {
+                            // only allow gammas that can also be speculated on
+                            return false;
+                        }
+                    } else if (auto sn = dynamic_cast<jive::structural_node *>(node)) {
+                        throw jlm::error("Unexpected structural node: " + node->operation().debug_string());
+                    }
+                }
+            }
+            return true;
+        }
+
         static void hls_gamma_conv_nonspec(jive::gamma_node *gamma) {
             jive::substitution_map smap;
             // create a branch for each entryvar and map the corresponding argument of each subregion to an output of the branch
@@ -692,16 +719,45 @@ namespace hls {
             remove(gamma);
         }
 
+        static void hls_gamma_conv_spec(jive::gamma_node *gamma) {
+            jive::substitution_map smap;
+            // connect arguments to origins of inputs. Forks will automatically be created later
+            auto pro = gamma->predicate()->origin();
+            for (size_t i = 0; i < gamma->nentryvars(); i++) {
+                auto envo = gamma->entryvar(i)->origin();
+                for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                    smap.insert(gamma->subregion(s)->argument(i), envo);
+                }
+            }
+            // copy each of the subregions
+            for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                gamma->subregion(s)->copy(gamma->region(), smap, false, false);
+            }
+            for (size_t i = 0; i < gamma->nexitvars(); i++) {
+                std::vector<jive::output *> alternatives;
+                for (size_t s = 0; s < gamma->nsubregions(); s++) {
+                    alternatives.push_back(smap.lookup(gamma->subregion(s)->result(i)->origin()));
+                }
+                // create discarding mux for each exitvar
+                auto merge = hls::mux_op::create(*pro, alternatives, true);
+                // divert users of exitvars to merge instead
+                gamma->exitvar(i)->divert_users(merge[0]);
+            }
+            remove(gamma);
+        }
+
         static void
         hls_gamma_conv(jive::region *region) {
             for (auto &node : jive::topdown_traverser(region)) {
                 if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
                     for (size_t n = 0; n < structnode->nsubregions(); n++)
                         hls_gamma_conv(structnode->subregion(n));
-                    auto gamma = dynamic_cast<jive::gamma_node *>(node);
-                    if (gamma) {
-                        // TODO: add speculative branch
-                        hls_gamma_conv_nonspec(gamma);
+                    if (auto gamma = dynamic_cast<jive::gamma_node *>(node)) {
+                        if (hls_gamma_can_be_spec(gamma)) {
+                            hls_gamma_conv_spec(gamma);
+                        } else {
+                            hls_gamma_conv_nonspec(gamma);
+                        }
                     }
                 }
             }
@@ -824,7 +880,6 @@ namespace hls {
                         hls_add_forks(structnode->subregion(n));
                     }
                 }
-                // TODO: simplify if forks depend on a fork
                 for (size_t i = 0; i < node->noutputs(); ++i) {
                     auto out = node->output(i);
                     if (out->nusers() > 1) {
@@ -1047,6 +1102,12 @@ namespace hls {
             return nullptr;
         }
 
+        static bool is_constant(const jive::node *node) {
+            return is<jive::bitconstant_op>(node) ||
+                   is<jlm::undef_constant_op>(node) ||
+                   is<jive::ctlconstant_op>(node);
+        }
+
         static void
         hls_add_triggers(jive::region *region) {
             auto trigger = get_trigger(region);
@@ -1074,9 +1135,7 @@ namespace hls {
                     }
                 } else if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
                     assert(trigger != nullptr);
-                    if (dynamic_cast<const jive::bitconstant_op *>(&(sn->operation())) ||
-                        dynamic_cast<const jlm::undef_constant_op *>(&(sn->operation())) ||
-                        dynamic_cast<const jive::ctlconstant_op *>(&(sn->operation()))) {
+                    if (is_constant(node)) {
                         auto orig_out = sn->output(0);
                         std::vector<jive::input *> previous_users(orig_out->begin(), orig_out->end());
                         auto gated = hls::trigger_op::create(*trigger, *orig_out)[0];
@@ -1108,12 +1167,20 @@ namespace hls {
                         throw jlm::error("There should be only simple nodes and loop nodes");
                     }
                 }
-                // TODO: check if constants have triggers
                 for (size_t i = 0; i < node->noutputs(); i++) {
                     if (node->output(i)->nusers() == 0) {
                         throw jlm::error("Output has no users");
                     } else if (node->output(i)->nusers() > 1) {
                         throw jlm::error("Output has more than one user");
+                    }
+                }
+                if (is_constant(node)) {
+                    if (node->noutputs() != 1) {
+                        throw jlm::error("Constant should have one output");
+                    }
+                    auto user_in = dynamic_cast<jive::node_input *>(*node->output(0)->begin());
+                    if (!user_in || !is<hls::trigger_op>(user_in->node())) {
+                        throw jlm::error("Constant has to be gated by a trigger");
                     }
                 }
             }
@@ -1229,7 +1296,7 @@ namespace hls {
             }
             // clean up unused arguments - only ones without an input should be left
             // go through in reverse because we remove some
-            int res_i = sr->nresults()-1;
+            int res_i = sr->nresults() - 1;
             for (int i = sr->narguments() - 1; i >= 0; --i) {
                 auto arg = sr->argument(i);
                 if (arg->input() != nullptr) {
@@ -1242,7 +1309,7 @@ namespace hls {
                     auto result = sr->result(res_i);
                     assert(result->type() == arg->type());
                     res_i--;
-                    if(arg->nusers() == 0){
+                    if (arg->nusers() == 0) {
                         sr->remove_argument(arg->index());
                         sr->remove_result(result->index());
                     }
@@ -1250,7 +1317,6 @@ namespace hls {
             }
             return any_changed;
         }
-
 
 
         static bool hls_dne(jive::region *sr) {
@@ -1448,9 +1514,7 @@ private:
             color = "pink";
         } else if (
                 is<hls::trigger_op>(node) ||
-                is<jive::bitconstant_op>(node) ||
-                is<jlm::undef_constant_op>(node) ||
-                is<jive::ctlconstant_op>(node)
+                hls::passes::is_constant(node)
                 ) {
             color = "orange";
         }
@@ -1939,11 +2003,8 @@ private:
                << ", clk  with: (reset => (reset, " << UInt(1, 0) << "))\n";
         auto o0 = n->output(0);
         auto i0 = n->input(0);
-        // TODO: allow pass-through?
         module << indent(2) << valid(o0) << " <= or(buf_valid_reg, " << valid(i0) << ")\n";
         module << indent(2) << data(o0) << " <= mux(buf_valid_reg, buf_data_reg, " << data(i0) << ")\n";
-//        module << indent(2) << valid(o0) << " <= buf_valid_reg\n";
-//        module << indent(2) << data(o0) << " <= buf_data_reg\n";
         module << indent(2) << ready(i0) << " <= not(buf_valid_reg)\n";
         module << indent(2) << "when " << fire(i0) << ":\n";
         module << indent(3) << "buf_valid_reg <= " << UInt(1, 1) << "\n";
@@ -2030,6 +2091,53 @@ private:
             module << indent(3) << data(o0) << " <= " << data(in) << "\n";
             module << indent(3) << ready(in) << " <= " << ready(o0) << "\n";
             module << indent(3) << ready(ipred) << " <= and(" << ready(o0) << "," << valid(in) << ")\n";
+        }
+        modules.emplace_back(module_name, module.str(), false);
+        return modules.back();
+    }
+
+    FirrtlModule &dmux_to_firrtl(const jive::simple_node *n) {
+        std::string module_name = get_node_name(n);
+        std::ostringstream module;
+        module << module_header(n);
+
+        auto ipred = n->input(0);
+        auto o0 = n->output(0);
+
+        std::string any_discard_reg = UInt(1, 0);
+        for (int i = 1; i < n->ninputs(); ++i) {
+            // discard and discard_reg are separate in order to allow tokens to be discarded in the same cycle.
+            module << indent(2) << "reg i" << i << "_discard_reg: UInt<1>, clk with: (reset => (reset, " << UInt(1, 0)
+                   << "))\n";
+            module << indent(2) << "wire i" << i << "_discard: UInt<1>\n";
+            module << indent(2) << "i" << i << "_discard <= i" << i << "_discard_reg\n";
+            module << indent(2) << "i" << i << "_discard_reg <= i" << i << "_discard\n";
+            any_discard_reg = jive::detail::strfmt("or(", any_discard_reg, ", i", i, "_discard_reg)");
+        }
+        module << indent(2) << "node any_discard_reg = " << any_discard_reg << "\n";
+
+        module << indent(2) << valid(o0) << " <= " << UInt(1, 0) << "\n";
+        module << indent(2) << data(o0) << " is invalid\n";
+        module << indent(2) << ready(ipred) << " <= " << UInt(1, 0) << "\n";
+
+        for (int i = 1; i < n->ninputs(); ++i) {
+            auto in = n->input(i);
+            module << indent(2) << ready(in) << " <= i" << i << "_discard\n";
+            // clear discard reg on fire
+            module << indent(2) << "when " << fire(in) << ":\n";
+            module << indent(3) << "i" << i << "_discard_reg <= " << UInt(1, 0) << "\n";
+            // pred match and no outstanding discards
+            module << indent(2) << "when and(and(" << valid(ipred) << ", eq(" << data(ipred) << ", " << UInt(64, i - 1)
+                   << ")), not(any_discard_reg)):\n";
+            module << indent(3) << valid(o0) << " <= " << valid(in) << "\n";
+            module << indent(3) << data(o0) << " <= " << data(in) << "\n";
+            module << indent(3) << ready(in) << " <= " << ready(o0) << "\n";
+            module << indent(3) << ready(ipred) << " <= and(" << ready(o0) << "," << valid(in) << ")\n";
+            for (int j = 1; j < n->ninputs(); ++j) {
+                if(i!=j){
+                    module << indent(3) << "i" << j << "_discard <= " << UInt(1, 1) << "\n";
+                }
+            }
         }
         modules.emplace_back(module_name, module.str(), false);
         return modules.back();
@@ -2189,7 +2297,7 @@ private:
                 throw std::logic_error(pt->debug_string() + " pointer not implemented!");
             }
             int bytes = bits / 8;
-            // TODO: fix
+            // TODO: make more general
             return "add(" + data(n->input(0)) + ", mul(" + data(n->input(1)) + ", " + UInt(64, bytes) + "))";
         } else {
             throw std::logic_error(n->operation().debug_string() + " not implemented!");
@@ -2253,7 +2361,7 @@ private:
                 return merge_to_firrtl(n);
             } else if (auto o = dynamic_cast<const hls::mux_op *>(&(n->operation()))) {
                 if (o->discarding) {
-                    throw std::logic_error("not implemented");
+                    return dmux_to_firrtl(n);
                 } else {
                     return ndmux_to_firrtl(n);
                 }
