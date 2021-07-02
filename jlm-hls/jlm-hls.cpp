@@ -30,8 +30,10 @@
 #include <getopt.h>
 #include <jlm/opt/dne.hpp>
 #include <jive/rvsdg/control.hpp>
+#include <jive/rvsdg/type.hpp>
 #include <jive/types/bitstring.hpp>
 #include <jlm/ir/operators.hpp>
+#include <jlm/ir/ipgraph.hpp>
 #include <jive/arch/load.hpp>
 #include <jive/arch/store.hpp>
 #include <jive/rvsdg/traverser.hpp>
@@ -326,42 +328,6 @@ namespace hls {
         }
     };
 
-    class dummy_op final : public jive::simple_op {
-    public:
-        virtual
-        ~dummy_op() {}
-
-        dummy_op(const jive::type &type)
-                : jive::simple_op({}, {type}) {}
-
-        bool
-        operator==(const jive::operation &other) const noexcept override {
-//            auto ot = dynamic_cast<const dummy_op *>(&other);
-//            return ot && ot->result(0).type() == result(0).type();
-            // dummy nodes should all be distinct and not be reused
-            return false;
-        }
-
-        std::string
-        debug_string() const override {
-            return "HLS_DUMMY";
-        }
-
-        std::unique_ptr<jive::operation>
-        copy() const override {
-            return std::unique_ptr<jive::operation>(new dummy_op(*this));
-        }
-
-        static std::vector<jive::output *>
-        create(
-                jive::output &value,
-                jive::region *region
-        ) {
-            dummy_op op(value.type());
-            return jive::simple_node::create_normalized(region, op, {});
-        }
-    };
-
     class predicate_buffer_op final : public jive::simple_op {
     public:
         virtual
@@ -578,11 +544,6 @@ namespace hls {
                 remove(node);
         }
 
-        inline size_t
-        nloopvars() const noexcept {
-            JIVE_DEBUG_ASSERT(ninputs() == noutputs());
-            return ninputs();
-        }
         // TODO: implement loop_node begin() and end()
 //        inline loop_node::loopvar_iterator
 //        begin() const
@@ -638,22 +599,19 @@ namespace hls {
             jive::substitution_map rmap;
             auto loop = create(region, false);
 
-            // add nullptr to rmap so we can copy loop arguments and results
-            rmap.insert((jive::output *) nullptr, nullptr);
-            rmap.insert((jive::structural_input *) nullptr, nullptr);
-            // create in and outputs and add them to rmap
-            for (int i = 0; i < nloopvars(); ++i) {
+            for (int i = 0; i < ninputs(); ++i) {
                 auto in_origin = smap.lookup(input(i)->origin());
-                loop->add_input(
-                        std::unique_ptr<jive::node_input>(new jive::node_input(in_origin, loop, in_origin->type())));
+                jive::structural_input::create(loop, in_origin, in_origin->type());
                 rmap.insert(input(i), loop->input(i));
-                loop->add_output(std::unique_ptr<jive::node_output>(new jive::node_output(loop, in_origin->type())));
-                rmap.insert(output(i), loop->output(i));
+            }
+            for (int i = 0; i < noutputs(); ++i) {
+                auto out = jive::structural_output::create(loop, output(i)->type());
+                rmap.insert(output(i), out);
+                smap.insert(output(i), out);
             }
 
             subregion()->copy(loop->subregion(), rmap, true, true);
             loop->_predicate_buffer = rmap.lookup(_predicate_buffer);
-
             nf->set_mutable(true);
             return loop;
         }
@@ -665,7 +623,7 @@ namespace hls {
         static bool hls_gamma_can_be_spec(jive::gamma_node *gamma) {
             for (int i = 0; i < gamma->noutputs(); ++i) {
                 auto out = gamma->output(i);
-                if (is<jive::statetype>(out->type())) {
+                if (jive::is<jive::statetype>(out->type())) {
                     // don't allow state outputs since they imply operations with side effects
                     return false;
                 }
@@ -673,7 +631,7 @@ namespace hls {
             for (int i = 0; i < gamma->nsubregions(); ++i) {
                 auto sr = gamma->subregion(i);
                 for (auto &node : jive::topdown_traverser(sr)) {
-                    if (is<jive::theta_op>(node) || is<hls::loop_op>(node)) {
+                    if (jive::is<jive::theta_op>(node) || jive::is<hls::loop_op>(node)) {
                         // don't allow thetas or loops since they could potentially block forever
                         return false;
                     } else if (auto g = dynamic_cast<jive::gamma_node *>(node)) {
@@ -810,10 +768,10 @@ namespace hls {
         hls_theta_conv(jive::region *region) {
             for (auto &node : jive::topdown_traverser(region)) {
                 if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
-                    auto theta = dynamic_cast<jive::theta_node *>(node);
-                    if (theta) {
+                    if (auto theta = dynamic_cast<jive::theta_node *>(node)) {
+                        hls_theta_conv(theta->subregion());
                         hls_theta_conv(theta);
-                        hls_theta_conv(region);
+//                        hls_theta_conv(region);
                     } else {
                         for (size_t n = 0; n < structnode->nsubregions(); n++)
                             hls_theta_conv(structnode->subregion(n));
@@ -1103,9 +1061,9 @@ namespace hls {
         }
 
         static bool is_constant(const jive::node *node) {
-            return is<jive::bitconstant_op>(node) ||
-                   is<jlm::undef_constant_op>(node) ||
-                   is<jive::ctlconstant_op>(node);
+            return jive::is<jive::bitconstant_op>(node) ||
+                   jive::is<jlm::undef_constant_op>(node) ||
+                   jive::is<jive::ctlconstant_op>(node);
         }
 
         static void
@@ -1179,7 +1137,7 @@ namespace hls {
                         throw jlm::error("Constant should have one output");
                     }
                     auto user_in = dynamic_cast<jive::node_input *>(*node->output(0)->begin());
-                    if (!user_in || !is<hls::trigger_op>(user_in->node())) {
+                    if (!user_in || !jive::is<hls::trigger_op>(user_in->node())) {
                         throw jlm::error("Constant has to be gated by a trigger");
                     }
                 }
@@ -1201,7 +1159,7 @@ namespace hls {
         }
 
         static bool node_buffers(jive::node *node) {
-            return is<hls::buffer_op>(node) || is<hls::loop_op>(node);
+            return jive::is<hls::buffer_op>(node) || jive::is<hls::loop_op>(node);
         }
 
         static bool users_are_buffered(jive::node *node) {
@@ -1226,7 +1184,7 @@ namespace hls {
 
         static void remove_redundant_buffers(hls::loop_node *ln) {
             for (auto &node : jive::topdown_traverser(ln->subregion())) {
-                if (is<hls::buffer_op>(node)) {
+                if (jive::is<hls::buffer_op>(node)) {
                     if (users_are_buffered(node)) {
                         std::cout << "removing buffer: " << node->input(0)->type().debug_string() << "\n";
                         node->output(0)->divert_users(node->input(0)->origin());
@@ -1500,20 +1458,20 @@ private:
         }
 
         std::string color = "black";
-        if (is<hls::buffer_op>(node)) {
+        if (jive::is<hls::buffer_op>(node)) {
             color = "blue";
-        } else if (is<hls::fork_op>(node)) {
+        } else if (jive::is<hls::fork_op>(node)) {
             color = "grey";
-        } else if (is<hls::sink_op>(node)) {
+        } else if (jive::is<hls::sink_op>(node)) {
             color = "grey";
-        } else if (is<hls::branch_op>(node)) {
+        } else if (jive::is<hls::branch_op>(node)) {
             color = "green";
-        } else if (is<hls::mux_op>(node)) {
+        } else if (jive::is<hls::mux_op>(node)) {
             color = "red";
-        } else if (is<hls::merge_op>(node)) {
+        } else if (jive::is<hls::merge_op>(node)) {
             color = "pink";
         } else if (
-                is<hls::trigger_op>(node) ||
+                jive::is<hls::trigger_op>(node) ||
                 hls::passes::is_constant(node)
                 ) {
             color = "orange";
