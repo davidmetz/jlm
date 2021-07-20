@@ -56,6 +56,21 @@ LIBJLM_SRC = \
 	libjlm/src/opt/unroll.cpp \
 	\
 	libjlm/src/util/stats.cpp \
+	\
+	libjlm/src/backend/hls/rvsdg2rhls/add-triggers.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/gamma-conv.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/theta-conv.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/add-sinks.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/add-forks.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/check-rhls.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/rhls-dne.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/remove-unused-state.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/inline.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/rvsdg2rhls.cpp \
+ 	\
+	libjlm/src/backend/hls/rhls2firrtl/base-hls.cpp \
+	libjlm/src/backend/hls/rhls2firrtl/dot-hls.cpp \
+	libjlm/src/backend/hls/rhls2firrtl/firrtl-hls.cpp \
 
 .PHONY: libjlm-debug
 libjlm-debug: CXXFLAGS += -g -DJIVE_DEBUG -DJLM_DEBUG -DJLM_ENABLE_ASSERTS
