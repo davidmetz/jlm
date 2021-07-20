@@ -1,0 +1,20 @@
+//
+// Created by david on 7/2/21.
+//
+
+#ifndef JLM_BACKEND_HLS_RVSDG2RHLS_ADD_FORKS_HPP
+#define JLM_BACKEND_HLS_RVSDG2RHLS_ADD_FORKS_HPP
+
+#include <jive/rvsdg/region.hpp>
+#include <jlm/ir/rvsdg-module.hpp>
+
+namespace jlm{
+	namespace hls{
+		static void
+		add_forks(jive::region *region);
+
+		void
+		add_forks(jlm::rvsdg_module &rm);
+	}
+}
+#endif //JLM_BACKEND_HLS_RVSDG2RHLS_ADD_FORKS_HPP
