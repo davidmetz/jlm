@@ -81,6 +81,7 @@ add_library(jlm STATIC
         src/backend/hls/rhls2firrtl/base-hls.cpp
         src/backend/hls/rhls2firrtl/dot-hls.cpp
         src/backend/hls/rhls2firrtl/firrtl-hls.cpp
+        src/backend/hls/rhls2firrtl/verilator-harness-hls.cpp
         )
 
 target_link_libraries(jlm jive)

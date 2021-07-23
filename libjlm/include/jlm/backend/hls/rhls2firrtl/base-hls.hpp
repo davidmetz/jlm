@@ -22,8 +22,9 @@ namespace jlm {
 				// ensure consistent naming across runs
 				create_node_names(get_hls_lambda(rm)->subregion());
 				auto text = get_text(rm);
-				auto source_file_name = rm.source_filename().name();
-				std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + extension();
+				std::basic_string<char, std::char_traits<char>, std::allocator<char>> base_file_name = get_base_file_name(
+						rm);
+				std::string file_name = base_file_name + extension();
 				std::ofstream out_file;
 				out_file.open(file_name);
 				out_file << text;
@@ -55,6 +56,9 @@ namespace jlm {
 
 			virtual std::string
 			get_text(jlm::rvsdg_module &rm) = 0;
+
+			static std::string
+			get_base_file_name(const rvsdg_module &rm);
 		};
 	}
 }

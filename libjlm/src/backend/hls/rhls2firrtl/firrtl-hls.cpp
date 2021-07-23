@@ -581,7 +581,7 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node *ln) {
 	for (const auto node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
-			std::string inst_name = node_module.name;// + "_inst";
+			std::string inst_name = node_module.name + "_inst";
 			if (node_module.has_mem) {
 				mem_nodes.push_back(inst_name);
 			}
@@ -674,7 +674,7 @@ jlm::hls::FirrtlHLS::subregion_to_firrtl(jive::region *sr) {
 	for (const auto node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
-			std::string inst_name = node_module.name;// + "_inst";
+			std::string inst_name = node_module.name + "_inst";
 			if (node_module.has_mem) {
 				mem_nodes.push_back(inst_name);
 			}
