@@ -18,6 +18,7 @@
 #include <jlm/util/stats.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/check-rhls.hpp>
 #include <jlm/ir/rvsdg-module.hpp>
+#include <jive/rvsdg/traverser.hpp>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -33,14 +34,40 @@ pre_opt(jlm::rvsdg_module &rm) {
 	ivr.run(rm, sd);
 }
 
+namespace jlm {
+	std::unique_ptr<jlm::rvsdg_module>
+	split_hls_function(jlm::rvsdg_module &rm, std::string &function_name) {
+		// TODO: use a different datastructure for rhls?
+		// create a copy of rm
+		auto rhls = jlm::rvsdg_module::create(rm.source_filename(), rm.target_triple(), rm.data_layout());
+
+		auto root = rm.graph()->root();
+		for (auto node : jive::topdown_traverser(root)) {
+			if (auto ln = dynamic_cast<lambda::node *>(node)) {
+				if (ln->name() != function_name) { // TODO: handle C++ name mangling
+					continue;
+				}
+				// may not use other functions TODO: do inlining here
+				JLM_ASSERT(ln->ninputs() == 0);
+				// copy function into rhls
+				jive::substitution_map smap;
+				auto new_ln = ln->copy(rhls->graph()->root(), smap);
+				jive::result::create(rhls->graph()->root(), new_ln->output(), nullptr, new_ln->output()->type());
+				// add function as input to rm and remove it
+				impport im(ln->output()->type(), ln->name(),  linkage::external_linkage); //TODO: change linkage?
+				auto arg = rm.graph()->add_import(im);
+				ln->output()->divert_users(arg);
+				remove(ln);
+				return rhls;
+			}
+		}
+		throw jlm::error("HLS function "+function_name+" not found");
+	}
+}
+
 std::unique_ptr<jlm::rvsdg_module>
-jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm) {
-	// TODO: use a different datastructure for rhls?
-	// create a copy of rm
-	auto rhls = rvsdg_module::create(rm.source_filename(), rm.target_triple(), rm.data_layout());
-	auto graph = rhls->graph();
-	jive::substitution_map smap;
-	rm.graph()->root()->copy(graph->root(), smap, true, true);
+jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
+	auto rhls = jlm::split_hls_function(rm, function_name); //TODO: pass through function name
 
 	pre_opt(*rhls);
 

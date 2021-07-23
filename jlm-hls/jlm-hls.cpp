@@ -25,6 +25,9 @@
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/dot-hls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/firrtl-hls.hpp>
+#include <jlm/backend/hls/rhls2firrtl/verilator-harness-hls.hpp>
+#include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
+#include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
 
 class cmdflags {
 public:
@@ -41,14 +44,17 @@ print_usage(const std::string &app) {
     std::cerr << "Usage: " << app << " [OPTIONS]\n";
     std::cerr << "OPTIONS:\n";
     std::cerr << "--file name: LLVM IR file.\n";
+    std::cerr << "--hls-function: name of the function to turn into an accelerator\n";
 }
 
 static void
 parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     static constexpr size_t file = 1;
+    static constexpr size_t hls_function = 2;
 
     static struct option options[] = {
             {"file", required_argument, NULL, file},
+            {"hls-function", required_argument, NULL, hls_function},
             {NULL, 0,                   NULL, 0}
     };
 
@@ -59,6 +65,10 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
                 flags.file = optarg;
                 break;
             }
+            case hls_function: {
+                flags.hls_function = optarg;
+                break;
+            }
 
             default:
                 print_usage(argv[0]);
@@ -66,7 +76,7 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
         }
     }
 
-    if (flags.file.empty()) {
+    if (flags.file.empty() || flags.hls_function.empty()) {
         print_usage(argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -100,7 +110,7 @@ main(int argc, char **argv) {
 
     dump_xml(rm);
     jive::view(rm->graph()->root(), stdout);
-    auto rhls = jlm::hls::rvsdg2rhls(*rm);
+    auto rhls = jlm::hls::rvsdg2rhls(*rm, flags.hls_function);
     jive::view(rhls->graph()->root(), stdout);
     dump_xml(rhls, "_hls");	// run conversion on copy
 
@@ -108,5 +118,17 @@ main(int argc, char **argv) {
     hls.run(*rhls);
 	jlm::hls::DotHLS dhls;
     dhls.run(*rhls);
+    jlm::hls::VerilatorHarnessHLS vhls;
+    vhls.run(*rhls);
+
+    // non-hls part
+	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rm, flags.sd);
+	auto lm2 = jlm::jlm2llvm::convert(*jm2, ctx);
+	std::error_code EC;
+	auto source_file_name = lm->getSourceFileName();
+	auto base_file_name = source_file_name.substr(0, source_file_name.find_last_of('.'));
+	llvm::raw_fd_ostream os(base_file_name+".rest.ll", EC);
+	lm2->print(os, nullptr);
+
     return 0;
 }

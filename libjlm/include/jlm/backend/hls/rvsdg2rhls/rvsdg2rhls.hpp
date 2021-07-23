@@ -19,7 +19,7 @@ namespace jlm{
 		}
 
 		std::unique_ptr<rvsdg_module>
-		rvsdg2rhls(jlm::rvsdg_module &rm);
+		rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_RVSDG2RHLS_HPP

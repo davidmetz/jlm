@@ -90,3 +90,10 @@ jlm::hls::BaseHLS::get_hls_lambda(jlm::rvsdg_module &rm) {
 		throw jlm::error("Root should have only one lambda node now");
 	}
 }
+
+std::string
+jlm::hls::BaseHLS::get_base_file_name(const jlm::rvsdg_module &rm) {
+	auto source_file_name = rm.source_filename().name();
+	auto base_file_name = source_file_name.substr(0, source_file_name.find_last_of('.'));
+	return base_file_name;
+}
