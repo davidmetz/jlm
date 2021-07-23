@@ -119,7 +119,8 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 	assert(ln->region() == ln->region()->graph()->root());
 	assert((*ln->output()->begin())->region() == ln->region()->graph()->root());
 
-//            ln->output()->divert_users(new_out);
+//	ln->output()->divert_users(new_out); // can't divert since the type changed
+	JLM_ASSERT(ln->output()->nusers()==1);
 	ln->region()->remove_result((*ln->output()->begin())->index());
 	remove(ln);
 	jive::result::create(new_lambda->region(), new_out, nullptr, new_out->type());

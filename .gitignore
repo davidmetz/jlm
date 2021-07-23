@@ -8,3 +8,5 @@ check.log
 tests/test-runner
 .Makefile.override
 libjlc/include/jlc/llvmpaths.hpp
+.idea
+cmake-build-debug
