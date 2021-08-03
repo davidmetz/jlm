@@ -37,7 +37,7 @@ namespace jlm {
 					"#include \"verilated_fst_c.h\"\n"
 					"#include \"V" << file_name << ".h\"\n" <<
 					"#define V_NAME V" << file_name << "\n" <<
-					"#define TIMEOUT 80000\n"
+					"#define TIMEOUT 10000000\n"
 					"#define xstr(s) str(s)\n"
 					"#define str(s) #s\n"
 					"void clock_cycle();\n"
@@ -208,7 +208,7 @@ namespace jlm {
 					if (i != 0) {
 						cpp << ",\n";
 					}
-					cpp << "    " << convert_to_c_type(&ln->type().argument_type(i)) << " a" << i;
+					cpp << "    " << convert_to_c_type(&ln->type().argument_type(i)) << " a" << i << convert_to_c_type_postfix(&ln->type().argument_type(i));
 				}
 
 				cpp << "\n"
@@ -263,8 +263,19 @@ namespace jlm {
 					return "int" + jive::detail::strfmt(t->nbits()) + "_t";
 				} else if (auto t = dynamic_cast<const jlm::ptrtype *>(type)) {
 					return convert_to_c_type(&t->pointee_type())+"*";
+				} else if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
+					return convert_to_c_type(&t->element_type());
 				} else {
 					throw std::logic_error(type->debug_string() + " not implemented!");
+				}
+			}
+
+			std::string
+			convert_to_c_type_postfix(const jive::type* type) {
+				if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
+					return jive::detail::strfmt("[",t->nelements(), "]", convert_to_c_type(&t->element_type()));
+				} else {
+					return "";
 				}
 			}
 		};
