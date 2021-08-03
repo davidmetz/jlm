@@ -141,6 +141,9 @@ namespace jlm {
 			trigger_to_firrtl(const jive::simple_node *n);
 
 			static std::string
+			gep_op_to_firrtl(const jive::simple_node *n);
+
+			static std::string
 			simple_op_to_firrtl(const jive::simple_node *n);
 
 			FirrtlModule &
