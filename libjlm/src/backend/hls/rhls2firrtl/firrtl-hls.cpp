@@ -450,6 +450,39 @@ jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
 	return modules.back();
 }
 
+int jlm_sizeof(const jive::type * t){
+	if (auto bt = dynamic_cast<const jive::bittype *>(t)) {
+		return bt->nbits();
+	} else if(auto at = dynamic_cast<const jlm::arraytype *>(t)){
+		return jlm_sizeof(&at->element_type())*at->nelements();
+	} else {
+		throw std::logic_error(t->debug_string() + " pointer not implemented!");
+	}
+}
+
+std::string
+jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
+	auto o = dynamic_cast<const jlm::getelementptr_op *>(&(n->operation()));
+	std::string result = data(n->input(0)); // start of with base pointer
+	//TODO: support structs
+	const jive::type *pt = &o->pointee_type();
+	for (int i = 1; i < n->ninputs(); ++i) {
+		int bits = jlm_sizeof(pt);
+		if (auto bt = dynamic_cast<const jive::bittype *>(pt)) {
+			;
+		} else if(auto at = dynamic_cast<const jlm::arraytype *>(pt)){
+			pt = &at->element_type();
+		} else {
+			throw std::logic_error(pt->debug_string() + " pointer not implemented!");
+		}
+		int bytes = bits / 8;
+		auto offset = "mul(" + data(n->input(i)) + ", " + UInt(64, bytes) + ")";
+		result = "add(" + result + ", " + offset + ")";
+	}
+	return result;
+
+}
+
 std::string
 jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 	if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
@@ -489,17 +522,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 	} else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
 		return UInt(1, o->value().alternative());
 	} else if (auto o = dynamic_cast<const jlm::getelementptr_op *>(&(n->operation()))) {
-		assert(n->ninputs() == 2);
-		const auto *pt = &o->pointee_type();
-		int bits;
-		if (auto bt = dynamic_cast<const jive::bittype *>(pt)) {
-			bits = bt->nbits();
-		} else {
-			throw std::logic_error(pt->debug_string() + " pointer not implemented!");
-		}
-		int bytes = bits / 8;
-		// TODO: make more general
-		return "add(" + data(n->input(0)) + ", mul(" + data(n->input(1)) + ", " + UInt(64, bytes) + "))";
+		return gep_op_to_firrtl(n);
 	} else {
 		throw std::logic_error(n->operation().debug_string() + " not implemented!");
 	}
