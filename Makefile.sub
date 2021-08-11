@@ -23,6 +23,9 @@ echo "libjlm-release         Compile jlm library in release mode"
 echo ""
 echo "libjlc-debug           Compile jlc library in debug mode"
 echo "libjlc-release         Compile jlc library in release mode"
+echo ""
+echo "jlc-hls-debug           Compile jlc-hls in debug mode"
+echo "jlc-hls-release         Compile jlc-hls in release mode"
 endef
 
 include $(JLM_ROOT)/libjlm/Makefile.sub
@@ -32,13 +35,13 @@ include $(JLM_ROOT)/jlm-opt/Makefile.sub
 include $(JLM_ROOT)/jlm-hls/Makefile.sub
 
 .PHONY: jlm-debug
-jlm-debug: libjlm-debug libjlc-debug jlm-print-debug jlm-opt-debug jlc-debug jlm-hls-debug
+jlm-debug: libjlm-debug libjlc-debug jlm-print-debug jlm-opt-debug jlc-debug jlm-hls-debug libjlc-hls-debug jlc-hls-debug
 
 .PHONY: jlm-release
-jlm-release: libjlm-release libjlc-release jlm-print-release jlm-opt-release jlc-release jlm-hls-release
+jlm-release: libjlm-release libjlc-release jlm-print-release jlm-opt-release jlc-release jlm-hls-release libjlc-hls-release jlc-hls-release
 
 .PHONY: jlm-clean
-jlm-clean: libjlc-clean libjlm-clean jlmopt-clean jlmprint-clean
+jlm-clean: libjlc-clean libjlm-clean jlmopt-clean jlmprint-clean jlmhls-clean libjlchls-clean
 	@rm -rf $(JLM_ROOT)/bin
 	@rm -rf $(JLM_ROOT)/tests/test-runner
 	@rm -rf $(JLM_ROOT)/utests.log
