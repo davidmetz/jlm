@@ -19,6 +19,7 @@
 #include <jlm/backend/hls/rvsdg2rhls/check-rhls.hpp>
 #include <jlm/ir/rvsdg-module.hpp>
 #include <jive/rvsdg/traverser.hpp>
+#include <regex>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -35,16 +36,25 @@ pre_opt(jlm::rvsdg_module &rm) {
 }
 
 namespace jlm {
+
+	bool function_match(lambda::node * ln, std::string &function_name){
+		const std::regex fn_regex(function_name);
+		if(std::regex_match(ln->name(), fn_regex)){// TODO: handle C++ name mangling
+			return true;
+		}
+		return false;
+	}
+
 	std::unique_ptr<jlm::rvsdg_module>
 	split_hls_function(jlm::rvsdg_module &rm, std::string &function_name) {
 		// TODO: use a different datastructure for rhls?
 		// create a copy of rm
 		auto rhls = jlm::rvsdg_module::create(rm.source_filename(), rm.target_triple(), rm.data_layout());
-
+		std::cout << "processing " << rm.source_filename().name() << "\n";
 		auto root = rm.graph()->root();
 		for (auto node : jive::topdown_traverser(root)) {
 			if (auto ln = dynamic_cast<lambda::node *>(node)) {
-				if (ln->name() != function_name) { // TODO: handle C++ name mangling
+				if (!function_match(ln, function_name)) {
 					continue;
 				}
 				// may not use other functions TODO: do inlining here
@@ -58,6 +68,7 @@ namespace jlm {
 				auto arg = rm.graph()->add_import(im);
 				ln->output()->divert_users(arg);
 				remove(ln);
+				std::cout << "function " << new_ln->name() << " extracted for HLS\n";
 				return rhls;
 			}
 		}

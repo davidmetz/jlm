@@ -98,6 +98,8 @@ main(int argc, char **argv) {
     llvm::LLVMContext ctx;
     llvm::SMDiagnostic err;
     auto lm = llvm::parseIRFile(flags.file, err, ctx);
+    // TODO: fix this hack
+    lm->setSourceFileName("jlm_hls");
     if (!lm) {
         err.print(argv[0], llvm::errs());
         exit(1);
@@ -108,11 +110,11 @@ main(int argc, char **argv) {
 //    jlm::print(*jm, stdout);
     auto rm = jlm::construct_rvsdg(*jm, flags.sd);
 
-    dump_xml(rm);
-    jive::view(rm->graph()->root(), stdout);
+//    dump_xml(rm);
+//    jive::view(rm->graph()->root(), stdout);
     auto rhls = jlm::hls::rvsdg2rhls(*rm, flags.hls_function);
-    jive::view(rhls->graph()->root(), stdout);
-    dump_xml(rhls, "_hls");	// run conversion on copy
+//    jive::view(rhls->graph()->root(), stdout);
+//    dump_xml(rhls, "_hls");	// run conversion on copy
 
 	jlm::hls::FirrtlHLS hls;
     hls.run(*rhls);
