@@ -498,6 +498,8 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 			   "))";
 	} else if (auto o = dynamic_cast<const jlm::trunc_op *>(&(n->operation()))) {
 		return data(n->input(0));
+	}  else if (auto o = dynamic_cast<const jlm::zext_op *>(&(n->operation()))) {
+		return data(n->input(0));
 	} else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
 		return "gt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
 	} else if (auto o = dynamic_cast<const jive::bitult_op *>(&(n->operation()))) {
