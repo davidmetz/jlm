@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 namespace jlm {
 
@@ -404,6 +405,9 @@ private:
 	jlm::filepath ifile_;
 };
 
+std::basic_string<char>
+gcd();
+
 class hlscmd final : public command {
 public:
 	virtual
@@ -431,14 +435,17 @@ public:
 	inline const jlm::filepath
 	llfile() const noexcept
 	{
-		return jlm::filepath("jlm_hls.ll");
+		return jlm::filepath("jlm_hls.rest.ll");
 	}
+
+
 
 
 	inline const jlm::filepath
 	harnessfile() const noexcept
 	{
-		return jlm::filepath("jlm_hls_harness.cpp");
+		std::basic_string<char> cd = gcd();
+		return jlm::filepath(cd+"/jlm_hls_harness.cpp");
 	}
 
 

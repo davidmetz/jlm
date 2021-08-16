@@ -51,7 +51,7 @@ generate_commands(const jlm::cmdline_options & opts)
 	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r->cmd())->ofile(), opts.hls_function_regex);
 	m2r->add_edge(hls);
 	// firrtl
-	jlm::filepath verilogfile("/tmp/hls.v");
+	jlm::filepath verilogfile("/tmp/jlm_hls.v");
 	auto firrtl = firrtlcmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->firfile(), verilogfile);
 	hls->add_edge(firrtl);
 	jlm::filepath asmofile("/tmp/hls.o");
@@ -60,7 +60,7 @@ generate_commands(const jlm::cmdline_options & opts)
 
 	std::vector<jlm::filepath> lnkifiles;
 	for (const auto & c : opts.compilations) {
-		if (c.link())
+		if (c.link() && !c.parse())
 			lnkifiles.push_back(c.ofile());
 	}
 	lnkifiles.push_back(asmofile);
@@ -209,9 +209,10 @@ cgencmd::to_str() const
 	return strfmt(
 	  llcpath.to_str() + " "
 	, "-", jlm::to_str(ol_), " "
+	, "--relocation-model=pic "
 	, "-filetype=obj "
 	, "-o ", ofile_.to_str()
-	, " /tmp/", create_optcmd_ofile(ifile_.base())
+	, " ", ifile_.to_str()
 	);
 }
 
@@ -339,6 +340,14 @@ lllnkcmd::run() const {
 	}
 
 	std::string
+	gcd() {
+		char tmp[256];
+		getcwd(tmp, 256);
+		auto cd = std::string(tmp);
+		return cd;
+	}
+
+	std::string
 	verilatorcmd::to_str() const {
 		std::string lfiles;
 		for (const auto & ifile : lfiles_)
@@ -351,6 +360,16 @@ lllnkcmd::run() const {
 		std::string libs;
 		for (const auto & lib : libs_)
 			libs += "-l" + lib + " ";
+
+		std::string cflags;
+//		if(!libs.empty()||!Lpaths.empty()){
+		cflags = " -CFLAGS \"" + libs + Lpaths + " -fPIC\"";
+//		}
+
+		std::string ofile = ofile_.to_str();
+		if(ofile.at(0)!='/'){
+			ofile = gcd() + "/" + ofile;
+		}
 		return strfmt(
 				"verilator"
 				, " --cc"
@@ -358,9 +377,10 @@ lllnkcmd::run() const {
 				, " --exe"
 				, " --trace-fst"
 				, " -j"
+				, " -Mdir /tmp/verilator/"
 				, " -MAKEFLAGS CXX=clang"
-				, " -CFLAGS \"", libs, Lpaths, "\""
-				, " -o ", ofile_.to_str()
+				, cflags
+				, " -o ", ofile
 				, " ", vfile().to_str()
 				, " ", hfile().to_str()
 				, " ", lfiles

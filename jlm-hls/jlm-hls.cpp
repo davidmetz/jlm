@@ -99,7 +99,8 @@ main(int argc, char **argv) {
     llvm::SMDiagnostic err;
     auto lm = llvm::parseIRFile(flags.file, err, ctx);
     // TODO: fix this hack
-    lm->setSourceFileName("jlm_hls");
+	jlm::filepath ff(flags.file);
+    lm->setSourceFileName(/*ff.path()+*/"jlm_hls");
     if (!lm) {
         err.print(argv[0], llvm::errs());
         exit(1);
