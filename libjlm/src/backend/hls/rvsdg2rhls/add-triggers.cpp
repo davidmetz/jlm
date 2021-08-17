@@ -8,6 +8,7 @@
 #include <jive/rvsdg/theta.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
+#include <jive/view.hpp>
 
 jive::output *
 jlm::hls::get_trigger(jive::region *region) {
@@ -22,8 +23,6 @@ jlm::hls::get_trigger(jive::region *region) {
 jlm::lambda::node *
 jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 	auto old_fcttype = ln->type();
-	// TODO: add support for cvarguments?
-	assert(ln->ncvarguments() == 0);
 	std::vector<const jive::type *> new_argument_types;
 	for (int i = 0; i < old_fcttype.narguments(); ++i) {
 		new_argument_types.push_back(&old_fcttype.argument_type(i));
@@ -38,14 +37,20 @@ jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 												ln->attributes());
 
 	jive::substitution_map smap;
-	for (int i = 0; i < ln->subregion()->narguments(); ++i) {
-		smap.insert(ln->subregion()->argument(i), new_lambda->subregion()->argument(i));
+	for (int i = 0; i < ln->ncvarguments(); ++i) {
+		// copy over cvarguments
+		smap.insert(ln->cvargument(i), new_lambda->add_ctxvar(ln->cvargument(i)->input()->origin()));
 	}
+	for (int i = 0; i < ln->nfctarguments(); ++i) {
+		smap.insert(ln->fctargument(i), new_lambda->fctargument(i));
+	}
+//	jive::view(ln->subregion(), stdout);
+//	jive::view(new_lambda->subregion(), stdout);
 	ln->subregion()->copy(new_lambda->subregion(), smap, false, false);
 
 	std::vector<jive::output *> new_results;
-	for (int i = 0; i < ln->subregion()->nresults(); ++i) {
-		new_results.push_back(smap.lookup(ln->subregion()->result(i)->origin()));
+	for (int i = 0; i < ln->nfctresults(); ++i) {
+		new_results.push_back(smap.lookup(ln->fctresult(i)->origin()));
 	}
 	auto new_out = new_lambda->finalize(new_results);
 
