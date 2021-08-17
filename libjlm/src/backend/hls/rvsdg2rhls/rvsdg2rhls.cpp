@@ -20,6 +20,7 @@
 #include <jlm/ir/rvsdg-module.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include <regex>
+#include <jlm/ir/operators/delta.hpp>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -57,10 +58,28 @@ namespace jlm {
 				if (!function_match(ln, function_name)) {
 					continue;
 				}
-				// may not use other functions TODO: do inlining here
-				JLM_ASSERT(ln->ninputs() == 0);
-				// copy function into rhls
+				// may not use other functions TODO: do inlining + global variables here
 				jive::substitution_map smap;
+				for (int i = 0; i < ln->ninputs(); ++i) {
+					//TODO: check for imports
+					auto orig_node = dynamic_cast<jive::node_output*>(ln->input(i)->origin())->node();
+					if(auto oln = dynamic_cast<lambda::node*>(orig_node)){
+						throw jlm::error("Inlining of function "+oln->name()+" not supported");
+					} else if(auto odn = dynamic_cast<delta_node*>(orig_node)){
+						std::cout << "delta node " << odn->name() << ": " << odn->type().debug_string() << "\n";
+						// add import for delta to rhls
+						impport im(odn->type(), odn->name(), linkage::external_linkage);
+						auto arg = rhls->graph()->add_import(im);
+						smap.insert(ln->input(i)->origin(), arg);
+						// add export for delta to rm
+						// TODO: check if not already exported and maybe adjust linkage?
+						rm.graph()->add_export(odn->output(0), {odn->type(), odn->name()});
+					} else{
+						throw jlm::error("Unsupported node type: "+orig_node->operation().debug_string());
+					}
+//					std::cout << "cvarg " << i << ": " <<ln->input(i)->type().debug_string() << "\n";
+				}
+				// copy function into rhls
 				auto new_ln = ln->copy(rhls->graph()->root(), smap);
 				jive::result::create(rhls->graph()->root(), new_ln->output(), nullptr, new_ln->output()->type());
 				// add function as input to rm and remove it
@@ -70,6 +89,8 @@ namespace jlm {
 				remove(ln);
 				std::cout << "function " << new_ln->name() << " extracted for HLS\n";
 				return rhls;
+			} else{
+//				std::cout << "other node: " << node->operation().debug_string() <<"\n";
 			}
 		}
 		throw jlm::error("HLS function "+function_name+" not found");
