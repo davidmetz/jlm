@@ -484,15 +484,30 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 }
 
 std::string
+jlm::hls::FirrtlHLS::match_op_to_firrtl(const jive::simple_node *n){
+	std::string result;
+	auto o = dynamic_cast<const jive::match_op *>(&(n->operation()));
+	JLM_ASSERT(o);
+	if (is_identity_mapping(*o)) {
+		return data(n->input(0));
+	} else {
+		result = UInt(64, 0);
+		//TODO: optimize?
+		for (auto it = o->begin(); it != o->end(); it++) {
+			result = "mux(eq("+ UInt(64, it->first)+", "+data(n->input(0))+"), "+ UInt(64, it->second)+", "+result+")";
+		}
+	}
+	return result;
+}
+
+std::string
 jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 	if (auto o = dynamic_cast<const jive::match_op *>(&(n->operation()))) {
-		if (is_identity_mapping(*o)) {
-			return data(n->input(0));
-		} else {
-			throw std::logic_error("non-identity mapping not implemented!");
-		}
+		return match_op_to_firrtl(n);
 	} else if (auto o = dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))) {
 		return "gt(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
+	} else if (auto o = dynamic_cast<const jive::bitsge_op *>(&(n->operation()))) {
+		return "geq(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
 	} else if (auto o = dynamic_cast<const jlm::sext_op *>(&(n->operation()))) {
 		return "asUInt(pad(asSInt(" + data(n->input(0)) + "), " + jive::detail::strfmt(o->ndstbits()) +
 			   "))";
@@ -514,6 +529,22 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 		return "mul(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
 	} else if (auto o = dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
 		return "sub(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
+	} else if (auto o = dynamic_cast<const jive::bitand_op *>(&(n->operation()))) {
+		return "and(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
+	} else if (auto o = dynamic_cast<const jive::bitxor_op *>(&(n->operation()))) {
+		return "xor(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
+	} else if (auto o = dynamic_cast<const jive::bitor_op *>(&(n->operation()))) {
+		return "or(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
+	} else if (auto o = dynamic_cast<const jive::bitshr_op *>(&(n->operation()))) {
+		//TODO: automatic conversion to static shift?
+		return "dshr(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
+	} else if (auto o = dynamic_cast<const jive::bitashr_op *>(&(n->operation()))) {
+		//TODO: automatic conversion to static shift?
+		return "asUInt(dshr(asSInt(" + data(n->input(0)) + "), " + data(n->input(1)) + "))";
+	}  else if (auto o = dynamic_cast<const jive::bitshl_op *>(&(n->operation()))) {
+		//TODO: automatic conversion to static shift?
+		// TODO: adjust shift limit (bits)
+		return "dshl(" + data(n->input(0)) + ", bits(" + data(n->input(1)) + ", 7, 0))";
 	} else if (auto o = dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
 		return "neq(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
 	} else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
