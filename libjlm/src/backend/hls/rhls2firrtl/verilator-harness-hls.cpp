@@ -129,7 +129,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"        void *addr = (void *) top->mem_req_addr;\n"
 		"        uint64_t data = top->mem_req_data;\n"
 		"        if (top->mem_req_write) {\n"
+		"#ifdef HLS_MEM_DEBUG\n"
 		"            std::cout << \"writing \" << data << \" to \" << addr << \"\\n\";\n"
+		"#endif\n"
 		"            switch (top->mem_req_width) {\n"
 		"                case 0:\n"
 		"                    *(uint8_t *) addr = data;\n"
@@ -147,7 +149,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"                    assert(false);\n"
 		"            }\n"
 		"        } else {\n"
+		"#ifdef HLS_MEM_DEBUG\n"
 		"            std::cout << \"reading from \" << addr << \"\\n\";\n"
+		"#endif\n"
 		"        }\n"
 		"        switch (top->mem_req_width) {\n"
 		"            case 0:\n"
@@ -181,7 +185,11 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 	auto root = rm.graph()->root();
 	for (int i = 0; i < root->narguments(); ++i) {
 		if(auto ip = dynamic_cast<const impport*>(&root->argument(i)->port())){
-			cpp << "extern " << convert_to_c_type(&ip->type()) << " " << ip->name() << ";\n";
+			if (auto t = dynamic_cast<const jlm::ptrtype *>(&ip->type())) {
+				cpp << "extern " << convert_to_c_type(&t->pointee_type()) << " " << ip->name() << ";\n";
+			} else{
+				throw error("unexpected impport type");
+			}
 		}
 	}
 	std::string return_type;
@@ -228,12 +236,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		} else{
 			throw jlm::error("Unsupported cvarg origin type type");
 		}
-//		if (auto odn = dynamic_cast<delta_node *>(orig_node)) {
-//			name = odn->name();
-//		} else {
-//			throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
-//		}
 		cpp << "    top->i_data" << ix << " = (uint64_t) &" << name << ";\n";
+		cpp << "#ifdef HLS_MEM_DEBUG\n";
+		cpp << "    std::cout << \"" << name << ": \" << &" << name << " << \"\\n\";\n";
+		cpp << "#endif\n";
 	}
 	cpp <<
 		"    int start = main_time;\n"

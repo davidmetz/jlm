@@ -18,10 +18,10 @@ namespace jlm{
 		static void gamma_conv_spec(jive::gamma_node *gamma);
 
 		static void
-		gamma_conv(jive::region *region);
+		gamma_conv(jive::region *region, bool allow_speculation=true);
 
 		void
-		gamma_conv(jlm::rvsdg_module &rm);
+		gamma_conv(jlm::rvsdg_module &rm, bool allow_speculation=true);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_GAMMA_CONV_HPP
