@@ -34,6 +34,9 @@ namespace jlm {
 		static inline bool
 		is_identity_mapping(const jive::match_op &op);
 
+
+		int jlm_sizeof(const jive::type * t);
+
 		class FirrtlHLS : public BaseHLS {
 			std::string
 			extension() override {
@@ -133,6 +136,9 @@ namespace jlm {
 
 			FirrtlModule &
 			sink_to_firrtl(const jive::simple_node *n);
+
+			FirrtlModule &
+			print_to_firrtl(const jive::simple_node *n);
 
 			FirrtlModule &
 			branch_to_firrtl(const jive::simple_node *n);

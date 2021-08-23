@@ -9,20 +9,20 @@
 #include <jive/rvsdg/traverser.hpp>
 
 void
-jlm::hls::gamma_conv(jlm::rvsdg_module &rm) {
+jlm::hls::gamma_conv(jlm::rvsdg_module &rm, bool allow_speculation) {
 	auto &graph = *rm.graph();
 	auto root = graph.root();
-	gamma_conv(root);
+	gamma_conv(root, allow_speculation);
 }
 
 void
-jlm::hls::gamma_conv(jive::region *region) {
+jlm::hls::gamma_conv(jive::region *region, bool allow_speculation) {
 	for (auto &node : jive::topdown_traverser(region)) {
 		if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
 			for (size_t n = 0; n < structnode->nsubregions(); n++)
 				gamma_conv(structnode->subregion(n));
 			if (auto gamma = dynamic_cast<jive::gamma_node *>(node)) {
-				if (gamma_can_be_spec(gamma)) {
+				if (allow_speculation && gamma_can_be_spec(gamma)) {
 					gamma_conv_spec(gamma);
 				} else {
 					gamma_conv_nonspec(gamma);

@@ -32,7 +32,7 @@ namespace jlm {
 			edge(std::string src, std::string snk, const jive::type &type, bool back = false);
 
 			std::string
-			loop_to_dot(hls::loop_node *ln);;
+			loop_to_dot(hls::loop_node *ln);
 
 			void
 			prepare_loop_out_port(hls::loop_node *ln);

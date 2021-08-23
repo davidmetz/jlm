@@ -27,15 +27,7 @@ jlm::hls::FirrtlHLS::get_text(jlm::rvsdg_module &rm) {
 
 std::string
 jlm::hls::FirrtlHLS::to_firrtl_type(const jive::type *type) {
-	if (auto t = dynamic_cast<const jive::bittype *>(type)) {
-		return "UInt<" + jive::detail::strfmt(t->nbits()) + ">";
-	} else if (auto t = dynamic_cast<const jlm::ptrtype *>(type)) {
-		return "UInt<64>";
-	} else if (auto t = dynamic_cast<const jive::statetype *>(type)) {
-		return "UInt<1>";
-	} else {
-		throw std::logic_error(type->debug_string() + " not implemented!");
-	}
+	return jive::detail::strfmt("UInt<", jlm_sizeof(type), ">");
 }
 
 std::string
@@ -138,7 +130,13 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 	} else {
 		module << indent(2) << "mem_req.write <= " << UInt(1, 0) << "\n";
 		module << indent(2) << "mem_req.data is invalid\n";
-		bit_width = dynamic_cast<const jive::bittype *>(&n->output(0)->type())->nbits();
+		if (auto bt = dynamic_cast<const jive::bittype *>(&n->output(0)->type())) {
+			bit_width = bt->nbits();
+		} else if (auto bt = dynamic_cast<const jlm::ptrtype *>(&n->output(0)->type())) {
+			bit_width = 64;
+		} else {
+			throw jlm::error("unknown width for mem request");
+		}
 	}
 	int log2_bytes = log2(bit_width / 8);
 	module << indent(2) << "mem_req.width <= " << UInt(4, log2_bytes) << "\n";
@@ -406,6 +404,30 @@ jlm::hls::FirrtlHLS::sink_to_firrtl(const jive::simple_node *n) {
 	return modules.back();
 }
 
+
+jlm::hls::FirrtlModule &
+jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
+	auto pn = dynamic_cast<const jlm::hls::print_op *>(&n->operation());
+	std::string module_name = get_node_name(n);
+	std::ostringstream module;
+	module << module_header(n);
+	auto i0 = n->input(0);
+	auto o0 = n->output(0);
+	module << indent(2) << " ; " << n->operation().debug_string() << "\n";
+	module << indent(2) << data(o0) << " <= " << data(i0);
+	// handshaking
+	module << indent(2) + "; handshaking" + "\n";
+
+	module << indent(2) << valid(o0) << " <= " << valid(i0) << "\n";
+	module << indent(2) << ready(i0) << " <= " << ready(o0) << "\n";
+	module << indent(2) << "printf(clk, " << fire(i0) << ", \"print node " << pn->id() << ": %x\\n\", " << data(i0)
+		   << ")\n";
+
+
+	modules.emplace_back(module_name, module.str(), false);
+	return modules.back();
+}
+
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::branch_to_firrtl(const jive::simple_node *n) {
 	std::string module_name = get_node_name(n);
@@ -450,13 +472,21 @@ jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
 	return modules.back();
 }
 
-int jlm_sizeof(const jive::type * t){
+
+int
+jlm::hls::jlm_sizeof(const jive::type *t) {
 	if (auto bt = dynamic_cast<const jive::bittype *>(t)) {
 		return bt->nbits();
-	} else if(auto at = dynamic_cast<const jlm::arraytype *>(t)){
-		return jlm_sizeof(&at->element_type())*at->nelements();
+	} else if (auto at = dynamic_cast<const jlm::arraytype *>(t)) {
+		return jlm_sizeof(&at->element_type()) * at->nelements();
+	} else if (auto pt = dynamic_cast<const jlm::ptrtype *>(t)) {
+		return 64;
+	} else if (auto ct = dynamic_cast<const jive::ctltype *>(t)) {
+		return ceil(log2(ct->nalternatives()));
+	} else if (auto st = dynamic_cast<const jive::statetype *>(t)) {
+		return 1;
 	} else {
-		throw std::logic_error(t->debug_string() + " pointer not implemented!");
+		throw std::logic_error(t->debug_string() + " size of not implemented!");
 	}
 }
 
@@ -468,9 +498,8 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 	const jive::type *pt = &o->pointee_type();
 	for (int i = 1; i < n->ninputs(); ++i) {
 		int bits = jlm_sizeof(pt);
-		if (auto bt = dynamic_cast<const jive::bittype *>(pt)) {
-			;
-		} else if(auto at = dynamic_cast<const jlm::arraytype *>(pt)){
+		if (auto bt = dynamic_cast<const jive::bittype *>(pt)) { ;
+		} else if (auto at = dynamic_cast<const jlm::arraytype *>(pt)) {
 			pt = &at->element_type();
 		} else {
 			throw std::logic_error(pt->debug_string() + " pointer not implemented!");
@@ -484,17 +513,18 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::match_op_to_firrtl(const jive::simple_node *n){
+jlm::hls::FirrtlHLS::match_op_to_firrtl(const jive::simple_node *n) {
 	std::string result;
 	auto o = dynamic_cast<const jive::match_op *>(&(n->operation()));
 	JLM_ASSERT(o);
 	if (is_identity_mapping(*o)) {
 		return data(n->input(0));
 	} else {
-		result = UInt(64, 0);
+		result = UInt(64, o->default_alternative());
 		//TODO: optimize?
 		for (auto it = o->begin(); it != o->end(); it++) {
-			result = "mux(eq("+ UInt(64, it->first)+", "+data(n->input(0))+"), "+ UInt(64, it->second)+", "+result+")";
+			result = "mux(eq(" + UInt(64, it->first) + ", " + data(n->input(0)) + "), " + UInt(64, it->second) + ", " +
+					 result + ")";
 		}
 	}
 	return result;
@@ -513,7 +543,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 			   "))";
 	} else if (auto o = dynamic_cast<const jlm::trunc_op *>(&(n->operation()))) {
 		return data(n->input(0));
-	}  else if (auto o = dynamic_cast<const jlm::zext_op *>(&(n->operation()))) {
+	} else if (auto o = dynamic_cast<const jlm::zext_op *>(&(n->operation()))) {
 		return data(n->input(0));
 	} else if (auto o = dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
 		return "gt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
@@ -541,7 +571,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 	} else if (auto o = dynamic_cast<const jive::bitashr_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		return "asUInt(dshr(asSInt(" + data(n->input(0)) + "), " + data(n->input(1)) + "))";
-	}  else if (auto o = dynamic_cast<const jive::bitshl_op *>(&(n->operation()))) {
+	} else if (auto o = dynamic_cast<const jive::bitshl_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		// TODO: adjust shift limit (bits)
 		return "dshl(" + data(n->input(0)) + ", bits(" + data(n->input(1)) + ", 7, 0))";
@@ -613,6 +643,8 @@ jlm::hls::FirrtlHLS::node_to_firrtl(const jive::node *node, const int depth) {
 			return trigger_to_firrtl(n);
 		} else if (auto o = dynamic_cast<const hls::sink_op *>(&(n->operation()))) {
 			return sink_to_firrtl(n);
+		} else if (auto o = dynamic_cast<const hls::print_op *>(&(n->operation()))) {
+			return print_to_firrtl(n);
 		} else if (auto o = dynamic_cast<const hls::fork_op *>(&(n->operation()))) {
 			return fork_to_firrtl(n);
 		} else if (auto o = dynamic_cast<const hls::merge_op *>(&(n->operation()))) {
@@ -682,7 +714,7 @@ jlm::hls::FirrtlHLS::connect(jive::region *sr) {
 	std::ostringstream firrtl;
 	for (const auto &node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
-			auto inst_name = node_map[node]+"_inst";
+			auto inst_name = node_map[node] + "_inst";
 			firrtl << indent(2) << inst_name << ".clk <= clk\n";
 			firrtl << indent(2) << inst_name << ".reset <= reset\n";
 			for (int i = 0; i < node->ninputs(); ++i) {
