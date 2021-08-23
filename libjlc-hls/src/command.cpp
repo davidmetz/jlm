@@ -64,6 +64,7 @@ generate_commands(const jlm::cmdline_options & opts)
 			lnkifiles.push_back(c.ofile());
 	}
 	lnkifiles.push_back(asmofile);
+	// TODO: remove old verilator folder first
 	auto verinode = verilatorcmd::create(pgraph.get(), verilogfile, lnkifiles, dynamic_cast<hlscmd*>(&hls->cmd())->harnessfile(), opts.lnkofile, opts.libpaths, opts.libs);
 	firrtl->add_edge(verinode);
 	verinode->add_edge(pgraph->exit());
