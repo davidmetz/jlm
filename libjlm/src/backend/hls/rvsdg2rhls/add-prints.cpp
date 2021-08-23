@@ -48,8 +48,8 @@ jlm::hls::convert_prints(jlm::rvsdg_module &rm) {
 	convert_prints(root, printf);
 }
 
-static jive::output *
-route_to_region(jive::output * output, jive::region * region)
+jive::output *
+jlm::hls::route_to_region(jive::output * output, jive::region * region)
 {
 	JLM_ASSERT(region != nullptr);
 
