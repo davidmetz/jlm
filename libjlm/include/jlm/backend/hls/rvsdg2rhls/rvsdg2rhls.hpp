@@ -20,6 +20,9 @@ namespace jlm{
 
 		std::unique_ptr<rvsdg_module>
 		rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name);
+
+		void
+		dump_ref(std::unique_ptr<jlm::rvsdg_module> &rhls);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_RVSDG2RHLS_HPP

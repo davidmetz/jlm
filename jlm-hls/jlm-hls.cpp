@@ -128,9 +128,7 @@ main(int argc, char **argv) {
 	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rm, flags.sd);
 	auto lm2 = jlm::jlm2llvm::convert(*jm2, ctx);
 	std::error_code EC;
-	auto source_file_name = lm->getSourceFileName();
-	auto base_file_name = source_file_name.substr(0, source_file_name.find_last_of('.'));
-	llvm::raw_fd_ostream os(base_file_name+".rest.ll", EC);
+	llvm::raw_fd_ostream os(rm->source_filename().base()+".rest.ll", EC);
 	lm2->print(os, nullptr);
 
     return 0;

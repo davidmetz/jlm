@@ -19,8 +19,18 @@
 #include <jlm/backend/hls/rvsdg2rhls/check-rhls.hpp>
 #include <jlm/ir/rvsdg-module.hpp>
 #include <jive/rvsdg/traverser.hpp>
-#include <regex>
 #include <jlm/ir/operators/delta.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/add-prints.hpp>
+#include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
+#include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
+
+#include <regex>
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IRReader/IRReader.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/SourceMgr.h>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -69,7 +79,10 @@ namespace jlm {
 						std::cout << "delta node " << odn->name() << ": " << odn->type().debug_string() << "\n";
 						// add import for delta to rhls
 						impport im(odn->type(), odn->name(), linkage::external_linkage);
+//						JLM_ASSERT(im.name()==odn->name());
 						auto arg = rhls->graph()->add_import(im);
+						auto tmp = dynamic_cast<const impport *>(&arg->port());
+						assert(tmp && tmp->name() == odn->name());
 						smap.insert(ln->input(i)->origin(), arg);
 						// add export for delta to rm
 						// TODO: check if not already exported and maybe adjust linkage?
@@ -77,7 +90,6 @@ namespace jlm {
 					} else{
 						throw jlm::error("Unsupported node type: "+orig_node->operation().debug_string());
 					}
-//					std::cout << "cvarg " << i << ": " <<ln->input(i)->type().debug_string() << "\n";
 				}
 				// copy function into rhls
 				auto new_ln = ln->copy(rhls->graph()->root(), smap);
@@ -89,8 +101,6 @@ namespace jlm {
 				remove(ln);
 				std::cout << "function " << new_ln->name() << " extracted for HLS\n";
 				return rhls;
-			} else{
-//				std::cout << "other node: " << node->operation().debug_string() <<"\n";
 			}
 		}
 		throw jlm::error("HLS function "+function_name+" not found");
@@ -103,11 +113,14 @@ jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
 
 	pre_opt(*rhls);
 
+//	jlm::hls::add_prints(*rhls);
+	dump_ref(rhls);
+
 	// run conversion on copy
 	jlm::hls::remove_unused_state(*rhls);
 	// main conversion steps
 	jlm::hls::add_triggers(*rhls); // TODO: make compatible with loop nodes?
-	jlm::hls::gamma_conv(*rhls);
+	jlm::hls::gamma_conv(*rhls, true);
 	jlm::hls::theta_conv(*rhls);
 	// rhls optimization
 	jlm::hls::dne(*rhls);
@@ -117,4 +130,24 @@ jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
 	// ensure that all rhls rules are met
 	jlm::hls::check_rhls(*rhls);
 	return rhls;
+}
+
+void
+jlm::hls::dump_ref(std::unique_ptr<jlm::rvsdg_module> &rhls) {
+	auto reference = rvsdg_module::create(rhls->source_filename(), rhls->target_triple(), rhls->data_layout());
+	jive::substitution_map smap;
+	rhls->graph()->root()->copy(reference->graph()->root(), smap, true, true);
+	convert_prints(*reference);
+	for (int i = 0; i < reference->graph()->root()->narguments(); ++i) {
+		auto arg = reference->graph()->root()->argument(i);
+		auto imp = dynamic_cast<const impport *>(&arg->port());
+		std::cout << "impport " << imp->name() << ": " << imp->type().debug_string() << "\n";
+	}
+	llvm::LLVMContext ctx;
+	stats_descriptor sd;
+	auto jm2 = rvsdg2jlm::rvsdg2jlm(*reference, sd);
+	auto lm2 = jlm2llvm::convert(*jm2, ctx);
+	std::error_code EC;
+	llvm::raw_fd_ostream os(reference->source_filename().base()+".ref.ll", EC);
+	lm2->print(os, nullptr);
 }

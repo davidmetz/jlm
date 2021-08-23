@@ -346,10 +346,10 @@ namespace jlm {
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
-				auto ot = dynamic_cast<const branch_op *>(&other);
+				auto ot = dynamic_cast<const trigger_op *>(&other);
 				// check predicate and value
 				return ot
-					   && ot->argument(0).type() == argument(0).type()
+					   && ot->argument(1).type() == argument(1).type()
 					   && ot->result(0).type() == result(0).type();
 			}
 
@@ -374,6 +374,54 @@ namespace jlm {
 				auto region = value.region();
 				trigger_op op(value.type());
 				return jive::simple_node::create_normalized(region, op, {&tg, &value});
+			}
+		};
+
+		class print_op final : public jive::simple_op {
+		private:
+			size_t _id;
+		public:
+			virtual
+			~print_op() {}
+
+			print_op(const jive::type &type)
+			: jive::simple_op({type}, {type}) {
+				static size_t common_id{0};
+				_id = common_id++;
+			}
+
+			bool
+			operator==(const jive::operation &other) const noexcept override {
+				auto ot = dynamic_cast<const print_op *>(&other);
+				// check predicate and value
+				return ot
+					   && ot->argument(0).type() == argument(0).type()
+					   && ot->result(0).type() == result(0).type();
+			}
+
+			std::string
+			debug_string() const override {
+				return jive::detail::strfmt("HLS_PRINT_", _id);
+			}
+
+			size_t
+			id() const {
+				return _id;
+			}
+
+			std::unique_ptr<jive::operation>
+			copy() const override {
+				return std::unique_ptr<jive::operation>(new print_op(*this));
+			}
+
+			static std::vector<jive::output *>
+			create(
+					jive::output &value
+			) {
+
+				auto region = value.region();
+				print_op op(value.type());
+				return jive::simple_node::create_normalized(region, op, {&value});
 			}
 		};
 

@@ -77,6 +77,7 @@ add_library(jlm STATIC
         src/backend/hls/rvsdg2rhls/remove-unused-state.cpp
         src/backend/hls/rvsdg2rhls/inline.cpp
         src/backend/hls/rvsdg2rhls/rvsdg2rhls.cpp
+        src/backend/hls/rvsdg2rhls/add-prints.cpp
 
         src/backend/hls/rhls2firrtl/base-hls.cpp
         src/backend/hls/rhls2firrtl/dot-hls.cpp
