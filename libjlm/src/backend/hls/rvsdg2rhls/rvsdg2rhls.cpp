@@ -31,6 +31,8 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/SourceMgr.h>
+#include <jlm/ir/operators/call.hpp>
+#include <jlm/ir/operators/alloca.hpp>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -56,6 +58,42 @@ namespace jlm {
 		return false;
 	}
 
+	int alloca_cnt = 0;
+
+	void
+	convert_alloca(jive::region * region){
+		for (auto &node : jive::topdown_traverser(region)) {
+			if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+				for (size_t n = 0; n < structnode->nsubregions(); n++) {
+					convert_alloca(structnode->subregion(n));
+				}
+			} else if (auto po = dynamic_cast<const jlm::alloca_op *>(&(node->operation()))) {
+				auto rr = region->graph()->root();
+				delta_builder db;
+				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
+				auto delta_type = jlm::ptrtype(po->value_type());
+				auto dr = db.begin(rr, delta_type, delta_name, linkage::external_linkage, false);
+				// create zero constant of allocated type
+				constant_aggregate_zero_op cop(po->value_type());
+				auto cout = jive::simple_node::create_normalized(dr, cop, {})[0];
+				auto delta = db.end(cout);
+				region->graph()->add_export(delta, {delta_type, delta_name});
+				auto delta_local = jlm::hls::route_to_region(delta, region);
+				node->output(0)->divert_users(delta_local);
+				//TODO: check that the input to alloca is a bitconst 1
+				JLM_ASSERT(node->output(1)->nusers() == 1);
+				auto mux_in = *node->output(1)->begin();
+				auto mux_node = input_node(mux_in);
+				JLM_ASSERT(dynamic_cast<const jlm::memstatemux_op*>(&mux_node->operation()));
+				JLM_ASSERT(mux_node->ninputs() == 2);
+				auto other_index = mux_in->index()? 0:1;
+				mux_node->output(0)->divert_users(mux_node->input(other_index)->origin());
+				jive::remove(mux_node);
+				jive::remove(node);
+			}
+		}
+	}
+
 	std::unique_ptr<jlm::rvsdg_module>
 	split_hls_function(jlm::rvsdg_module &rm, std::string &function_name) {
 		// TODO: use a different datastructure for rhls?
@@ -68,7 +106,9 @@ namespace jlm {
 				if (!function_match(ln, function_name)) {
 					continue;
 				}
-				// may not use other functions TODO: do inlining + global variables here
+				// may not use other functions TODO: do inlining  here
+				// then do deduplication?
+				convert_alloca(ln->subregion());
 				jive::substitution_map smap;
 				for (int i = 0; i < ln->ninputs(); ++i) {
 					//TODO: check for imports

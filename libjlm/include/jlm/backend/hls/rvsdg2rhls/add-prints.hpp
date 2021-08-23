@@ -20,6 +20,9 @@ namespace jlm{
 
 		static void
 		convert_prints(jive::region *region, jive::output * printf);
+
+		jive::output *
+		route_to_region(jive::output * output, jive::region * region);
 	}
 }
 
