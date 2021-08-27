@@ -1,0 +1,20 @@
+//
+// Created by david on 8/26/21.
+//
+
+#ifndef JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP
+#define JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP
+
+#include <jive/rvsdg/region.hpp>
+#include <jlm/ir/rvsdg-module.hpp>
+
+namespace jlm{
+	namespace hls{
+		static void
+		add_buffers(jive::region *region);
+
+		void
+		add_buffers(jlm::rvsdg_module &rm);
+	}
+}
+#endif //JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP
