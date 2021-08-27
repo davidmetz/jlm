@@ -20,7 +20,7 @@ jlm::hls::gamma_conv(jive::region *region, bool allow_speculation) {
 	for (auto &node : jive::topdown_traverser(region)) {
 		if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
 			for (size_t n = 0; n < structnode->nsubregions(); n++)
-				gamma_conv(structnode->subregion(n));
+				gamma_conv(structnode->subregion(n), allow_speculation);
 			if (auto gamma = dynamic_cast<jive::gamma_node *>(node)) {
 				if (allow_speculation && gamma_can_be_spec(gamma)) {
 					gamma_conv_spec(gamma);
