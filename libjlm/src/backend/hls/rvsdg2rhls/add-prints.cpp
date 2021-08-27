@@ -20,11 +20,22 @@ jlm::hls::add_prints(jive::region *region) {
 				add_prints(structnode->subregion(n));
 			}
 		}
-		if (auto lo = dynamic_cast<const jlm::load_op *>(&(node->operation()))) {
-
-		} else if (auto so = dynamic_cast<const jlm::store_op *>(&(node->operation()))) {
-			auto po = hls::print_op::create(*node->input(1)->origin())[0];
-			node->input(1)->divert_to(po);
+//		if (auto lo = dynamic_cast<const jlm::load_op *>(&(node->operation()))) {
+//
+//		} else if (auto so = dynamic_cast<const jlm::store_op *>(&(node->operation()))) {
+//			auto po = hls::print_op::create(*node->input(1)->origin())[0];
+//			node->input(1)->divert_to(po);
+//		}
+		if(auto simplenode = dynamic_cast<jive::simple_node *>(node)
+				&& node->noutputs()==1
+				&& is<jive::bittype>(node->output(0)->type())
+				&& !is<jlm::undef_constant_op>(node)){
+			auto out = node->output(0);
+			std::vector<jive::input *> old_users(out->begin(), out->end());
+			auto new_out = hls::print_op::create(*out)[0];
+			for (auto user: old_users) {
+				user->divert_to(new_out);
+			}
 		}
 	}
 }
