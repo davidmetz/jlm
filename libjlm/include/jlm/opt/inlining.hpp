@@ -7,6 +7,7 @@
 #define JLM_OPT_INLINE_HPP
 
 #include <jlm/opt/optimization.hpp>
+#include <jive/rvsdg.hpp>
 
 namespace jlm {
 
@@ -24,6 +25,12 @@ public:
 	virtual void
 	run(rvsdg_module & module, const stats_descriptor & sd) override;
 };
+
+jive::output *
+find_producer(jive::input * input);
+
+void
+inline_apply(const jive::structural_node * lambda, jive::simple_node * apply);
 
 }
 
