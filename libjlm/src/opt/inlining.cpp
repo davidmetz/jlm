@@ -97,7 +97,7 @@ find_consumers(const jive::structural_node * node)
 	return consumers;
 }
 
-static jive::output *
+jive::output *
 find_producer(jive::input * input)
 {
 	auto graph = input->region()->graph();
@@ -155,9 +155,9 @@ route_dependencies(const jive::structural_node * lambda, const jive::simple_node
 	return deps;
 }
 
-static void
-inline_apply(const jive::structural_node * lambda, jive::simple_node * apply)
-{
+
+void
+inline_apply(const jive::structural_node *lambda, jive::simple_node *apply) {
 	JLM_ASSERT(is<lambda::operation>(lambda));
 	JLM_ASSERT(dynamic_cast<const call_op*>(&apply->operation()));
 
@@ -185,7 +185,7 @@ inline_apply(const jive::structural_node * lambda, jive::simple_node * apply)
 	remove(apply);
 }
 
-static void
+	static void
 inlining(jive::graph & graph)
 {
 	auto root = graph.root();
