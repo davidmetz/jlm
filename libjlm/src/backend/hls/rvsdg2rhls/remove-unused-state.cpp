@@ -4,6 +4,7 @@
 
 #include "jlm/backend/hls/rvsdg2rhls/remove-unused-state.hpp"
 #include <jive/rvsdg/traverser.hpp>
+#include <jive/view.hpp>
 
 void
 jlm::hls::remove_unused_state(jive::region *region, bool can_remove_arguments) {
@@ -47,21 +48,33 @@ void
 jlm::hls::remove_gamma_passthrough(jive::gamma_node *gn) {// remove inputs in reverse
 	for (int i = gn->nentryvars() - 1; i >= 0; --i) {
 		bool can_remove = true;
+		int res_index = 0;
+		auto arg = gn->subregion(0)->argument(i);
+		if(arg->nusers()==1){
+			auto res = dynamic_cast<jive::result *>(*arg->begin());
+			res_index = res?res->index():res_index;
+		}
 		for (size_t n = 0; n < gn->nsubregions(); n++) {
 			auto sr = gn->subregion(n);
-			can_remove &= is_passthrough(sr->argument(i));
+			can_remove &= is_passthrough(sr->argument(i)) &&
+			// check that all subregions pass through to the same result
+			dynamic_cast<jive::result *>(*sr->argument(i)->begin())->index() == res_index;
 		}
 		if (can_remove) {
 			auto origin = gn->entryvar(i)->origin();
-			// remove input
-			gn->remove_input(i + 1);
 			// divert users of output to origin of input
-			auto res_index = dynamic_cast<jive::result *>(*gn->subregion(0)->argument(
-					i)->begin())->index();
+
 			gn->output(res_index)->divert_users(origin);
+			gn->output(res_index)->results.clear();
 			gn->remove_output(res_index);
+			// remove input
+			gn->input(i+1)->arguments.clear();
+			gn->remove_input(i + 1);
 			for (int j = 0; j < gn->nsubregions(); ++j) {
+				JLM_ASSERT(gn->subregion(j)->result(res_index)->origin() == gn->subregion(j)->argument(i));
+				JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 1);
 				gn->subregion(j)->remove_result(res_index);
+				JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 0);
 				gn->subregion(j)->remove_argument(i);
 			}
 		}
