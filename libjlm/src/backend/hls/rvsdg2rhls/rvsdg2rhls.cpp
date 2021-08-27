@@ -33,6 +33,8 @@
 #include <llvm/Support/SourceMgr.h>
 #include <jlm/ir/operators/call.hpp>
 #include <jlm/ir/operators/alloca.hpp>
+#include <jlm/opt/inlining.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/add-buffers.hpp>
 
 void
 pre_opt(jlm::rvsdg_module &rm) {
@@ -58,6 +60,23 @@ namespace jlm {
 		return false;
 	}
 
+	void
+	inline_calls(jive::region * region){
+		for (auto &node : jive::topdown_traverser(region)) {
+			if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+				for (size_t n = 0; n < structnode->nsubregions(); n++) {
+					inline_calls(structnode->subregion(n));
+				}
+			} else if (auto co = dynamic_cast<const jlm::call_op *>(&(node->operation()))) {
+				auto func = jlm::find_producer(node->input(0));
+				jlm::inline_apply(dynamic_cast<const jive::structural_output*>(func)->node(), dynamic_cast<jive::simple_node*>(node));
+				// restart for this region
+				inline_calls(region);
+				return;
+			}
+		}
+	}
+
 	int alloca_cnt = 0;
 
 	void
@@ -74,13 +93,18 @@ namespace jlm {
 				auto delta_type = jlm::ptrtype(po->value_type());
 				auto dr = db.begin(rr, delta_type, delta_name, linkage::external_linkage, false);
 				// create zero constant of allocated type
-				constant_aggregate_zero_op cop(po->value_type());
-				auto cout = jive::simple_node::create_normalized(dr, cop, {})[0];
+				jive::output * cout;
+				if(auto bt = dynamic_cast<const jive::bittype*>(&po->value_type())){
+					cout = jive::create_bitconstant(dr, bt->nbits(), 0);
+				} else {
+					constant_aggregate_zero_op cop(po->value_type());
+					cout = jive::simple_node::create_normalized(dr, cop, {})[0];
+				}
 				auto delta = db.end(cout);
 				region->graph()->add_export(delta, {delta_type, delta_name});
 				auto delta_local = jlm::hls::route_to_region(delta, region);
 				node->output(0)->divert_users(delta_local);
-				//TODO: check that the input to alloca is a bitconst 1
+				// TODO: check that the input to alloca is a bitconst 1
 				JLM_ASSERT(node->output(1)->nusers() == 1);
 				auto mux_in = *node->output(1)->begin();
 				auto mux_node = input_node(mux_in);
@@ -92,6 +116,31 @@ namespace jlm {
 				jive::remove(node);
 			}
 		}
+	}
+
+	delta_node*
+	rename_delta(delta_node* odn){
+		delta_builder db;
+		auto name = odn->name();
+		std::replace_if(name.begin(), name.end(), [](char c){return c=='.';}, '_');
+		std::cout << "renaming delta node " << odn->name() << " to " << name << "\n";
+		db.begin(odn->region(), odn->type(), name, linkage::external_linkage, odn->constant());
+		/* add dependencies */
+		jive::substitution_map rmap;
+		for (const auto & input : *odn) {
+			auto nd = db.add_dependency(input.origin());
+			rmap.insert(input.arguments.first(), nd);
+		}
+
+		/* copy subregion */
+		odn->subregion()->copy(db.region(), rmap, false, false);
+
+		auto result = rmap.lookup(odn->subregion()->result(0)->origin());
+		auto data = db.end(result);
+
+		odn->output(0)->divert_users(data);
+		jive::remove(odn);
+		return static_cast<delta_node*>(jive::node_output::node(data));
 	}
 
 	std::unique_ptr<jlm::rvsdg_module>
@@ -106,8 +155,10 @@ namespace jlm {
 				if (!function_match(ln, function_name)) {
 					continue;
 				}
-				// may not use other functions TODO: do inlining  here
-				// then do deduplication?
+				// TODO: do inlining  here
+				inline_calls(ln->subregion());
+				// TODO: do deduplication? other passes here?
+				pre_opt(rm);
 				convert_alloca(ln->subregion());
 				jive::substitution_map smap;
 				for (int i = 0; i < ln->ninputs(); ++i) {
@@ -116,6 +167,10 @@ namespace jlm {
 					if(auto oln = dynamic_cast<lambda::node*>(orig_node)){
 						throw jlm::error("Inlining of function "+oln->name()+" not supported");
 					} else if(auto odn = dynamic_cast<delta_node*>(orig_node)){
+						// modify name to not contain .
+						if(odn->name().find('.')!=std::string::npos){
+							odn = rename_delta(odn);
+						}
 						std::cout << "delta node " << odn->name() << ": " << odn->type().debug_string() << "\n";
 						// add import for delta to rhls
 						impport im(odn->type(), odn->name(), linkage::external_linkage);
@@ -167,6 +222,7 @@ jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(*rhls);
 	jlm::hls::add_forks(*rhls);
+//	jlm::hls::add_buffers(*rhls);
 	// ensure that all rhls rules are met
 	jlm::hls::check_rhls(*rhls);
 	return rhls;
