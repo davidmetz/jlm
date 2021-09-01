@@ -20,7 +20,7 @@ jlm::hls::FirrtlHLS::get_text(jlm::rvsdg_module &rm) {
 	auto module = lambda_node_to_firrtl(get_hls_lambda(rm));
 	firrtl << indent(0) << "circuit " << module.name << ":\n";
 	for (auto module: modules) {
-		firrtl << module.firrtl;
+		firrtl << module.second.firrtl;
 	}
 	return firrtl.str();
 }
@@ -71,7 +71,7 @@ std::string
 jlm::hls::FirrtlHLS::module_header(const jive::node *node, bool has_mem_io) {
 	std::ostringstream module;
 
-	module << indent(1) << "module " << get_node_name(node) << ":\n";
+	module << indent(1) << "module " << get_module_name(node) << ":\n";
 	// io
 	module << indent(2) << "; io\n";
 	module << indent(2) << "input clk: Clock\n";
@@ -94,7 +94,7 @@ jlm::hls::FirrtlHLS::module_header(const jive::node *node, bool has_mem_io) {
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n, true);
 
@@ -171,13 +171,13 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 		module << indent(3) << "o" << i << "_valid_reg <= " << UInt(1, 0) << "\n";
 	}
 
-	modules.emplace_back(module_name, module.str(), true);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), true});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 	module << indent(2) << "; registers\n";
@@ -196,13 +196,13 @@ jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jive::simple_node *n) {
 	module << indent(3) << "buf_data_reg <= " << data(i0) << "\n";
 	module << indent(2) << "when " << fire(o0) << ":\n";
 	module << indent(3) << "buf_valid_reg <= " << UInt(1, 0) << "\n";
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::buffer_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 	module << indent(2) << "; registers\n";
@@ -252,13 +252,13 @@ jlm::hls::FirrtlHLS::buffer_to_firrtl(const jive::simple_node *n) {
 		module << indent(4) << "buf" << i << "_data_reg <= " << data(i0) << "\n";
 
 	}
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 
@@ -280,13 +280,13 @@ jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jive::simple_node *n) {
 		module << indent(3) << ready(in) << " <= " << ready(o0) << "\n";
 		module << indent(3) << ready(ipred) << " <= and(" << ready(o0) << "," << valid(in) << ")\n";
 	}
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::dmux_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 
@@ -335,13 +335,13 @@ jlm::hls::FirrtlHLS::dmux_to_firrtl(const jive::simple_node *n) {
 	}
 	module << indent(2) << "when " << fire(o0) << ":\n";
 	module << indent(3) << "processed_reg <= " << UInt(1, 0) << "\n";
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::merge_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 	auto o0 = n->output(0);
@@ -357,13 +357,13 @@ jlm::hls::FirrtlHLS::merge_to_firrtl(const jive::simple_node *n) {
 		module << indent(3) << valid(o0) << " <= " << valid(in) << "\n";
 		module << indent(3) << data(o0) << " <= " << data(in) << "\n";
 	}
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::fork_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 
@@ -393,27 +393,27 @@ jlm::hls::FirrtlHLS::fork_to_firrtl(const jive::simple_node *n) {
 	for (int i = 0; i < n->noutputs(); ++i) {
 		module << indent(3) << "out" << i << "_fired <= " << UInt(1, 0) << "\n";
 	}
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::sink_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 	auto i0 = n->input(0);
 	module << indent(2) << ready(i0) << " <= " << UInt(1, 1) << "\n";
 
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
 	auto pn = dynamic_cast<const jlm::hls::print_op *>(&n->operation());
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 	auto i0 = n->input(0);
@@ -430,13 +430,13 @@ jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
 		   << ")\n";
 
 
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::branch_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 
@@ -456,13 +456,13 @@ jlm::hls::FirrtlHLS::branch_to_firrtl(const jive::simple_node *n) {
 		module << indent(3) << valid(out) << " <= " << valid(ival) << "\n";
 		module << indent(3) << data(out) << " <= " << data(ival) << "\n";
 	}
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
 
@@ -474,8 +474,8 @@ jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
 	module << indent(2) << ready(ival) << " <= and(" << ready(out) << "," << valid(itrig) << ")\n";
 	module << indent(2) << valid(out) << " <= and(" << valid(ival) << "," << valid(itrig) << ")\n";
 	module << indent(2) << data(out) << " <= " << data(ival) << "\n";
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 
@@ -605,7 +605,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 
 jlm::hls::FirrtlModule &
 jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jive::simple_node *n) {
-	std::string module_name = get_node_name(n);
+	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 
 	module << module_header(n);
@@ -634,12 +634,18 @@ jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jive::simple_node *n
 		module << indent(2) + ready(n->input(i)) + "<= and(" << ready(n->output(0)) << ", inputs_valid)\n";
 	}
 
-	modules.emplace_back(module_name, module.str(), false);
-	return modules.back();
+	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule
 jlm::hls::FirrtlHLS::node_to_firrtl(const jive::node *node, const int depth) {
+	// check if module for operation was already generated
+	for (auto pair: modules) {
+		if(pair.first != nullptr && *pair.first == node->operation()) {
+			return pair.second;
+		}
+	}
 	if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
 		if (auto o = dynamic_cast<const jlm::load_op *>(&(n->operation()))) {
 			return mem_node_to_firrtl(n);
@@ -681,7 +687,7 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node *ln) {
 	for (const auto node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
-			std::string inst_name = node_module.name + "_inst";
+			std::string inst_name = get_node_name(node);
 			if (node_module.has_mem) {
 				mem_nodes.push_back(inst_name);
 			}
@@ -726,7 +732,7 @@ jlm::hls::FirrtlHLS::connect(jive::region *sr) {
 	std::ostringstream firrtl;
 	for (const auto &node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
-			auto inst_name = node_map[node] + "_inst";
+			auto inst_name = get_node_name(node);
 			firrtl << indent(2) << inst_name << ".clk <= clk\n";
 			firrtl << indent(2) << inst_name << ".reset <= reset\n";
 			for (int i = 0; i < node->ninputs(); ++i) {
@@ -774,7 +780,7 @@ jlm::hls::FirrtlHLS::subregion_to_firrtl(jive::region *sr) {
 	for (const auto node : jive::topdown_traverser(sr)) {
 		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
-			std::string inst_name = node_module.name + "_inst";
+			std::string inst_name = get_node_name(node);
 			if (node_module.has_mem) {
 				mem_nodes.push_back(inst_name);
 			}
@@ -799,8 +805,8 @@ jlm::hls::FirrtlHLS::subregion_to_firrtl(jive::region *sr) {
 
 	module << mux_mem(mem_nodes);
 
-	modules.emplace_back(module_name, module.str(), true);
-	return modules.back();
+	modules.emplace_back(nullptr, FirrtlModule{module_name, module.str(), true});
+	return modules.back().second;
 }
 
 jlm::hls::FirrtlModule
@@ -894,6 +900,14 @@ jlm::hls::FirrtlHLS::lambda_node_to_firrtl(const jlm::lambda::node *ln) {
 	}
 
 	module << mux_mem({"sr",});
-	modules.emplace_back(module_name, module.str(), true);
-	return modules.back();
+	modules.emplace_back(&ln->operation(), FirrtlModule{module_name, module.str(), false});
+	return modules.back().second;
+}
+
+std::string
+jlm::hls::FirrtlHLS::get_module_name(const jive::node *node) {
+	auto new_name = jive::detail::strfmt("op_", node->operation().debug_string(), "_", modules.size());
+	// remove chars that are not valid in firrtl module names
+	std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');
+	return new_name;
 }
