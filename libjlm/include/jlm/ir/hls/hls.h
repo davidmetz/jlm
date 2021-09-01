@@ -66,11 +66,11 @@ namespace jlm {
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
-				auto ot = dynamic_cast<const branch_op *>(&other);
+				auto ot = dynamic_cast<const fork_op *>(&other);
 				// check predicate and value
 				return ot
 					   && ot->argument(0).type() == argument(0).type()
-					   && ot->narguments() == narguments();
+					   && ot->nresults() == nresults();
 			}
 
 			std::string
