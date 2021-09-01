@@ -47,8 +47,11 @@ namespace jlm {
 			get_text(jlm::rvsdg_module &rm) override;
 
 		private:
-			std::vector<FirrtlModule> modules;
+			std::vector<std::pair<const jive::operation*, FirrtlModule>> modules;
 			std::vector<std::string> mem_nodes;
+
+			std::string
+			get_module_name(const jive::node *node);
 
 			static inline std::string
 			indent(size_t depth) {
