@@ -8,11 +8,11 @@
 #include "jlm/backend/hls/rvsdg2rhls/add-buffers.hpp"
 
 void
-jlm::hls::add_buffers(jive::region *region) {
+jlm::hls::add_buffers(jive::region *region, bool pass_through) {
 	for (auto &node : jive::topdown_traverser(region)) {
 		if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
 			for (size_t n = 0; n < structnode->nsubregions(); n++) {
-				add_buffers(structnode->subregion(n));
+				add_buffers(structnode->subregion(n), pass_through);
 			}
 		} else if (auto simplenode = dynamic_cast<jive::simple_node *>(node)) {
 			if (jive::is<hls::buffer_op>(node)) {
@@ -26,12 +26,18 @@ jlm::hls::add_buffers(jive::region *region) {
 				auto out = node->output(i);
 				JLM_ASSERT(out->nusers() == 1);
 				if (auto ni = dynamic_cast<jive::node_input *>(*out->begin())) {
-					if (jive::is<hls::buffer_op>(ni->node())) {
+					auto buf = dynamic_cast<const hls::buffer_op*>(&ni->node()->operation());
+					if (buf && (buf->pass_through||!pass_through)) {
 						continue;
 					}
 				}
 				std::vector<jive::input *> old_users(out->begin(), out->end());
-				auto new_out = buffer_op::create(*out, 1)[0];
+				jive::output* new_out;
+				if(pass_through){
+					new_out = buffer_op::create(*out, 10, true)[0];
+				} else{
+					new_out = buffer_op::create(*out, 1, false)[0];
+				}
 				for (auto user: old_users) {
 					user->divert_to(new_out);
 				}
@@ -41,8 +47,8 @@ jlm::hls::add_buffers(jive::region *region) {
 }
 
 void
-jlm::hls::add_buffers(jlm::rvsdg_module &rm) {
+jlm::hls::add_buffers(jlm::rvsdg_module &rm, bool pass_through) {
 	auto &graph = *rm.graph();
 	auto root = graph.root();
-	add_buffers(root);
+	add_buffers(root, pass_through);
 }
