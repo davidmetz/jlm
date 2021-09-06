@@ -11,10 +11,10 @@
 namespace jlm{
 	namespace hls{
 		static void
-		add_buffers(jive::region *region);
+		add_buffers(jive::region *region, bool pass_through);
 
 		void
-		add_buffers(jlm::rvsdg_module &rm);
+		add_buffers(jlm::rvsdg_module &rm, bool pass_through);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP

@@ -257,7 +257,7 @@ jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(*rhls);
 	jlm::hls::add_forks(*rhls);
-//	jlm::hls::add_buffers(*rhls);
+//	jlm::hls::add_buffers(*rhls, true);
 	// ensure that all rhls rules are met
 	jlm::hls::check_rhls(*rhls);
 	return rhls;

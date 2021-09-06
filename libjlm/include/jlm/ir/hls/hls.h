@@ -274,18 +274,21 @@ namespace jlm {
 			virtual
 			~buffer_op() {}
 
-			buffer_op(const jive::type &type, size_t capacity)
-					: jive::simple_op({type}, {type}), capacity(capacity) {}
+			buffer_op(const jive::type &type, size_t capacity, bool pass_through)
+			: jive::simple_op({type}, {type}), capacity(capacity), pass_through(pass_through) {}
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
 				auto ot = dynamic_cast<const buffer_op *>(&other);
-				return ot && ot->result(0).type() == result(0).type();
+				return ot
+				&& ot->capacity == capacity
+				&& ot->pass_through == pass_through
+				&& ot->result(0).type() == result(0).type();
 			}
 
 			std::string
 			debug_string() const override {
-				return "HLS_BUF";
+				return jive::detail::strfmt("HLS_BUF_",(pass_through ? "P_": ""),capacity);
 			}
 
 			std::unique_ptr<jive::operation>
@@ -296,14 +299,16 @@ namespace jlm {
 			static std::vector<jive::output *>
 			create(
 					jive::output &value,
-					size_t capacity
+					size_t capacity,
+					bool pass_through = false
 			) {
 				auto region = value.region();
-				buffer_op op(value.type(), capacity);
+				buffer_op op(value.type(), capacity, pass_through);
 				return jive::simple_node::create_normalized(region, op, {&value});
 			}
 
 			size_t capacity;
+			bool pass_through;
 		private:
 		};
 

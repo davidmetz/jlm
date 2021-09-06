@@ -229,6 +229,12 @@ jlm::hls::FirrtlHLS::buffer_to_firrtl(const jive::simple_node *n) {
 	// shift register with insertion into earliest free slot
 	module << indent(2) << "shift_out0 <= " << fire(o0) << "\n";
 	module << indent(2) << "in_consumed0 <= " << UInt(1, 0) << "\n";
+	if(o->pass_through){
+		module << indent(2) << valid(o0) << " <= or(" << valid(i0) << ", buf0_valid_reg)\n";
+		module << indent(2) << "in_consumed0 <= and(not(buf0_valid_reg), "<<ready(o0)<<")\n";
+		module << indent(2) << "when not(buf0_valid_reg):\n";
+		module << indent(3) << data(o0) << " <= " << data(i0) << "\n";
+	}
 	// invalid pseudo slot so we can use the same logic for the last slot
 	module << indent(2) << "node buf" << capacity << "_valid_reg = " << UInt(1, 0) << "\n";
 	module << indent(2) << "node buf" << capacity << "_data_reg = " << UInt(1, 0) << "\n";
