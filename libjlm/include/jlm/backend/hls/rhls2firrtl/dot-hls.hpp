@@ -39,6 +39,8 @@ namespace jlm {
 
 			std::string
 			subregion_to_dot(jive::region *sr);
+
+			int loop_ctr = 0;
 		};
 	}
 }
