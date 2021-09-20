@@ -12,6 +12,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 	auto function_name = ln->name();
 	auto file_name = get_base_file_name(rm);
 	cpp <<
+		"#define TRACE_CHUNK_SIZE 100000\n"
+		"#define FST 1\n"
+//		"#define HLS_MEM_DEBUG 1\n"
+		"\n"
 		"#include <verilated.h>\n"
 		"#include <cassert>\n"
 		"#include <iostream>\n"
@@ -22,7 +26,11 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"#include <unistd.h>\n"
 		"#include <sstream>\n"
 		"#include <iomanip>\n"
+		"#ifdef FST\n"
 		"#include \"verilated_fst_c.h\"\n"
+		"#else\n"
+		"#include \"verilated_vcd_c.h\"\n"
+		"#endif\n"
 		"#include \"V" << file_name << ".h\"\n" <<
 		"#define V_NAME V" << file_name << "\n" <<
 		"#define TIMEOUT 10000000\n"
@@ -30,7 +38,6 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"#define str(s) #s\n"
 		"void clock_cycle();\n"
 		"\n"
-		"#define TRACE_CHUNK_SIZE 100000\n"
 		"// Current simulation time (64-bit unsigned)\n"
 		"vluint64_t main_time = 0;\n"
 		"// Called by $time in Verilog\n"
@@ -38,7 +45,11 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"    return main_time;  // Note does conversion to real, to match SystemC\n"
 		"}\n"
 		"V_NAME *top;\n"
+		"#ifdef FST\n"
 		"VerilatedFstC *tfp;\n"
+		"#else\n"
+		"VerilatedVcdC *tfp;\n"
+		"#endif\n"
 		"bool terminate = false;\n"
 		"\n"
 		"void term(int signum) {\n"
@@ -89,9 +100,15 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"\n"
 		"    // Construct the Verilated model, from Vtop.h generated from Verilating \"top.v\"\n"
 		"    top = new V_NAME;  // Or use a const unique_ptr, or the VL_UNIQUE_PTR wrapper\n"
+		"#ifdef FST\n"
 		"    tfp = new VerilatedFstC;\n"
 		"    top->trace(tfp, 99);   // Trace 99 levels of hierarchy\n"
 		"    tfp->open(xstr(V_NAME)\".fst\");\n"
+		"#else\n"
+		"    tfp = new VerilatedVcdC;\n"
+		"    top->trace(tfp, 99);   // Trace 99 levels of hierarchy\n"
+		"    tfp->open(xstr(V_NAME)\".vcd\");\n"
+		"#endif\n"
 		"\n"
 		"    top->i_valid = 0;\n";
 	// reset all data inputs to zero
@@ -177,6 +194,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::rvsdg_module &rm) {
 		"    top->clk = 0;\n"
 		"    top->eval();\n"
 		"    tfp->dump(main_time * 2 + 1);\n"
+//		"    tfp->flush();\n"
 		"    main_time++;\n"
 		"}\n"
 		"extern \"C\"\n"// TODO: parameter for linkage type here

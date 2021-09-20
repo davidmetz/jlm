@@ -377,6 +377,7 @@ lllnkcmd::run() const {
 				, " --build"
 				, " --exe"
 				, " --trace-fst"
+//				, " --trace"
 				, " -Wno-WIDTH" //divisions otherwise cause errors
 				, " -j"
 				, " -Mdir /tmp/verilator/"
