@@ -399,9 +399,10 @@ namespace jlm {
 			operator==(const jive::operation &other) const noexcept override {
 				auto ot = dynamic_cast<const print_op *>(&other);
 				// check predicate and value
-				return ot
-					   && ot->argument(0).type() == argument(0).type()
-					   && ot->result(0).type() == result(0).type();
+//				return ot
+//					   && ot->argument(0).type() == argument(0).type()
+//					   && ot->result(0).type() == result(0).type();
+				return false; // print nodes are intentionally distinct
 			}
 
 			std::string
