@@ -431,9 +431,9 @@ jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
 
 	module << indent(2) << valid(o0) << " <= " << valid(i0) << "\n";
 	module << indent(2) << ready(i0) << " <= " << ready(o0) << "\n";
-	module << indent(2) << "printf(clk, and(" << fire(i0) << ", not(reset)), \"print node " << pn->id() << ": %x\\n\", "
+	module << indent(2) << "printf(clk, and(" << fire(i0) << ", not(reset)), \"print node " << pn->id() << ": %x\\n\", pad("
 		   << data(i0)
-		   << ")\n";
+		   << ", 64))\n";
 
 
 	modules.emplace_back(&n->operation(), FirrtlModule{module_name, module.str(), false});
@@ -505,7 +505,7 @@ jlm::hls::jlm_sizeof(const jive::type *t) {
 std::string
 jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 	auto o = dynamic_cast<const jlm::getelementptr_op *>(&(n->operation()));
-	std::string result = data(n->input(0)); // start of with base pointer
+	std::string result = "cvt("+data(n->input(0))+")"; // start of with base pointer
 	//TODO: support structs
 	const jive::type *pt = &o->pointee_type();
 	for (int i = 1; i < n->ninputs(); ++i) {
@@ -517,10 +517,11 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 			throw std::logic_error(pt->debug_string() + " pointer not implemented!");
 		}
 		int bytes = bits / 8;
-		auto offset = "mul(" + data(n->input(i)) + ", " + UInt(64, bytes) + ")";
+		// gep inputs are signed
+		auto offset = "mul(asSInt(" + data(n->input(i)) + "), cvt(" + UInt(64, bytes) + "))";
 		result = "add(" + result + ", " + offset + ")";
 	}
-	return result;
+	return "asUInt("+result+")";
 
 }
 
