@@ -83,10 +83,12 @@ jlm::hls::gamma_conv_nonspec(jive::gamma_node *gamma) {
 		for (size_t s = 0; s < gamma->nsubregions(); s++) {
 			alternatives.push_back(smap.lookup(gamma->subregion(s)->result(i)->origin()));
 		}
-		// create merge nodes for each exitvar
-		auto merge = hls::merge_op::create(alternatives);
-		// divert users of exitvars to merge instead
-		gamma->exitvar(i)->divert_users(merge[0]);
+		// create mux nodes for each exitvar
+		// use mux instead of merge in case of paths with different delay - otherwise one could overtake the other
+		// see https://ieeexplore.ieee.org/abstract/document/9515491
+		auto mux = hls::mux_op::create(*pro, alternatives, false);
+		// divert users of exitvars to mux instead
+		gamma->exitvar(i)->divert_users(mux[0]);
 	}
 	remove(gamma);
 }
