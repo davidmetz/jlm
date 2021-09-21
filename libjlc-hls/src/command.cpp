@@ -380,7 +380,7 @@ lllnkcmd::run() const {
 //				, " --trace"
 				, " -Wno-WIDTH" //divisions otherwise cause errors
 				, " -j"
-				, " -Mdir /tmp/verilator", random(), "/"
+				, " -Mdir /tmp/verilator", time(nullptr), "/"
 				, " -MAKEFLAGS CXX=clang"
 				, cflags
 				, " -o ", ofile
