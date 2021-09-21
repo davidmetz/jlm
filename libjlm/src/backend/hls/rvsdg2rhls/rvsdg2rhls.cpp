@@ -89,6 +89,13 @@ namespace jlm {
 			result = trace_call(argument->input());
 		}
 		auto so = dynamic_cast<const jive::structural_output *>(result);
+		if(!so){
+			auto arg = dynamic_cast<const jive::argument *>(result);
+			auto ip = dynamic_cast<const impport *>(&arg->port());
+			if(ip){
+				throw jive::compiler_error("can not inline external function "+ip->name());
+			}
+		}
 		JLM_ASSERT(so);
 		JLM_ASSERT(is<lambda::operation>(so->node()));
 		return result;
