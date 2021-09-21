@@ -590,6 +590,8 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 		return "asUInt(dshr(asSInt(" + data(n->input(0)) + "), " + data(n->input(1)) + "))";
 	} else if (auto o = dynamic_cast<const jive::bitsdiv_op *>(&(n->operation()))) {
 		return "asUInt(div(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + ")))";
+	}  else if (auto o = dynamic_cast<const jive::bitsmod_op *>(&(n->operation()))) {
+		return "asUInt(rem(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + ")))";
 	} else if (auto o = dynamic_cast<const jive::bitshl_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		// TODO: adjust shift limit (bits)
