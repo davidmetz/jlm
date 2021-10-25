@@ -52,6 +52,11 @@ add_library(jlm STATIC
         src/ir/types.cpp
         src/ir/variable.cpp
 
+        src/opt/alias-analyses/encoders.cpp
+        src/opt/alias-analyses/operators.cpp
+        src/opt/alias-analyses/Optimization.cpp
+        src/opt/alias-analyses/pointsto-graph.cpp
+        src/opt/alias-analyses/steensgaard.cpp
         src/opt/cne.cpp
         src/opt/dne.cpp
         src/opt/inlining.cpp
