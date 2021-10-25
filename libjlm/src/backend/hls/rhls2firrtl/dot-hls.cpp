@@ -198,16 +198,27 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 		}
 	}
 
+	// all loop muxes at one level
 	dot << "{rank=same ";
 	for (auto node: jive::topdown_traverser(sr)) {
 		auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
-		if(mx && !mx->discarding){
+		if(mx && !mx->discarding && mx->loop){
 			dot << get_node_name(node) << " ";
 		}
 	}
 	dot << "}\n";
+	// all loop branches at one level
+	dot << "{rank=same ";
+	for (auto node: jive::topdown_traverser(sr)) {
+		auto br = dynamic_cast<const hls::branch_op*>(&node->operation());
+		if(br && br->loop){
+			dot << get_node_name(node) << " ";
+		}
+	}
 	dot << "}\n";
-	// do edges separately in order not to pull other nodes into the cluster
+
+	dot << "}\n";
+	// do edges outside in order not to pull other nodes into the cluster
 	for (auto node: jive::topdown_traverser(sr)) {
 		if (dynamic_cast<jive::simple_node *>(node)) {
 			auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
@@ -217,7 +228,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 				assert(output_map.count(node->input(i)->origin()));
 				auto origin = output_map[node->input(i)->origin()];
 				// implement edge as back edge when it produces a cycle
-				bool back = mx && !mx->discarding && (i==0||i==2);//back_outputs.count(node->input(i)->origin());
+				bool back = mx && !mx->discarding && mx->loop && (i==0||i==2);//back_outputs.count(node->input(i)->origin());
 				dot << edge(origin, in_name, node->input(i)->type(), back);
 			}
 		}
