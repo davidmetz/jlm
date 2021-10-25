@@ -43,6 +43,7 @@ LIBJLM_SRC = \
 	libjlm/src/ir/tac.cpp \
 	libjlm/src/ir/types.cpp \
 	libjlm/src/ir/variable.cpp \
+	libjlm/src/ir/hls/hls.cpp \
 	\
 	libjlm/src/opt/alias-analyses/encoders.cpp \
 	libjlm/src/opt/alias-analyses/operators.cpp \
@@ -73,7 +74,7 @@ LIBJLM_SRC = \
 	libjlm/src/backend/hls/rvsdg2rhls/inline.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/rvsdg2rhls.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/add-prints.cpp \
-	src/backend/hls/rvsdg2rhls/add-buffers.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/add-buffers.cpp \
  	\
 	libjlm/src/backend/hls/rhls2firrtl/base-hls.cpp \
 	libjlm/src/backend/hls/rhls2firrtl/dot-hls.cpp \

@@ -8,6 +8,7 @@
 
 #include <jlm/opt/optimization.hpp>
 #include <jive/rvsdg.hpp>
+#include <jlm/ir/operators/lambda.hpp>
 
 namespace jlm {
 
@@ -30,7 +31,7 @@ jive::output *
 find_producer(jive::input * input);
 
 void
-inline_apply(const jive::structural_node * lambda, jive::simple_node * apply);
+inlineCall(jive::simple_node * call, const lambda::node * lambda);
 
 }
 

@@ -110,8 +110,8 @@ namespace jlm {
 				}
 			} else if (auto co = dynamic_cast<const jlm::call_op *>(&(node->operation()))) {
 				auto func = trace_call(node->input(0));
-				jlm::inline_apply(dynamic_cast<const jive::structural_output *>(func)->node(),
-								  dynamic_cast<jive::simple_node *>(node));
+				auto ln = dynamic_cast<const jive::structural_output *>(func)->node();
+				jlm::inlineCall(dynamic_cast<jive::simple_node *>(node), dynamic_cast<const lambda::node *>(ln));
 				// restart for this region
 				inline_calls(region);
 				return;
@@ -130,19 +130,18 @@ namespace jlm {
 				}
 			} else if (auto po = dynamic_cast<const jlm::alloca_op *>(&(node->operation()))) {
 				auto rr = region->graph()->root();
-				delta_builder db;
 				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
 				auto delta_type = jlm::ptrtype(po->value_type());
-				auto dr = db.begin(rr, delta_type, delta_name, linkage::external_linkage, false);
+				auto db = delta::node::create(rr, delta_type, delta_name, linkage::external_linkage, false);
 				// create zero constant of allocated type
 				jive::output *cout;
 				if (auto bt = dynamic_cast<const jive::bittype *>(&po->value_type())) {
-					cout = jive::create_bitconstant(dr, bt->nbits(), 0);
+					cout = jive::create_bitconstant(db->subregion(), bt->nbits(), 0);
 				} else {
-					constant_aggregate_zero_op cop(po->value_type());
-					cout = jive::simple_node::create_normalized(dr, cop, {})[0];
+					ConstantAggregateZero cop(po->value_type());
+					cout = jive::simple_node::create_normalized(db->subregion(), cop, {})[0];
 				}
-				auto delta = db.end(cout);
+				auto delta = db->finalize(cout);
 				region->graph()->add_export(delta, {delta_type, delta_name});
 				auto delta_local = jlm::hls::route_to_region(delta, region);
 				node->output(0)->divert_users(delta_local);
@@ -150,7 +149,7 @@ namespace jlm {
 				JLM_ASSERT(node->output(1)->nusers() == 1);
 				auto mux_in = *node->output(1)->begin();
 				auto mux_node = input_node(mux_in);
-				JLM_ASSERT(dynamic_cast<const jlm::memstatemux_op *>(&mux_node->operation()));
+				JLM_ASSERT(dynamic_cast<const jlm::MemStateMergeOperator *>(&mux_node->operation()));
 				JLM_ASSERT(mux_node->ninputs() == 2);
 				auto other_index = mux_in->index() ? 0 : 1;
 				mux_node->output(0)->divert_users(mux_node->input(other_index)->origin());
@@ -160,29 +159,29 @@ namespace jlm {
 		}
 	}
 
-	delta_node *
-	rename_delta(delta_node *odn) {
-		delta_builder db;
+	delta::node *
+	rename_delta(delta::node *odn) {
 		auto name = odn->name();
 		std::replace_if(name.begin(), name.end(), [](char c) { return c == '.'; }, '_');
 		std::cout << "renaming delta node " << odn->name() << " to " << name << "\n";
-		db.begin(odn->region(), odn->type(), name, linkage::external_linkage, odn->constant());
+		auto db = delta::node::create(odn->region(), odn->type(), name, linkage::external_linkage, odn->constant());
 		/* add dependencies */
 		jive::substitution_map rmap;
-		for (const auto &input : *odn) {
-			auto nd = db.add_dependency(input.origin());
-			rmap.insert(input.arguments.first(), nd);
+		for (int i=0; i<odn->ncvarguments(); i++) {
+			auto input = odn->input(i);
+			auto nd = db->add_ctxvar(input->origin());
+			rmap.insert(input->argument(), nd);
 		}
 
 		/* copy subregion */
-		odn->subregion()->copy(db.region(), rmap, false, false);
+		odn->subregion()->copy(db->subregion(), rmap, false, false);
 
 		auto result = rmap.lookup(odn->subregion()->result(0)->origin());
-		auto data = db.end(result);
+		auto data = db->finalize(result);
 
-		odn->output(0)->divert_users(data);
+		odn->output()->divert_users(data);
 		jive::remove(odn);
-		return static_cast<delta_node *>(jive::node_output::node(data));
+		return static_cast<delta::node *>(jive::node_output::node(data));
 	}
 
 	std::unique_ptr<jlm::rvsdg_module>
@@ -208,7 +207,7 @@ namespace jlm {
 					auto orig_node = dynamic_cast<jive::node_output *>(ln->input(i)->origin())->node();
 					if (auto oln = dynamic_cast<lambda::node *>(orig_node)) {
 						throw jlm::error("Inlining of function " + oln->name() + " not supported");
-					} else if (auto odn = dynamic_cast<delta_node *>(orig_node)) {
+					} else if (auto odn = dynamic_cast<delta::node *>(orig_node)) {
 						// modify name to not contain .
 						if (odn->name().find('.') != std::string::npos) {
 							odn = rename_delta(odn);
@@ -223,7 +222,7 @@ namespace jlm {
 						smap.insert(ln->input(i)->origin(), arg);
 						// add export for delta to rm
 						// TODO: check if not already exported and maybe adjust linkage?
-						rm.graph()->add_export(odn->output(0), {odn->type(), odn->name()});
+						rm.graph()->add_export(odn->output(), {odn->type(), odn->name()});
 					} else {
 						throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
 					}
