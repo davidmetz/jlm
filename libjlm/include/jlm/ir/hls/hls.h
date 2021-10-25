@@ -15,8 +15,8 @@ namespace jlm {
 	namespace hls {
 		class branch_op final : public jive::simple_op {
 		private:
-			branch_op(size_t nalternatives, const jive::type &type)
-					: jive::simple_op({jive::ctltype(nalternatives), type}, std::vector<jive::port>(nalternatives, type)) {}
+			branch_op(size_t nalternatives, const jive::type &type, bool loop)
+					: jive::simple_op({jive::ctltype(nalternatives), type}, std::vector<jive::port>(nalternatives, type)), loop(loop){}
 
 		public:
 			virtual
@@ -44,16 +44,19 @@ namespace jlm {
 			static std::vector<jive::output *>
 			create(
 					jive::output &predicate,
-					jive::output &value
+					jive::output &value,
+					bool loop=false
 			) {
 				auto ctl = dynamic_cast<const jive::ctltype *>(&predicate.type());
 				if (!ctl)
 					throw jlm::error("Predicate needs to be a ctltype.");
 
 				auto region = predicate.region();
-				branch_op op(ctl->nalternatives(), value.type());
+				branch_op op(ctl->nalternatives(), value.type(), loop);
 				return jive::simple_node::create_normalized(region, op, {&predicate, &value});
 			}
+
+			bool loop;//only used for dot output
 		};
 
 		class fork_op final : public jive::simple_op {
@@ -140,8 +143,8 @@ namespace jlm {
 			virtual
 			~mux_op() {}
 
-			mux_op(size_t nalternatives, const jive::type &type, bool discarding)
-					: jive::simple_op(create_portvector(nalternatives, type), {type}), discarding(discarding) {}
+			mux_op(size_t nalternatives, const jive::type &type, bool discarding, bool loop)
+					: jive::simple_op(create_portvector(nalternatives, type), {type}), discarding(discarding), loop(loop) {}
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
@@ -167,7 +170,8 @@ namespace jlm {
 			create(
 					jive::output &predicate,
 					const std::vector<jive::output *> &alternatives,
-					bool discarding
+					bool discarding,
+					bool loop=false
 			) {
 				if (alternatives.empty())
 					throw jlm::error("Insufficient number of operands.");
@@ -182,12 +186,13 @@ namespace jlm {
 				auto operands = std::vector<jive::output *>();
 				operands.push_back(&predicate);
 				operands.insert(operands.end(), alternatives.begin(), alternatives.end());
-				mux_op op(alternatives.size(), alternatives.front()->type(), discarding);
+				mux_op op(alternatives.size(), alternatives.front()->type(), discarding, loop);
 				return jive::simple_node::create_normalized(region, op, operands);
 			}
 
 
 			bool discarding;
+			bool loop; // used only for dot output
 		private:
 
 			static std::vector<jive::port>
@@ -533,9 +538,9 @@ namespace jlm {
 				auto argument_in = jive::argument::create(subregion(), input, origin->type());
 				auto argument_loop = jive::argument::create(subregion(), nullptr, origin->type());
 
-				auto mux = hls::mux_op::create(*predicate_buffer(), {argument_in, argument_loop}, false)[0];
+				auto mux = hls::mux_op::create(*predicate_buffer(), {argument_in, argument_loop}, false, true)[0];
 				auto buf = hls::buffer_op::create(*mux, 2)[0];
-				auto branch = hls::branch_op::create(*predicate()->origin(), *buf);
+				auto branch = hls::branch_op::create(*predicate()->origin(), *buf, true);
 				if (buffer != nullptr) {
 					*buffer = buf;
 				}
