@@ -158,6 +158,11 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 	, cl::desc("function that should be accelerated")
 	, cl::value_desc("regex"));
 
+	cl::opt<bool> generate_firrtl(
+	  "firrtl"
+	, cl::ValueDisallowed
+	, cl::desc("Generate firrtl"));
+
 	cl::ParseCommandLineOptions(argc, argv);
 
 	if (show_help)
@@ -225,6 +230,7 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 	options.flags = flags;
 	options.jlmopts = jlmopts;
 	options.hls_function_regex = hls_functiom.front();
+	options.generate_firrtl = generate_firrtl;
 
 	for (const auto & ifile : ifiles) {
 		if (is_objfile(ifile)) {
