@@ -52,23 +52,25 @@ generate_commands(const jlm::cmdline_options & opts)
 	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r->cmd())->ofile(), opts.hls_function_regex);
 	m2r->add_edge(hls);
 	// firrtl
-	jlm::filepath verilogfile("/tmp/jlm_hls.v");
-	auto firrtl = firrtlcmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->firfile(), verilogfile);
-	hls->add_edge(firrtl);
-	jlm::filepath asmofile("/tmp/hls.o");
-	auto asmnode = cgencmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->llfile(), asmofile, opts.Olvl);
-	hls->add_edge(asmnode);
+	if (!opts.generate_firrtl) {
+		jlm::filepath verilogfile("/tmp/jlm_hls.v");
+		auto firrtl = firrtlcmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->firfile(), verilogfile);
+		hls->add_edge(firrtl);
+		jlm::filepath asmofile("/tmp/hls.o");
+		auto asmnode = cgencmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->llfile(), asmofile, opts.Olvl);
+		hls->add_edge(asmnode);
 
-	std::vector<jlm::filepath> lnkifiles;
-	for (const auto & c : opts.compilations) {
-		if (c.link() && !c.parse())
-			lnkifiles.push_back(c.ofile());
+		std::vector<jlm::filepath> lnkifiles;
+		for (const auto & c : opts.compilations) {
+			if (c.link() && !c.parse())
+				lnkifiles.push_back(c.ofile());
+		}
+		lnkifiles.push_back(asmofile);
+		// TODO: remove old verilator folder first
+		auto verinode = verilatorcmd::create(pgraph.get(), verilogfile, lnkifiles, dynamic_cast<hlscmd*>(&hls->cmd())->harnessfile(), opts.lnkofile, opts.libpaths, opts.libs);
+		firrtl->add_edge(verinode);
+		verinode->add_edge(pgraph->exit());
 	}
-	lnkifiles.push_back(asmofile);
-	// TODO: remove old verilator folder first
-	auto verinode = verilatorcmd::create(pgraph.get(), verilogfile, lnkifiles, dynamic_cast<hlscmd*>(&hls->cmd())->harnessfile(), opts.lnkofile, opts.libpaths, opts.libs);
-	firrtl->add_edge(verinode);
-	verinode->add_edge(pgraph->exit());
 //	if (!lnkifiles.empty()) {
 //		auto lnknode = lnkcmd::create(pgraph.get(), lnkifiles, opts.lnkofile,
 //			opts.libpaths, opts.libs);
