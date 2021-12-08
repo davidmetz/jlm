@@ -19,12 +19,13 @@ namespace jlm {\n \
 \n \
   filepath clangpath(\"$(shell $(LLVMCONFIG) --bindir)/clang\");\n \
   filepath llcpath(\"$(shell $(LLVMCONFIG) --bindir)/llc\");\n \
+  filepath firrtlpath(\"$(FIRRTL)\");\n \
 \n \
 }\n \
 \n \
 \#endif \
 "
-LLVMPATHSFILE = $(JLM_ROOT)/libjlc-hls/include/jlc/llvmpaths.hpp
+LLVMPATHSFILE = $(JLM_ROOT)/libjlc-hls/include/jlc-hls/llvmpaths.hpp
 
 $(LLVMPATHSFILE):
 	@printf $(LLVMPATHS) > $@
