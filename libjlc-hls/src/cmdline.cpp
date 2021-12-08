@@ -69,11 +69,6 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 
 	cl::TopLevelSubCommand->reset();
 
-	cl::opt<bool> show_help(
-	  "help"
-	, cl::ValueDisallowed
-	, cl::desc("Display available options."));
-
 	cl::opt<bool> print_commands(
 	  "###"
 	, cl::ValueDisallowed
@@ -159,9 +154,6 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 	, cl::value_desc("regex"));
 
 	cl::ParseCommandLineOptions(argc, argv);
-
-	if (show_help)
-		cl::PrintHelpMessage();
 
 	/* Process parsed options */
 
