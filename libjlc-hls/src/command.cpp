@@ -327,10 +327,9 @@ lllnkcmd::run() const {
 	firrtlcmd::to_str() const {
 		return strfmt(
 				firrtlpath.to_str()
-				, " -i ", ifile().to_str()
-				, " -o ", ofile().to_str()
-				, " -X verilog"
-				, " --no-dce"
+				, " -format=fir --verilog "
+				, ifile().to_str()
+				, " > ", ofile().to_str()
 		);
 	}
 

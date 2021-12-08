@@ -19,7 +19,7 @@ namespace jlm {\n \
 \n \
   filepath clangpath(\"$(shell $(LLVMCONFIG) --bindir)/clang\");\n \
   filepath llcpath(\"$(shell $(LLVMCONFIG) --bindir)/llc\");\n \
-  filepath firrtlpath(\"$(FIRRTL)\");\n \
+  filepath firrtlpath(\"$(FIRTOOL)\");\n \
 \n \
 }\n \
 \n \
