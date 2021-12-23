@@ -4,7 +4,8 @@
  */
 
 #include <jlc-hls/command.hpp>
-#include <jlc-hls/llvmpaths.hpp>
+#include <jlc/llvmpaths.hpp>
+#include <jlc-hls/toolpaths.hpp>
 #include <jlm/util/strfmt.hpp>
 
 #include <deque>
@@ -326,7 +327,7 @@ lllnkcmd::run() const {
 	std::string
 	firrtlcmd::to_str() const {
 		return strfmt(
-				firrtlpath.to_str()
+				firtoolpath.to_str()
 				, " -format=fir --verilog "
 				, ifile().to_str()
 				, " > ", ofile().to_str()
@@ -371,7 +372,10 @@ lllnkcmd::run() const {
 			ofile = gcd() + "/" + ofile;
 		}
 		return strfmt(
-				"verilator"
+				"VERILATOR_ROOT="
+				, verilatorrootpath.to_str()
+				, " "
+				,verilatorpath.to_str()
 				, " --cc"
 				, " --build"
 				, " --exe"
@@ -380,7 +384,7 @@ lllnkcmd::run() const {
 				, " -Wno-WIDTH" //divisions otherwise cause errors
 				, " -j"
 				, " -Mdir /tmp/verilator", time(nullptr), "/"
-				, " -MAKEFLAGS CXX=clang"
+				, " -MAKEFLAGS CXX=g++ "
 				, cflags
 				, " -o ", ofile
 				, " ", vfile().to_str()
