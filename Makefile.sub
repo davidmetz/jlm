@@ -28,6 +28,7 @@ echo "jlc-hls-debug           Compile jlc-hls in debug mode"
 echo "jlc-hls-release         Compile jlc-hls in release mode"
 endef
 
+include $(JLM_ROOT)/libjive/Makefile.sub
 include $(JLM_ROOT)/libjlm/Makefile.sub
 include $(JLM_ROOT)/libjlc/Makefile.sub
 include $(JLM_ROOT)/jlm-print/Makefile.sub
