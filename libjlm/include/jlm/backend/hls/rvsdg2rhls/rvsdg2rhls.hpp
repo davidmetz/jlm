@@ -8,7 +8,7 @@
 #include <jive/rvsdg/node.hpp>
 #include <jive/types/bitstring/constant.hpp>
 #include <jlm/ir/operators/operators.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -18,11 +18,11 @@ namespace jlm{
 				   jive::is<jive::ctlconstant_op>(node);
 		}
 
-		std::unique_ptr<rvsdg_module>
-		rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name);
+		std::unique_ptr<RvsdgModule>
+		rvsdg2rhls(jlm::RvsdgModule &rm, std::string &function_name);
 
 		void
-		dump_ref(std::unique_ptr<jlm::rvsdg_module> &rhls);
+		dump_ref(std::unique_ptr<jlm::RvsdgModule> &rhls);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_RVSDG2RHLS_HPP

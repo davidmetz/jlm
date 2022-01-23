@@ -6,7 +6,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_ADD_SINKS_HPP
 
 #include <jive/rvsdg/region.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -14,7 +14,7 @@ namespace jlm{
 		add_sinks(jive::region *region);
 
 		void
-		add_sinks(jlm::rvsdg_module &rm);
+		add_sinks(jlm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_ADD_SINKS_HPP

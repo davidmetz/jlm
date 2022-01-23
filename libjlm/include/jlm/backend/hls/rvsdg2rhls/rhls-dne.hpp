@@ -5,7 +5,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_RHLS_DNE_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_RHLS_DNE_HPP
 
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/ir/hls/hls.h>
 
 namespace jlm {
@@ -21,7 +21,7 @@ namespace jlm {
 		dne(jive::region *sr);
 
 		void
-		dne(jlm::rvsdg_module &rm);
+		dne(jlm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_RHLS_DNE_HPP

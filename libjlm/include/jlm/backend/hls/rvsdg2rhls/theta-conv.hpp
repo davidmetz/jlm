@@ -6,7 +6,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_THETA_CONV_HPP
 
 #include <jive/rvsdg/theta.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -16,7 +16,7 @@ namespace jlm{
 		theta_conv(jive::region *region);
 
 		void
-		theta_conv(jlm::rvsdg_module &rm);
+		theta_conv(jlm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_THETA_CONV_HPP

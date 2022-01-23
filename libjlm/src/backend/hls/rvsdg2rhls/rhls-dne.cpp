@@ -86,8 +86,8 @@ jlm::hls::dne(jive::region *sr) {
 }
 
 void
-jlm::hls::dne(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::dne(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	if (root->nodes.size() != 1) {
 		throw jlm::error("Root should have only one node now");

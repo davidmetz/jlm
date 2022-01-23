@@ -5,7 +5,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_INLINE_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_INLINE_HPP
 
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/ir/operators/lambda.hpp>
 #include <jive/rvsdg/traverser.hpp>
 

@@ -81,8 +81,8 @@ jlm::hls::BaseHLS::create_node_names(jive::region *r) {
 }
 
 const jlm::lambda::node *
-jlm::hls::BaseHLS::get_hls_lambda(jlm::rvsdg_module &rm) {
-	auto region = rm.graph()->root();
+jlm::hls::BaseHLS::get_hls_lambda(jlm::RvsdgModule &rm) {
+	auto region = rm.Rvsdg().root();
 	auto ln = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
 	if (region->nnodes() == 1 && ln) {
 		return ln;
@@ -92,8 +92,8 @@ jlm::hls::BaseHLS::get_hls_lambda(jlm::rvsdg_module &rm) {
 }
 
 std::string
-jlm::hls::BaseHLS::get_base_file_name(const jlm::rvsdg_module &rm) {
-	auto source_file_name = rm.source_filename().name();
+jlm::hls::BaseHLS::get_base_file_name(const jlm::RvsdgModule &rm) {
+	auto source_file_name = rm.SourceFileName().name();
 	auto base_file_name = source_file_name.substr(0, source_file_name.find_last_of('.'));
 	return base_file_name;
 }

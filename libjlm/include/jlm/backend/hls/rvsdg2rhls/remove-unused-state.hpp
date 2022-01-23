@@ -8,7 +8,7 @@
 #include <jive/rvsdg/region.hpp>
 #include <jive/rvsdg/gamma.hpp>
 #include <jlm/ir/operators/lambda.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm {
 	namespace hls {
@@ -29,7 +29,7 @@ namespace jlm {
 		remove_gamma_passthrough(jive::gamma_node *gn);
 
 		void
-		remove_unused_state(jlm::rvsdg_module &rm);
+		remove_unused_state(jlm::RvsdgModule &rm);
 
 		static void
 		remove_unused_state(jive::region *region, bool can_remove_arguments = true);

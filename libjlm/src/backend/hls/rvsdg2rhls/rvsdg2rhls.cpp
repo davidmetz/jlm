@@ -11,13 +11,11 @@
 #include <jlm/backend/hls/rvsdg2rhls/add-sinks.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/add-forks.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/rhls-dne.hpp>
-#include <jlm/opt/dne.hpp>
 #include <jlm/opt/invariance.hpp>
 #include <jlm/opt/inversion.hpp>
 #include <jlm/opt/cne.hpp>
-#include <jlm/util/stats.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/check-rhls.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include <jlm/ir/operators/delta.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/add-prints.hpp>
@@ -36,17 +34,18 @@
 #include <jlm/opt/inlining.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/add-buffers.hpp>
 #include <jlm/ir/operators/theta.hpp>
+#include <jlm/util/Statistics.hpp>
 
 void
-pre_opt(jlm::rvsdg_module &rm) {
+pre_opt(jlm::RvsdgModule &rm) {
 	// TODO: figure out which optimizations to use here
-	jlm::dne dne;
+//	jlm::dne dne;
 	jlm::cne cne;
 	jlm::ivr ivr;
 	jlm::tginversion tgi;
-	jlm::stats_descriptor sd;
+	jlm::StatisticsDescriptor sd;
 	tgi.run(rm, sd);
-	dne.run(rm, sd);
+//	dne.run(rm, sd);
 	cne.run(rm, sd);
 	ivr.run(rm, sd);
 }
@@ -67,7 +66,7 @@ namespace jlm {
 		auto pt = dynamic_cast<const jlm::ptrtype *>(&input->type());
 		if (!pt)
 			return false;
-		return dynamic_cast<const jive::fcttype *>(&pt->pointee_type());
+		return dynamic_cast<const FunctionType *>(&pt->pointee_type());
 	}
 
 	const jive::output *
@@ -184,13 +183,13 @@ namespace jlm {
 		return static_cast<delta::node *>(jive::node_output::node(data));
 	}
 
-	std::unique_ptr<jlm::rvsdg_module>
-	split_hls_function(jlm::rvsdg_module &rm, std::string &function_name) {
+	std::unique_ptr<jlm::RvsdgModule>
+	split_hls_function(jlm::RvsdgModule &rm, std::string &function_name) {
 		// TODO: use a different datastructure for rhls?
 		// create a copy of rm
-		auto rhls = jlm::rvsdg_module::create(rm.source_filename(), rm.target_triple(), rm.data_layout());
-		std::cout << "processing " << rm.source_filename().name() << "\n";
-		auto root = rm.graph()->root();
+		auto rhls = jlm::RvsdgModule::Create(rm.SourceFileName(), rm.TargetTriple(), rm.DataLayout());
+		std::cout << "processing " << rm.SourceFileName().name() << "\n";
+		auto root = rm.Rvsdg().root();
 		for (auto node : jive::topdown_traverser(root)) {
 			if (auto ln = dynamic_cast<lambda::node *>(node)) {
 				if (!function_match(ln, function_name)) {
@@ -216,23 +215,23 @@ namespace jlm {
 						// add import for delta to rhls
 						impport im(odn->type(), odn->name(), linkage::external_linkage);
 //						JLM_ASSERT(im.name()==odn->name());
-						auto arg = rhls->graph()->add_import(im);
+						auto arg = rhls->Rvsdg().add_import(im);
 						auto tmp = dynamic_cast<const impport *>(&arg->port());
 						assert(tmp && tmp->name() == odn->name());
 						smap.insert(ln->input(i)->origin(), arg);
 						// add export for delta to rm
 						// TODO: check if not already exported and maybe adjust linkage?
-						rm.graph()->add_export(odn->output(), {odn->type(), odn->name()});
+						rm.Rvsdg().add_export(odn->output(), {odn->type(), odn->name()});
 					} else {
 						throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
 					}
 				}
 				// copy function into rhls
-				auto new_ln = ln->copy(rhls->graph()->root(), smap);
-				jive::result::create(rhls->graph()->root(), new_ln->output(), nullptr, new_ln->output()->type());
+				auto new_ln = ln->copy(rhls->Rvsdg().root(), smap);
+				jive::result::create(rhls->Rvsdg().root(), new_ln->output(), nullptr, new_ln->output()->type());
 				// add function as input to rm and remove it
 				impport im(ln->output()->type(), ln->name(), linkage::external_linkage); //TODO: change linkage?
-				auto arg = rm.graph()->add_import(im);
+				auto arg = rm.Rvsdg().add_import(im);
 				ln->output()->divert_users(arg);
 				remove(ln);
 				std::cout << "function " << new_ln->name() << " extracted for HLS\n";
@@ -243,8 +242,8 @@ namespace jlm {
 	}
 }
 
-std::unique_ptr<jlm::rvsdg_module>
-jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
+std::unique_ptr<jlm::RvsdgModule>
+jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rm, std::string &function_name) {
 	auto rhls = jlm::split_hls_function(rm, function_name); //TODO: pass through function name
 
 	pre_opt(*rhls);
@@ -270,21 +269,21 @@ jlm::hls::rvsdg2rhls(jlm::rvsdg_module &rm, std::string &function_name) {
 }
 
 void
-jlm::hls::dump_ref(std::unique_ptr<jlm::rvsdg_module> &rhls) {
-	auto reference = rvsdg_module::create(rhls->source_filename(), rhls->target_triple(), rhls->data_layout());
+jlm::hls::dump_ref(std::unique_ptr<jlm::RvsdgModule> &rhls) {
+	auto reference = RvsdgModule::Create(rhls->SourceFileName(), rhls->TargetTriple(), rhls->DataLayout());
 	jive::substitution_map smap;
-	rhls->graph()->root()->copy(reference->graph()->root(), smap, true, true);
+	rhls->Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
 	convert_prints(*reference);
-	for (int i = 0; i < reference->graph()->root()->narguments(); ++i) {
-		auto arg = reference->graph()->root()->argument(i);
+	for (int i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
+		auto arg = reference->Rvsdg().root()->argument(i);
 		auto imp = dynamic_cast<const impport *>(&arg->port());
 		std::cout << "impport " << imp->name() << ": " << imp->type().debug_string() << "\n";
 	}
 	llvm::LLVMContext ctx;
-	stats_descriptor sd;
+	StatisticsDescriptor sd;
 	auto jm2 = rvsdg2jlm::rvsdg2jlm(*reference, sd);
 	auto lm2 = jlm2llvm::convert(*jm2, ctx);
 	std::error_code EC;
-	llvm::raw_fd_ostream os(reference->source_filename().base() + ".ref.ll", EC);
+	llvm::raw_fd_ostream os(reference->SourceFileName().base() + ".ref.ll", EC);
 	lm2->print(os, nullptr);
 }

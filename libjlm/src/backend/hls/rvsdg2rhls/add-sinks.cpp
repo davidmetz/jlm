@@ -31,8 +31,8 @@ jlm::hls::add_sinks(jive::region *region) {
 }
 
 void
-jlm::hls::add_sinks(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::add_sinks(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	add_sinks(root);
 }

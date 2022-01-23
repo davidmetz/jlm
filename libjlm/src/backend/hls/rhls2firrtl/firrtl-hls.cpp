@@ -15,7 +15,7 @@ jlm::hls::is_identity_mapping(const jive::match_op &op) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::get_text(jlm::rvsdg_module &rm) {
+jlm::hls::FirrtlHLS::get_text(jlm::RvsdgModule &rm) {
 	std::ostringstream firrtl;
 	auto module = lambda_node_to_firrtl(get_hls_lambda(rm));
 	firrtl << indent(0) << "circuit " << module.name << ":\n";

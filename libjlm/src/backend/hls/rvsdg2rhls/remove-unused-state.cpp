@@ -38,8 +38,8 @@ jlm::hls::remove_unused_state(jive::region *region, bool can_remove_arguments) {
 }
 
 void
-jlm::hls::remove_unused_state(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::remove_unused_state(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	remove_unused_state(root);
 }
@@ -85,24 +85,24 @@ jlm::lambda::node *
 jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 	auto old_fcttype = ln->type();
 	std::vector<const jive::type *> new_argument_types;
-	for (int i = 0; i < old_fcttype.narguments(); ++i) {
+	for (int i = 0; i < old_fcttype.NumArguments(); ++i) {
 		auto arg = ln->subregion()->argument(i);
-		auto argtype = &old_fcttype.argument_type(i);
+		auto argtype = &old_fcttype.ArgumentType(i);
 		assert(*argtype == arg->type());
 		if (!is_passthrough(arg)) {
 			new_argument_types.push_back(argtype);
 		}
 	}
 	std::vector<const jive::type *> new_result_types;
-	for (int i = 0; i < old_fcttype.nresults(); ++i) {
+	for (int i = 0; i < old_fcttype.NumResults(); ++i) {
 		auto res = ln->subregion()->result(i);
-		auto restype = &old_fcttype.result_type(i);
+		auto restype = &old_fcttype.ResultType(i);
 		assert(*restype == res->type());
 		if (!is_passthrough(res)) {
-			new_result_types.push_back(&old_fcttype.result_type(i));
+			new_result_types.push_back(&old_fcttype.ResultType(i));
 		}
 	}
-	jive::fcttype new_fcttype(new_argument_types, new_result_types);
+	FunctionType new_fcttype(new_argument_types, new_result_types);
 	auto new_lambda = jlm::lambda::node::create(ln->region(), new_fcttype, ln->name(), ln->linkage(),
 												ln->attributes());
 

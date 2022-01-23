@@ -44,7 +44,7 @@ namespace jlm {
 			}
 
 			std::string
-			get_text(jlm::rvsdg_module &rm) override;
+			get_text(jlm::RvsdgModule &rm) override;
 
 		private:
 			std::vector<std::pair<const jive::operation*, FirrtlModule>> modules;

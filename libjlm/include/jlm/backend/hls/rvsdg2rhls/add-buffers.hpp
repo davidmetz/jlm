@@ -6,7 +6,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP
 
 #include <jive/rvsdg/region.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -14,7 +14,7 @@ namespace jlm{
 		add_buffers(jive::region *region, bool pass_through);
 
 		void
-		add_buffers(jlm::rvsdg_module &rm, bool pass_through);
+		add_buffers(jlm::RvsdgModule &rm, bool pass_through);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_ADD_BUFFERS_HPP

@@ -24,15 +24,15 @@ jlm::lambda::node *
 jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 	auto old_fcttype = ln->type();
 	std::vector<const jive::type *> new_argument_types;
-	for (int i = 0; i < old_fcttype.narguments(); ++i) {
-		new_argument_types.push_back(&old_fcttype.argument_type(i));
+	for (int i = 0; i < old_fcttype.NumArguments(); ++i) {
+		new_argument_types.push_back(&old_fcttype.ArgumentType(i));
 	}
 	new_argument_types.push_back(type);
 	std::vector<const jive::type *> new_result_types;
-	for (int i = 0; i < old_fcttype.nresults(); ++i) {
-		new_result_types.push_back(&old_fcttype.result_type(i));
+	for (int i = 0; i < old_fcttype.NumResults(); ++i) {
+		new_result_types.push_back(&old_fcttype.ResultType(i));
 	}
-	jive::fcttype new_fcttype(new_argument_types, new_result_types);
+	FunctionType new_fcttype(new_argument_types, new_result_types);
 	auto new_lambda = jlm::lambda::node::create(ln->region(), new_fcttype, ln->name(), ln->linkage(),
 												ln->attributes());
 
@@ -108,8 +108,8 @@ jlm::hls::add_triggers(jive::region *region) {
 }
 
 void
-jlm::hls::add_triggers(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::add_triggers(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	add_triggers(root);
 }

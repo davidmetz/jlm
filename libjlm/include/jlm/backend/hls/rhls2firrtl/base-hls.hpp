@@ -5,7 +5,7 @@
 #ifndef JLM_BACKEND_HLS_RHLS2FIRRTL_BASE_HLS_HPP
 #define JLM_BACKEND_HLS_RHLS2FIRRTL_BASE_HLS_HPP
 
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 #include <fstream>
 #include <jlm/ir/operators/lambda.hpp>
 
@@ -17,7 +17,7 @@ namespace jlm {
 		class BaseHLS {
 		public:
 			void
-			run(jlm::rvsdg_module &rm) {
+			run(jlm::RvsdgModule &rm) {
 				assert(node_map.empty());
 				// ensure consistent naming across runs
 				create_node_names(get_hls_lambda(rm)->subregion());
@@ -49,16 +49,16 @@ namespace jlm {
 			get_port_name(jive::output *port);
 
 			const jlm::lambda::node *
-			get_hls_lambda(jlm::rvsdg_module &rm);
+			get_hls_lambda(jlm::RvsdgModule &rm);
 
 			void
 			create_node_names(jive::region *r);
 
 			virtual std::string
-			get_text(jlm::rvsdg_module &rm) = 0;
+			get_text(jlm::RvsdgModule &rm) = 0;
 
 			static std::string
-			get_base_file_name(const rvsdg_module &rm);
+			get_base_file_name(const RvsdgModule &rm);
 		};
 	}
 }

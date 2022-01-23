@@ -18,8 +18,8 @@
 
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/print.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
-#include <jlm/util/stats.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
+#include <jlm/util/Statistics.hpp>
 #include <jlm/frontend/llvm/llvm2jlm/module.hpp>
 #include <jlm/frontend/llvm/jlm2rvsdg/module.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
@@ -35,7 +35,7 @@ public:
     cmdflags() {}
 
     std::string file;
-    jlm::stats_descriptor sd;
+    jlm::StatisticsDescriptor sd;
     std::string hls_function;
 };
 
@@ -82,11 +82,11 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     }
 }
 void
-dump_xml(std::unique_ptr<jlm::rvsdg_module> &rm, const std::string &suffix = "") {
-	auto source_file_name = rm->source_filename().name();
+dump_xml(std::unique_ptr<jlm::RvsdgModule> &rm, const std::string &suffix = "") {
+	auto source_file_name = rm->SourceFileName().name();
     std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + suffix + ".rvsdg";
     auto xml_file = fopen(file_name.c_str(), "w");
-    jive::view_xml(rm->graph()->root(), xml_file);
+    jive::view_xml(rm->Rvsdg().root(), xml_file);
     fclose(xml_file);
 }
 
@@ -128,7 +128,7 @@ main(int argc, char **argv) {
 	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rm, flags.sd);
 	auto lm2 = jlm::jlm2llvm::convert(*jm2, ctx);
 	std::error_code EC;
-	llvm::raw_fd_ostream os(rm->source_filename().base()+".rest.ll", EC);
+	llvm::raw_fd_ostream os(rm->SourceFileName().base()+".rest.ll", EC);
 	lm2->print(os, nullptr);
 
     return 0;

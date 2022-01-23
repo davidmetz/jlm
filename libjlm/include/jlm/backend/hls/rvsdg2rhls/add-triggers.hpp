@@ -7,7 +7,7 @@
 
 #include <jive/rvsdg/region.hpp>
 #include <jlm/ir/operators/lambda.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm {
 	namespace hls {
@@ -22,7 +22,7 @@ namespace jlm {
 		add_triggers(jive::region *region);
 
 		void
-		add_triggers(jlm::rvsdg_module &rm);
+		add_triggers(jlm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_LIBJLM_SRC_BACKEND_HLS_RVSDG2RHLS_ADD_TRIGGERS_HPP

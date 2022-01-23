@@ -9,8 +9,8 @@
 #include <jive/rvsdg/traverser.hpp>
 
 void
-jlm::hls::gamma_conv(jlm::rvsdg_module &rm, bool allow_speculation) {
-	auto &graph = *rm.graph();
+jlm::hls::gamma_conv(jlm::RvsdgModule &rm, bool allow_speculation) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	gamma_conv(root, allow_speculation);
 }

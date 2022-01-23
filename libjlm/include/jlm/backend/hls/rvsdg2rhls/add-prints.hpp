@@ -5,7 +5,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_ADD_PRINTS_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_ADD_PRINTS_HPP
 #include <jive/rvsdg/region.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -13,10 +13,10 @@ namespace jlm{
 		add_prints(jive::region *region);
 
 		void
-		add_prints(jlm::rvsdg_module &rm);
+		add_prints(jlm::RvsdgModule &rm);
 
 		void
-		convert_prints(jlm::rvsdg_module &rm);
+		convert_prints(jlm::RvsdgModule &rm);
 
 		static void
 		convert_prints(jive::region *region, jive::output * printf);

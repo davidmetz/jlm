@@ -6,7 +6,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_GAMMA_CONV_HPP
 
 #include <jive/rvsdg/gamma.hpp>
-#include <jlm/ir/rvsdg-module.hpp>
+#include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{
@@ -21,7 +21,7 @@ namespace jlm{
 		gamma_conv(jive::region *region, bool allow_speculation=true);
 
 		void
-		gamma_conv(jlm::rvsdg_module &rm, bool allow_speculation=true);
+		gamma_conv(jlm::RvsdgModule &rm, bool allow_speculation=true);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_GAMMA_CONV_HPP

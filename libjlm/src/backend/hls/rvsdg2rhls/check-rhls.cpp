@@ -38,8 +38,8 @@ jlm::hls::check_rhls(jive::region *sr) {
 }
 
 void
-jlm::hls::check_rhls(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::check_rhls(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	if (root->nodes.size() != 1) {
 		throw jlm::error("Root should have only one node now");

@@ -40,8 +40,8 @@ jlm::hls::add_forks(jive::region *region) {
 }
 
 void
-jlm::hls::add_forks(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::add_forks(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	add_forks(root);
 }

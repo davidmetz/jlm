@@ -49,10 +49,10 @@ jlc-hls-debug: jive-debug $(JLM_ROOT)/libjlm.a $(JLM_ROOT)/libjlc-hls.a $(JLM_RO
 jlc-hls-release: CXXFLAGS += -O3
 jlc-hls-release: jive-release $(JLM_ROOT)/libjlm.a $(JLM_ROOT)/libjlc-hls.a $(JLM_ROOT)/bin/jlc-hls
 
-$(JLM_ROOT)/bin/jlc-hls: CPPFLAGS += -I$(JIVE_ROOT)/include -I$(JLM_ROOT)/libjlc-hls/include -I$(JLM_ROOT)/libjlm/include -I$(shell $(LLVMCONFIG) --includedir)
+$(JLM_ROOT)/bin/jlc-hls: CPPFLAGS += -I$(JLM_ROOT)/libjive/include -I$(JLM_ROOT)/libjlc-hls/include -I$(JLM_ROOT)/libjlm/include -I$(shell $(LLVMCONFIG) --includedir)
 $(JLM_ROOT)/bin/jlc-hls: CXXFLAGS += -Wall -Wpedantic -Wextra -Wno-unused-parameter --std=c++14 -Wfatal-errors
-$(JLM_ROOT)/bin/jlc-hls: LDFLAGS += $(shell $(LLVMCONFIG) --libs core irReader) $(shell $(LLVMCONFIG) --ldflags) $(shell $(LLVMCONFIG) --system-libs) -L$(JIVE_ROOT) -L$(JLM_ROOT)/ -ljlc-hls -ljlm -ljive
-$(JLM_ROOT)/bin/jlc-hls: $(patsubst %.cpp, $(JLM_ROOT)/%.o, $(JLC_HLS_SRC)) $(JIVE_ROOT)/libjive.a $(JLM_ROOT)/libjlm.a $(JLM_ROOT)/libjlc-hls.a
+$(JLM_ROOT)/bin/jlc-hls: LDFLAGS += $(shell $(LLVMCONFIG) --libs core irReader) $(shell $(LLVMCONFIG) --ldflags) $(shell $(LLVMCONFIG) --system-libs) -L$(JLM_ROOT)/ -ljlc-hls -ljlm -ljive
+$(JLM_ROOT)/bin/jlc-hls: $(patsubst %.cpp, $(JLM_ROOT)/%.o, $(JLC_HLS_SRC)) $(JLM_ROOT)/libjive.a $(JLM_ROOT)/libjlm.a $(JLM_ROOT)/libjlc-hls.a
 	@mkdir -p $(JLM_ROOT)/bin
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $^ $(LDFLAGS)
 

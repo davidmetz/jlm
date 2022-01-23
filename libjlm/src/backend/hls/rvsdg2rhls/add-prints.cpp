@@ -41,18 +41,18 @@ jlm::hls::add_prints(jive::region *region) {
 }
 
 void
-jlm::hls::add_prints(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::add_prints(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	add_prints(root);
 }
 
 void
-jlm::hls::convert_prints(jlm::rvsdg_module &rm) {
-	auto &graph = *rm.graph();
+jlm::hls::convert_prints(jlm::RvsdgModule &rm) {
+	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	//TODO: make this less hacky by using the correct state types
-	jive::fcttype fct({&jive::bit64, &jive::bit64}, {loopstatetype::create().get()});
+	FunctionType fct({&jive::bit64, &jive::bit64}, {loopstatetype::create().get()});
 	jlm::ptrtype ptr(fct);
 	impport imp(ptr, "printnode", linkage::external_linkage);
 	auto printf = graph.add_import(imp);
