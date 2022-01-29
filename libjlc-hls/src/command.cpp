@@ -49,7 +49,7 @@ generate_commands(const jlm::cmdline_options & opts)
 	auto m2r = m2rcmd::create(pgraph.get(), ll_merged);
 	ll_link->add_edge(m2r);
 	// hls
-	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r->cmd())->ofile(), opts.hls_function_regex);
+	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r->cmd())->ofile(), opts.hls_function_regex, opts.circt);
 	m2r->add_edge(hls);
 	// firrtl
 	if (!opts.generate_firrtl) {
@@ -313,11 +313,19 @@ lllnkcmd::run() const {
 
 	std::string
 	hlscmd::to_str() const {
-		return strfmt(
+		if (circt_)
+			return strfmt(
 				"jlm-hls"
 				, " --file ", ifile().to_str()
 				, " --hls-function ", function()
-		);
+				, " --circt "
+			 );
+		else
+			return strfmt(
+				"jlm-hls"
+				, " --file ", ifile().to_str()
+				, " --hls-function ", function()
+			 );
 	}
 
 	void

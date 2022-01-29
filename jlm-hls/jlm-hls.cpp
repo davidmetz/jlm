@@ -25,6 +25,7 @@
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/dot-hls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/firrtl-hls.hpp>
+#include <jlm/backend/hls/rhls2firrtl/mlirgen.hpp>
 #include <jlm/backend/hls/rhls2firrtl/verilator-harness-hls.hpp>
 #include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
 #include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
@@ -37,6 +38,7 @@ public:
     std::string file;
     jlm::StatisticsDescriptor sd;
     std::string hls_function;
+    bool circt = false;
 };
 
 static void
@@ -51,11 +53,13 @@ static void
 parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     static constexpr size_t file = 1;
     static constexpr size_t hls_function = 2;
+    static constexpr size_t circt = 3;
 
     static struct option options[] = {
             {"file", required_argument, NULL, file},
             {"hls-function", required_argument, NULL, hls_function},
-            {NULL, 0,                   NULL, 0}
+            {"circt", optional_argument, NULL, circt},
+            {NULL, 0, NULL, 0}
     };
 
     int opt;
@@ -67,6 +71,10 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
             }
             case hls_function: {
                 flags.hls_function = optarg;
+                break;
+            }
+            case circt: {
+                flags.circt = circt;
                 break;
             }
 
@@ -117,9 +125,18 @@ main(int argc, char **argv) {
 //    jive::view(rhls->graph()->root(), stdout);
 //    dump_xml(rhls, "_hls");	// run conversion on copy
 
+
+    // TODO
+    // Fix such that this if statement works when using --circt as a command line argument
+    if (flags.circt) {
+	jlm::hls::MLIRGen hls;
+	hls.run(*rhls);
+    } else {
 	jlm::hls::FirrtlHLS hls;
-    hls.run(*rhls);
-	jlm::hls::DotHLS dhls;
+	hls.run(*rhls);
+    }
+
+    jlm::hls::DotHLS dhls;
     dhls.run(*rhls);
     jlm::hls::VerilatorHarnessHLS vhls;
     vhls.run(*rhls);

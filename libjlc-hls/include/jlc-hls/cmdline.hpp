@@ -104,6 +104,7 @@ public:
 	bool only_print_commands;
 	bool generate_debug_information;
 	bool generate_firrtl;
+	bool circt;
 
 	optlvl Olvl;
 	standard std;

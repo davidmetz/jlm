@@ -415,9 +415,11 @@ public:
 
 	hlscmd(
 		const jlm::filepath & ifile,
-		const std::string & function)
-	: ifile_(ifile),
-	function_(function)
+		const std::string & function,
+	        const bool &circt)
+	: ifile_(ifile)
+	, function_(function)
+	, circt_(circt)
 	{}
 
 	virtual std::string
@@ -438,16 +440,12 @@ public:
 		return jlm::filepath("jlm_hls.rest.ll");
 	}
 
-
-
-
 	inline const jlm::filepath
 	harnessfile() const noexcept
 	{
 		std::basic_string<char> cd = gcd();
 		return jlm::filepath(cd+"/jlm_hls_harness.cpp");
 	}
-
 
 	inline const jlm::filepath &
 	ifile() const noexcept
@@ -464,15 +462,17 @@ public:
 	create(
 		passgraph * pgraph,
 		const jlm::filepath & ifile,
-		const std::string & function)
+		const std::string & function,
+	        const bool &circt)
 	{
-		std::unique_ptr<hlscmd> cmd(new hlscmd(ifile, function));
+		std::unique_ptr<hlscmd> cmd(new hlscmd(ifile, function, circt));
 		return passgraph_node::create(pgraph, std::move(cmd));
 	}
 
 private:
 	jlm::filepath ifile_;
 	std::string function_;
+	bool circt_;
 };
 
 /* print command */

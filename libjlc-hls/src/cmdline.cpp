@@ -158,6 +158,11 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 	, cl::ValueDisallowed
 	, cl::desc("Generate firrtl"));
 
+	cl::opt<bool> circt(
+	  "circt"
+	, cl::Prefix
+	, cl::desc("Use circt to generate FIRRTL"));
+
 	cl::ParseCommandLineOptions(argc, argv);
 
 	/* Process parsed options */
@@ -223,6 +228,7 @@ parse_cmdline(int argc, char ** argv, jlm::cmdline_options & options)
 	options.jlmopts = jlmopts;
 	options.hls_function_regex = hls_functiom.front();
 	options.generate_firrtl = generate_firrtl;
+	options.circt = circt;
 
 	for (const auto & ifile : ifiles) {
 		if (is_objfile(ifile)) {
