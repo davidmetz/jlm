@@ -226,7 +226,7 @@ convert_argument(const llvm::Argument & argument, context & ctx)
 	auto function = argument.getParent();
 	auto name = argument.getName().str();
 	auto type = convert_type(argument.getType(), ctx);
-	auto attributes = convert_attributes(function->getAttributes().getParamAttrs(
+	auto attributes = convert_attributes(function->getAttributes().getParamAttributes(
 		argument.getArgNo()), ctx);
 
 	return jlm::argument::create(name, *type, attributes);
@@ -420,7 +420,7 @@ declare_globals(llvm::Module & lm, context & ctx)
 		auto name = f.getName().str();
 		auto linkage = convert_linkage(f.getLinkage());
 		auto type = convert_type(f.getFunctionType(), ctx);
-		auto attributes = convert_attributes(f.getAttributes().getFnAttrs(), ctx);
+		auto attributes = convert_attributes(f.getAttributes().getFnAttributes(), ctx);
 
 		return function_node::create(ctx.module().ipgraph(), name, *type, linkage, attributes);
 	};
