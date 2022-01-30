@@ -7,6 +7,7 @@ check.log
 /bin
 tests/test-runner
 .Makefile.override
+libjlc-hls/include/jlc/
 libjlc/include/jlc/llvmpaths.hpp
 libjlc-hls/include/jlc-hls/toolpaths.hpp
 .idea
