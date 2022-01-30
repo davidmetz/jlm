@@ -112,7 +112,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"\n"
 		"    top->i_valid = 0;\n";
 	// reset all data inputs to zero
-	for (int i = 0; i < ln->ninputs(); ++i) {
+	for (size_t i = 0; i < ln->ninputs(); ++i) {
 		cpp << "    top->i_data" << i << " = 0;\n";
 	}
 	cpp <<
@@ -201,7 +201,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"{\n";
 	// imports
 	auto root = rm.Rvsdg().root();
-	for (int i = 0; i < root->narguments(); ++i) {
+	for (size_t i = 0; i < root->narguments(); ++i) {
 		if(auto ip = dynamic_cast<const impport*>(&root->argument(i)->port())){
 			if (auto t = dynamic_cast<const jlm::ptrtype *>(&ip->type())) {
 				cpp << "extern " << convert_to_c_type(&t->pointee_type()) << " " << ip->name() << ";\n";
@@ -222,7 +222,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		}
 	}
 	cpp << return_type << " " << function_name << "(\n";
-	for (int i = 0; i < ln->type().NumArguments(); ++i) {
+	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
 		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
 			continue;
 		}
@@ -238,14 +238,14 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		   "	if(!top){\n"
 		   "		verilator_init(0, NULL);\n"
 		   "	}\n";
-	for (int i = 0; i < ln->type().NumArguments(); ++i) {
+	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
 		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
 			continue;
 		}
 		cpp << "    top->i_data" << i << " = (uint64_t) a" << i << ";\n";
 	}
-	for (int i = 0; i < ln->ncvarguments(); ++i) {
-		int ix = ln->cvargument(i)->input()->argument()->index();
+	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
+		size_t ix = ln->cvargument(i)->input()->argument()->index();
 		std::string name;
 		if(auto a = dynamic_cast<jive::argument *>(ln->input(i)->origin())){
 			if(auto ip = dynamic_cast<const impport*>(&a->port())){
@@ -273,7 +273,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    top->o_ready = 1;\n"
 		"    clock_cycle();\n"
 		"    top->i_valid = 0;\n";
-	for (int i = 0; i < ln->type().NumArguments(); ++i) {
+	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
 		cpp << "    top->i_data" << i << " = 0;\n";
 	}
 	cpp <<

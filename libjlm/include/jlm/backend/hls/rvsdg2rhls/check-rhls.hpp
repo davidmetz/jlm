@@ -9,7 +9,7 @@
 
 namespace jlm {
 	namespace hls {
-		static void
+		void
 		check_rhls(jive::region *sr);
 
 		void

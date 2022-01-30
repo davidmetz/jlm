@@ -107,7 +107,7 @@ namespace jlm {
 				for (size_t n = 0; n < structnode->nsubregions(); n++) {
 					inline_calls(structnode->subregion(n));
 				}
-			} else if (auto co = dynamic_cast<const jlm::call_op *>(&(node->operation()))) {
+			} else if (dynamic_cast<const jlm::call_op *>(&(node->operation()))) {
 				auto func = trace_call(node->input(0));
 				auto ln = dynamic_cast<const jive::structural_output *>(func)->node();
 				jlm::inlineCall(dynamic_cast<jive::simple_node *>(node), dynamic_cast<const lambda::node *>(ln));
@@ -118,7 +118,7 @@ namespace jlm {
 		}
 	}
 
-	int alloca_cnt = 0;
+	size_t alloca_cnt = 0;
 
 	void
 	convert_alloca(jive::region *region) {
@@ -166,7 +166,7 @@ namespace jlm {
 		auto db = delta::node::create(odn->region(), odn->type(), name, linkage::external_linkage, odn->constant());
 		/* add dependencies */
 		jive::substitution_map rmap;
-		for (int i=0; i<odn->ncvarguments(); i++) {
+		for (size_t i=0; i<odn->ncvarguments(); i++) {
 			auto input = odn->input(i);
 			auto nd = db->add_ctxvar(input->origin());
 			rmap.insert(input->argument(), nd);
@@ -201,7 +201,7 @@ namespace jlm {
 				pre_opt(rm);
 				convert_alloca(ln->subregion());
 				jive::substitution_map smap;
-				for (int i = 0; i < ln->ninputs(); ++i) {
+				for (size_t i = 0; i < ln->ninputs(); ++i) {
 					//TODO: check for imports
 					auto orig_node = dynamic_cast<jive::node_output *>(ln->input(i)->origin())->node();
 					if (auto oln = dynamic_cast<lambda::node *>(orig_node)) {
@@ -274,7 +274,7 @@ jlm::hls::dump_ref(std::unique_ptr<jlm::RvsdgModule> &rhls) {
 	jive::substitution_map smap;
 	rhls->Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
 	convert_prints(*reference);
-	for (int i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
+	for (size_t i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
 		auto arg = reference->Rvsdg().root()->argument(i);
 		auto imp = dynamic_cast<const impport *>(&arg->port());
 		std::cout << "impport " << imp->name() << ": " << imp->type().debug_string() << "\n";

@@ -31,7 +31,7 @@ namespace jlm {
 		};
 
 
-		static inline bool
+		inline bool
 		is_identity_mapping(const jive::match_op &op);
 
 

@@ -12,13 +12,13 @@
 namespace jlm {
 	namespace hls {
 
-		static jive::output *
+		jive::output *
 		get_trigger(jive::region *region);
 
-		static jlm::lambda::node *
+		jlm::lambda::node *
 		add_lambda_argument(jlm::lambda::node *ln, const jive::type *type);
 
-		static void
+		void
 		add_triggers(jive::region *region);
 
 		void

@@ -8,7 +8,7 @@
 
 void
 jlm::hls::add_sinks(jive::region *region) {
-	for (int i = 0; i < region->narguments(); ++i) {
+	for (size_t i = 0; i < region->narguments(); ++i) {
 		auto arg = region->argument(i);
 		if (!arg->nusers()) {
 			hls::sink_op::create(*arg);
@@ -21,7 +21,7 @@ jlm::hls::add_sinks(jive::region *region) {
 			}
 		}
 
-		for (int i = 0; i < node->noutputs(); ++i) {
+		for (size_t i = 0; i < node->noutputs(); ++i) {
 			auto out = node->output(i);
 			if (!out->nusers()) {
 				hls::sink_op::create(*out);

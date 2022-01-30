@@ -13,25 +13,25 @@
 namespace jlm {
 	namespace hls {
 
-		static bool
+		bool
 		is_passthrough(const jive::argument *arg);
 
-		static bool
+		bool
 		is_passthrough(const jive::result *res);
 
-		static jlm::lambda::node *
+		jlm::lambda::node *
 		remove_lambda_passthrough(jlm::lambda::node *ln);
 
-		static void
+		void
 		remove_region_passthrough(const jive::argument *arg);
 
-		static void
+		void
 		remove_gamma_passthrough(jive::gamma_node *gn);
 
 		void
 		remove_unused_state(jlm::RvsdgModule &rm);
 
-		static void
+		void
 		remove_unused_state(jive::region *region, bool can_remove_arguments = true);
 	}
 }

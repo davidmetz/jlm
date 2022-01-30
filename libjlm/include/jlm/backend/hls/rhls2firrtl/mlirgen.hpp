@@ -38,7 +38,7 @@ namespace jlm {
 				return ".fir";
 				}
 		public:
-			std::string get_text(jlm::rvsdg_module &rvsdg_module) {return "MLIR/FIRRTL generator";}
+			std::string get_text(jlm::RvsdgModule &rvsdgModule) {return "MLIR/FIRRTL generator";}
 			MLIRGenImpl(mlir::MLIRContext &context) : builder(&context) {}
 			circt::firrtl::CircuitOp MlirGen(const jlm::lambda::node *lamdaNode);
 			void WriteModuleToFile(const circt::firrtl::FModuleOp fModuleOp, const jive::node *node);
@@ -141,10 +141,10 @@ namespace jlm {
 				return ".fir";
 			}
 
-			std::string get_text(jlm::rvsdg_module &rm) {return "";}
+			std::string get_text(jlm::RvsdgModule &rm) {return "";}
 		public:
 			void
-			run(jlm::rvsdg_module &rvsdgModule) {
+			run(jlm::RvsdgModule &rvsdgModule) {
 				assert(node_map.empty());
 				// Ensure consistent naming across runs
 				create_node_names(get_hls_lambda(rvsdgModule)->subregion());

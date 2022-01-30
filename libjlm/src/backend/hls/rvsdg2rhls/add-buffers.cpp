@@ -14,7 +14,7 @@ jlm::hls::add_buffers(jive::region *region, bool pass_through) {
 			for (size_t n = 0; n < structnode->nsubregions(); n++) {
 				add_buffers(structnode->subregion(n), pass_through);
 			}
-		} else if (auto simplenode = dynamic_cast<jive::simple_node *>(node)) {
+		} else if (dynamic_cast<jive::simple_node *>(node)) {
 			if (jive::is<hls::buffer_op>(node)) {
 				continue;
 			} else if (is_constant(node)) {
@@ -22,7 +22,7 @@ jlm::hls::add_buffers(jive::region *region, bool pass_through) {
 			} else if (jive::is<hls::print_op>(node)) {
 				continue;
 			}
-			for (int i = 0; i < node->noutputs(); ++i) {
+			for (size_t i = 0; i < node->noutputs(); ++i) {
 				auto out = node->output(i);
 				JLM_ASSERT(out->nusers() == 1);
 				if (auto ni = dynamic_cast<jive::node_input *>(*out->begin())) {

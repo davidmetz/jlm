@@ -11,7 +11,7 @@
 void
 jlm::hls::check_rhls(jive::region *sr) {
 	for (auto &node : jive::topdown_traverser(sr)) {
-		if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+		if (dynamic_cast<jive::structural_node *>(node)) {
 			if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
 				check_rhls(ln->subregion());
 			} else {

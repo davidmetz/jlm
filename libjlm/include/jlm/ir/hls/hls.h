@@ -402,7 +402,7 @@ namespace jlm {
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
-				auto ot = dynamic_cast<const print_op *>(&other);
+//				auto ot = dynamic_cast<const print_op *>(&other);
 				// check predicate and value
 //				return ot
 //					   && ot->argument(0).type() == argument(0).type()
@@ -545,8 +545,8 @@ namespace jlm {
 					*buffer = buf;
 				}
 				//TODO: proper connection between argument_loop and result_loop
-				auto result_out = jive::result::create(subregion(), branch[0], output, origin->type());
-				auto result_loop = jive::result::create(subregion(), branch[1], nullptr, origin->type());
+				jive::result::create(subregion(), branch[0], output, origin->type());
+				jive::result::create(subregion(), branch[1], nullptr, origin->type());
 				return output;
 			}
 
@@ -559,12 +559,12 @@ namespace jlm {
 				jive::substitution_map rmap;
 				auto loop = create(region, false);
 
-				for (int i = 0; i < ninputs(); ++i) {
+				for (size_t i = 0; i < ninputs(); ++i) {
 					auto in_origin = smap.lookup(input(i)->origin());
 					jive::structural_input::create(loop, in_origin, in_origin->type());
 					rmap.insert(input(i), loop->input(i));
 				}
-				for (int i = 0; i < noutputs(); ++i) {
+				for (size_t i = 0; i < noutputs(); ++i) {
 					auto out = jive::structural_output::create(loop, output(i)->type());
 					rmap.insert(output(i), out);
 					smap.insert(output(i), out);

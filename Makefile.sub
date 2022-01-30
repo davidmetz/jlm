@@ -35,7 +35,6 @@ include $(JLM_ROOT)/libjlc-hls/Makefile.sub
 include $(JLM_ROOT)/jlm-print/Makefile.sub
 include $(JLM_ROOT)/jlm-opt/Makefile.sub
 include $(JLM_ROOT)/jlm-hls/Makefile.sub
-include $(JLM_ROOT)/libjlc-hls/Makefile.sub
 
 .PHONY: jlm-debug
 jlm-debug: libjlm-debug libjlc-debug jlm-print-debug jlm-opt-debug jlc-debug jlm-hls-debug libjlc-hls-debug jlc-hls-debug

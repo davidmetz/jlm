@@ -11,13 +11,13 @@
 namespace jlm{
 	namespace hls{
 
-		static bool gamma_can_be_spec(jive::gamma_node *gamma);
+		bool gamma_can_be_spec(jive::gamma_node *gamma);
 
-		static void gamma_conv_nonspec(jive::gamma_node *gamma);
+		void gamma_conv_nonspec(jive::gamma_node *gamma);
 
-		static void gamma_conv_spec(jive::gamma_node *gamma);
+		void gamma_conv_spec(jive::gamma_node *gamma);
 
-		static void
+		void
 		gamma_conv(jive::region *region, bool allow_speculation=true);
 
 		void

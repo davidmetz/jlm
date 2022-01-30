@@ -10,7 +10,7 @@
 
 namespace jlm{
 	namespace hls{
-		static void
+		void
 		add_forks(jive::region *region);
 
 		void

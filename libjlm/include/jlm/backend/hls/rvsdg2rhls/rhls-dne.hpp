@@ -10,14 +10,14 @@
 
 namespace jlm {
 	namespace hls {
-		static bool
+		bool
 		remove_unused_loop_outputs(hls::loop_node *ln);
 
-		static bool
+		bool
 		remove_unused_loop_inputs(hls::loop_node *ln);
 
 
-		static bool
+		bool
 		dne(jive::region *sr);
 
 		void

@@ -10,9 +10,9 @@
 
 namespace jlm{
 	namespace hls{
-		static void theta_conv(jive::theta_node *theta);
+		void theta_conv(jive::theta_node *theta);
 
-		static void
+		void
 		theta_conv(jive::region *region);
 
 		void

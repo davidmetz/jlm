@@ -48,7 +48,7 @@ void
 jlm::hls::remove_gamma_passthrough(jive::gamma_node *gn) {// remove inputs in reverse
 	for (int i = gn->nentryvars() - 1; i >= 0; --i) {
 		bool can_remove = true;
-		int res_index = 0;
+		size_t res_index = 0;
 		auto arg = gn->subregion(0)->argument(i);
 		if(arg->nusers()==1){
 			auto res = dynamic_cast<jive::result *>(*arg->begin());
@@ -70,7 +70,7 @@ jlm::hls::remove_gamma_passthrough(jive::gamma_node *gn) {// remove inputs in re
 			// remove input
 			gn->input(i+1)->arguments.clear();
 			gn->remove_input(i + 1);
-			for (int j = 0; j < gn->nsubregions(); ++j) {
+			for (size_t j = 0; j < gn->nsubregions(); ++j) {
 				JLM_ASSERT(gn->subregion(j)->result(res_index)->origin() == gn->subregion(j)->argument(i));
 				JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 1);
 				gn->subregion(j)->remove_result(res_index);
@@ -85,7 +85,7 @@ jlm::lambda::node *
 jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 	auto old_fcttype = ln->type();
 	std::vector<const jive::type *> new_argument_types;
-	for (int i = 0; i < old_fcttype.NumArguments(); ++i) {
+	for (size_t i = 0; i < old_fcttype.NumArguments(); ++i) {
 		auto arg = ln->subregion()->argument(i);
 		auto argtype = &old_fcttype.ArgumentType(i);
 		assert(*argtype == arg->type());
@@ -94,7 +94,7 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 		}
 	}
 	std::vector<const jive::type *> new_result_types;
-	for (int i = 0; i < old_fcttype.NumResults(); ++i) {
+	for (size_t i = 0; i < old_fcttype.NumResults(); ++i) {
 		auto res = ln->subregion()->result(i);
 		auto restype = &old_fcttype.ResultType(i);
 		assert(*restype == res->type());
@@ -107,12 +107,12 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 												ln->attributes());
 
 	jive::substitution_map smap;
-	for (int i = 0; i < ln->ncvarguments(); ++i) {
+	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
 		// copy over cvarguments
 		smap.insert(ln->cvargument(i), new_lambda->add_ctxvar(ln->cvargument(i)->input()->origin()));
 	}
-	int new_i = 0;
-	for (int i = 0; i < ln->nfctarguments(); ++i) {
+	size_t new_i = 0;
+	for (size_t i = 0; i < ln->nfctarguments(); ++i) {
 		auto arg = ln->fctargument(i);
 		if (!is_passthrough(arg)) {
 			smap.insert(arg, new_lambda->fctargument(new_i));
@@ -122,7 +122,7 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 	ln->subregion()->copy(new_lambda->subregion(), smap, false, false);
 
 	std::vector<jive::output *> new_results;
-	for (int i = 0; i < ln->nfctresults(); ++i) {
+	for (size_t i = 0; i < ln->nfctresults(); ++i) {
 		auto res = ln->fctresult(i);
 		if (!is_passthrough(res)) {
 			new_results.push_back(smap.lookup(res->origin()));

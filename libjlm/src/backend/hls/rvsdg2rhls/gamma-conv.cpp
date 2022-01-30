@@ -95,14 +95,14 @@ jlm::hls::gamma_conv_nonspec(jive::gamma_node *gamma) {
 
 bool
 jlm::hls::gamma_can_be_spec(jive::gamma_node *gamma) {
-	for (int i = 0; i < gamma->noutputs(); ++i) {
+	for (size_t i = 0; i < gamma->noutputs(); ++i) {
 		auto out = gamma->output(i);
 		if (jive::is<jive::statetype>(out->type())) {
 			// don't allow state outputs since they imply operations with side effects
 			return false;
 		}
 	}
-	for (int i = 0; i < gamma->nsubregions(); ++i) {
+	for (size_t i = 0; i < gamma->nsubregions(); ++i) {
 		auto sr = gamma->subregion(i);
 		for (auto &node : jive::topdown_traverser(sr)) {
 			if (jive::is<jive::theta_op>(node) || jive::is<hls::loop_op>(node)) {
@@ -113,7 +113,7 @@ jlm::hls::gamma_can_be_spec(jive::gamma_node *gamma) {
 					// only allow gammas that can also be speculated on
 					return false;
 				}
-			} else if (auto sn = dynamic_cast<jive::structural_node *>(node)) {
+			} else if (dynamic_cast<jive::structural_node *>(node)) {
 				throw jlm::error("Unexpected structural node: " + node->operation().debug_string());
 			}
 		}

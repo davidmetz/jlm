@@ -9,7 +9,7 @@
 
 namespace jlm{
 	namespace hls{
-		static void
+		void
 		add_prints(jive::region *region);
 
 		void
@@ -18,7 +18,7 @@ namespace jlm{
 		void
 		convert_prints(jlm::RvsdgModule &rm);
 
-		static void
+		void
 		convert_prints(jive::region *region, jive::output * printf);
 
 		jive::output *

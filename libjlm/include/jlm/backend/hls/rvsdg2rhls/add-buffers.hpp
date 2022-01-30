@@ -10,7 +10,7 @@
 
 namespace jlm{
 	namespace hls{
-		static void
+		void
 		add_buffers(jive::region *region, bool pass_through);
 
 		void

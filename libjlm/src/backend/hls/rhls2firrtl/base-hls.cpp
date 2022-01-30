@@ -37,9 +37,9 @@ jlm::hls::BaseHLS::get_node_name(const jive::node *node) {
 std::string
 jlm::hls::BaseHLS::get_port_name(jive::input *port) {
 	std::string result;
-	if (auto p = dynamic_cast<const jive::node_input *>(port)) {
+	if (dynamic_cast<const jive::node_input *>(port)) {
 		result += "i";
-	} else if (auto p = dynamic_cast<const jive::result *>(port)) {
+	} else if (dynamic_cast<const jive::result *>(port)) {
 		result += "r";
 	} else {
 		throw std::logic_error(port->debug_string() + " not implemented!");
@@ -54,11 +54,11 @@ jlm::hls::BaseHLS::get_port_name(jive::output *port) {
 		throw std::logic_error("nullptr!");
 	}
 	std::string result;
-	if (auto p = dynamic_cast<const jive::argument *>(port)) {
+	if (dynamic_cast<const jive::argument *>(port)) {
 		result += "a";
-	} else if (auto p = dynamic_cast<const jive::node_output *>(port)) {
+	} else if (dynamic_cast<const jive::node_output *>(port)) {
 		result += "o";
-	} else if (auto p = dynamic_cast<const jive::structural_output *>(port)) {
+	} else if (dynamic_cast<const jive::structural_output *>(port)) {
 		result += "so";
 	} else {
 		throw std::logic_error(port->debug_string() + " not implemented!");
@@ -70,7 +70,7 @@ jlm::hls::BaseHLS::get_port_name(jive::output *port) {
 void
 jlm::hls::BaseHLS::create_node_names(jive::region *r) {
 	for (auto &node : r->nodes) {
-		if (auto sn = dynamic_cast<jive::simple_node *>(&node)) {
+		if (dynamic_cast<jive::simple_node *>(&node)) {
 			get_node_name(&node);
 		} else if (auto oln = dynamic_cast<jlm::hls::loop_node *>(&node)) {
 			create_node_names(oln->subregion());

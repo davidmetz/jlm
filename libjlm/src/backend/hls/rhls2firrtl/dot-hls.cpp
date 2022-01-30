@@ -65,7 +65,7 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 	std::replace_if(opname.begin(), opname.end(), isForbiddenChar, '_');
 
 	std::string inputs;
-	for (int i = 0; i < node->ninputs(); ++i) {
+	for (size_t i = 0; i < node->ninputs(); ++i) {
 		if (i != 0) {
 			inputs += SPACER;
 		}
@@ -76,7 +76,7 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 	}
 
 	std::string outputs;
-	for (int i = 0; i < node->noutputs(); ++i) {
+	for (size_t i = 0; i < node->noutputs(); ++i) {
 		if (i != 0) {
 			outputs += SPACER;
 		}
@@ -173,7 +173,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 
 	std::set<jive::output *> back_outputs;
 	std::set<jive::node *> top_nodes; // no artificial top nodes for now
-	for (int i = 0; i < sr->narguments(); ++i) {
+	for (size_t i = 0; i < sr->narguments(); ++i) {
 		auto arg = sr->argument(i);
 		// arguments without an input produce a cycle
 		if (arg->input() == nullptr) {
@@ -223,7 +223,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 		if (dynamic_cast<jive::simple_node *>(node)) {
 			auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
 			auto node_name = get_node_name(node);
-			for (int i = 0; i < node->ninputs(); ++i) {
+			for (size_t i = 0; i < node->ninputs(); ++i) {
 				auto in_name = node_name + ":" + get_port_name(node->input(i));
 				assert(output_map.count(node->input(i)->origin()));
 				auto origin = output_map[node->input(i)->origin()];
@@ -243,9 +243,9 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node *ln) {
 	auto sr = ln->subregion();
 	// just translate outputs
 	for (auto node: jive::topdown_traverser(sr)) {
-		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
+		if (dynamic_cast<jive::simple_node *>(node)) {
 			auto node_name = get_node_name(node);
-			for (int i = 0; i < node->noutputs(); ++i) {
+			for (size_t i = 0; i < node->noutputs(); ++i) {
 				output_map[node->output(i)] = node_name + ":" + get_port_name(node->output(i));
 			}
 		} else if (auto oln = dynamic_cast<hls::loop_node *>(node)) {
@@ -255,8 +255,8 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node *ln) {
 					"Unimplemented op (unexpected structural node) : " + node->operation().debug_string());
 		}
 	}
-	int res_i = 0;
-	for (int i = 0; i < sr->narguments(); ++i) {
+	size_t res_i = 0;
+	for (size_t i = 0; i < sr->narguments(); ++i) {
 		auto arg = sr->argument(i);
 		if (arg->input() != nullptr) {
 			// map to input of loop
@@ -273,7 +273,7 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node *ln) {
 			output_map[arg] = output_map[result->origin()];
 		}
 	}
-	for (int i = 0; i < ln->noutputs(); ++i) {
+	for (size_t i = 0; i < ln->noutputs(); ++i) {
 		auto out = ln->output(i);
 		assert(out->results.size() == 1);
 		output_map[out] = output_map[out->results.begin()->origin()];
@@ -294,7 +294,7 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 	dot << "color=\"#80b3ff\"\n";
 	dot << "penwidth=6\n";
 
-	for (int i = 0; i < sr->narguments(); ++i) {
+	for (size_t i = 0; i < sr->narguments(); ++i) {
 		output_map[sr->argument(i)] = get_port_name(sr->argument(i));
 	}
 	for (auto node: jive::topdown_traverser(sr)) {
@@ -302,13 +302,13 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 			auto node_dot = node_to_dot(node);
 			dot << node_dot;
 			auto node_name = get_node_name(node);
-			for (int i = 0; i < node->ninputs(); ++i) {
+			for (size_t i = 0; i < node->ninputs(); ++i) {
 				auto in_name = node_name + ":" + get_port_name(node->input(i));
 				assert(output_map.count(node->input(i)->origin()));
 				auto origin = output_map[node->input(i)->origin()];
 				dot << edge(origin, in_name, node->input(i)->type());
 			}
-			for (int i = 0; i < node->noutputs(); ++i) {
+			for (size_t i = 0; i < node->noutputs(); ++i) {
 				output_map[node->output(i)] = node_name + ":" + get_port_name(node->output(i));
 			}
 		} else if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
@@ -319,7 +319,7 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 					"Unimplemented op (unexpected structural node) : " + node->operation().debug_string());
 		}
 	}
-	for (int i = 0; i < sr->nresults(); ++i) {
+	for (size_t i = 0; i < sr->nresults(); ++i) {
 		auto origin = output_map[sr->result(i)->origin()];
 		auto result = get_port_name(sr->result(i));
 		dot << edge(origin, result, sr->result(i)->type());

@@ -26,7 +26,7 @@ jlm::hls::add_prints(jive::region *region) {
 //			auto po = hls::print_op::create(*node->input(1)->origin())[0];
 //			node->input(1)->divert_to(po);
 //		}
-		if(auto simplenode = dynamic_cast<jive::simple_node *>(node)
+		if( dynamic_cast<jive::simple_node *>(node)
 				&& node->noutputs()==1
 				&& is<jive::bittype>(node->output(0)->type())
 				&& !is<jlm::undef_constant_op>(node)){

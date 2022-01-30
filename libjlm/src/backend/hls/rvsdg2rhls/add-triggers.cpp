@@ -12,7 +12,7 @@
 
 jive::output *
 jlm::hls::get_trigger(jive::region *region) {
-	for (int i = 0; i < region->narguments(); ++i) {
+	for (size_t i = 0; i < region->narguments(); ++i) {
 		if (region->argument(i)->type() == hls::trigger) {
 			return region->argument(i);
 		}
@@ -24,12 +24,12 @@ jlm::lambda::node *
 jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 	auto old_fcttype = ln->type();
 	std::vector<const jive::type *> new_argument_types;
-	for (int i = 0; i < old_fcttype.NumArguments(); ++i) {
+	for (size_t i = 0; i < old_fcttype.NumArguments(); ++i) {
 		new_argument_types.push_back(&old_fcttype.ArgumentType(i));
 	}
 	new_argument_types.push_back(type);
 	std::vector<const jive::type *> new_result_types;
-	for (int i = 0; i < old_fcttype.NumResults(); ++i) {
+	for (size_t i = 0; i < old_fcttype.NumResults(); ++i) {
 		new_result_types.push_back(&old_fcttype.ResultType(i));
 	}
 	FunctionType new_fcttype(new_argument_types, new_result_types);
@@ -37,11 +37,11 @@ jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 												ln->attributes());
 
 	jive::substitution_map smap;
-	for (int i = 0; i < ln->ncvarguments(); ++i) {
+	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
 		// copy over cvarguments
 		smap.insert(ln->cvargument(i), new_lambda->add_ctxvar(ln->cvargument(i)->input()->origin()));
 	}
-	for (int i = 0; i < ln->nfctarguments(); ++i) {
+	for (size_t i = 0; i < ln->nfctarguments(); ++i) {
 		smap.insert(ln->fctargument(i), new_lambda->fctargument(i));
 	}
 //	jive::view(ln->subregion(), stdout);
@@ -49,7 +49,7 @@ jlm::hls::add_lambda_argument(jlm::lambda::node *ln, const jive::type *type) {
 	ln->subregion()->copy(new_lambda->subregion(), smap, false, false);
 
 	std::vector<jive::output *> new_results;
-	for (int i = 0; i < ln->nfctresults(); ++i) {
+	for (size_t i = 0; i < ln->nfctresults(); ++i) {
 		new_results.push_back(smap.lookup(ln->fctresult(i)->origin()));
 	}
 	auto new_out = new_lambda->finalize(new_results);
@@ -85,7 +85,7 @@ jlm::hls::add_triggers(jive::region *region) {
 				assert(trigger != nullptr);
 				assert(get_trigger(gn->subregion(0)) == nullptr);
 				gn->add_entryvar(trigger);
-				for (int i = 0; i < gn->nsubregions(); ++i) {
+				for (size_t i = 0; i < gn->nsubregions(); ++i) {
 					add_triggers(gn->subregion(i));
 				}
 			} else {
