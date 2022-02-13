@@ -23,7 +23,8 @@ public:
 	{}
 
 	pullstat()
-	: ninputs_before_(0), ninputs_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::PullNodes)
+  , ninputs_before_(0), ninputs_after_(0)
 	{}
 
 	void
@@ -284,8 +285,7 @@ pull(RvsdgModule & rm, const StatisticsDescriptor & sd)
 	pull(rm.Rvsdg().root());
 	stat.end(rm.Rvsdg());
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::PullNodes))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 }
 
 /* pullin class */

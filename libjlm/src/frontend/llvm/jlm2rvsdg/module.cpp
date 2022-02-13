@@ -28,10 +28,7 @@
 #include <jive/rvsdg/theta.hpp>
 #include <jive/rvsdg/type.hpp>
 
-#include <cmath>
 #include <stack>
-
-static std::string source_filename;
 
 static inline jive::output *
 create_undef_value(jive::region * region, const jive::type & type)
@@ -51,296 +48,569 @@ create_undef_value(jive::region * region, const jive::type & type)
 
 namespace jlm {
 
-class cfrstat final : public Statistics {
-public:
-	virtual
-	~cfrstat()
-	{}
-
-	cfrstat(const std::string & filename, const std::string & fctname)
-	: nnodes_(0)
-	, fctname_(fctname)
-	, filename_(filename)
-	{}
-
-	void
-	start(const jlm::cfg & cfg) noexcept
-	{
-		nnodes_ = cfg.nnodes();
-		timer_.start();
-	}
-
-	void
-	end() noexcept
-	{
-		timer_.stop();
-	}
-
-	virtual std::string
-	ToString() const override
-	{
-		return strfmt("CFRTIME ", filename_, " ", fctname_, " ", nnodes_, " ", timer_.ns());
-	}
-
-private:
-	size_t nnodes_;
-	jlm::timer timer_;
-	std::string fctname_;
-	std::string filename_;
-};
-
-class aggregation_stat final : public Statistics {
-public:
-	virtual
-	~aggregation_stat()
-	{}
-
-	aggregation_stat(const std::string & filename, const std::string & fctname)
-	: nnodes_(0)
-	, fctname_(fctname)
-	, filename_(filename)
-	{}
-
-	void
-	start(const jlm::cfg & cfg) noexcept
-	{
-		nnodes_ = cfg.nnodes();
-		timer_.start();
-	}
-
-	void
-	end() noexcept
-	{
-		timer_.stop();
-	}
-
-	virtual std::string
-	ToString() const override
-	{
-		return strfmt("AGGREGATIONTIME ", filename_, " ", fctname_, " ", nnodes_, " ", timer_.ns());
-	}
-
-private:
-	size_t nnodes_;
-	jlm::timer timer_;
-	std::string fctname_;
-	std::string filename_;
-};
-
-class annotation_stat final : public Statistics {
-public:
-	virtual
-	~annotation_stat()
-	{}
-
-	annotation_stat(const std::string & filename, const std::string & fctname)
-	: ntacs_(0)
-	, fctname_(fctname)
-	, filename_(filename)
-	{}
-
-	void
-	start(const aggnode & node) noexcept
-	{
-		ntacs_ = jlm::ntacs(node);
-		timer_.start();
-	}
-
-	void
-	end() noexcept
-	{
-		timer_.stop();
-	}
-
-	virtual std::string
-	ToString() const override
-	{
-		return strfmt("ANNOTATIONTIME ", filename_, " ", fctname_, " ", ntacs_, " ", timer_.ns());
-	}
-
-private:
-	size_t ntacs_;
-	jlm::timer timer_;
-	std::string fctname_;
-	std::string filename_;
-};
-
-class jlm_rvsdg_conversion_stat final : public Statistics {
-public:
-	virtual
-	~jlm_rvsdg_conversion_stat()
-	{}
-
-	jlm_rvsdg_conversion_stat(const std::string & filename, const std::string & fctname)
-	: fctname_(fctname)
-	, filename_(filename)
-	{}
-
-	void
-	start() noexcept
-	{
-		timer_.start();
-	}
-
-	void
-	end() noexcept
-	{
-		timer_.stop();
-	}
-
-	virtual std::string
-	ToString() const override
-	{
-		return strfmt("RVSDGCREATIONTIME ", filename_, " ", fctname_, " ", timer_.ns());
-	}
-
-private:
-	jlm::timer timer_;
-	std::string fctname_;
-	std::string filename_;
-};
-
-class rvsdg_construction_stat final : public Statistics {
-public:
-	virtual
-	~rvsdg_construction_stat()
-	{}
-
-	rvsdg_construction_stat(const jlm::filepath & filename)
-	: ntacs_(0)
-	, nnodes_(0)
-	, filename_(filename)
-	{}
-
-	void
-	start(const ipgraph_module & im) noexcept
-	{
-		ntacs_ = jlm::ntacs(im);
-		timer_.start();
-	}
-
-	void
-	end(const jive::graph & graph) noexcept
-	{
-		timer_.stop();
-		nnodes_ = jive::nnodes(graph.root());
-	}
-
-	virtual std::string
-	ToString() const override
-	{
-		return strfmt("RVSDGCONSTRUCTION ", filename_.to_str(), " ",
-			ntacs_, " ", nnodes_, " ", timer_.ns());
-	}
-
-private:
-	size_t ntacs_;
-	size_t nnodes_;
-	jlm::timer timer_;
-	jlm::filepath filename_;
-};
-
 class vmap final {
 public:
-	bool
-	contains(const variable * v) const noexcept
-	{
-		return map_.find(v) != map_.end();
-	}
+  bool
+  contains(const variable * v) const noexcept
+  {
+    return map_.find(v) != map_.end();
+  }
 
-	jive::output *
-	lookup(const variable * v) const
-	{
-		JLM_ASSERT(contains(v));
-		return map_.at(v);
-	}
+  jive::output *
+  lookup(const variable * v) const
+  {
+    JLM_ASSERT(contains(v));
+    return map_.at(v);
+  }
 
-	void
-	insert(const variable * v, jive::output * o)
-	{
-		JLM_ASSERT(v->type() == o->type());
-		map_[v] = o;
-	}
+  void
+  insert(const variable * v, jive::output * o)
+  {
+    JLM_ASSERT(v->type() == o->type());
+    map_[v] = o;
+  }
 
 private:
-	std::unordered_map<const variable*, jive::output*> map_;
+  std::unordered_map<const variable*, jive::output*> map_;
 };
 
 class scoped_vmap final {
 public:
-	inline
-	~scoped_vmap()
-	{
-		pop_scope();
-		JLM_ASSERT(nscopes() == 0);
-	}
+  inline
+  ~scoped_vmap()
+  {
+    pop_scope();
+    JLM_ASSERT(nscopes() == 0);
+  }
 
-	inline
-	scoped_vmap(const ipgraph_module & im, jive::region * region)
-	: module_(im)
-	{
-		push_scope(region);
-	}
+  inline
+  scoped_vmap(const ipgraph_module & im, jive::region * region)
+    : module_(im)
+  {
+    push_scope(region);
+  }
 
-	inline size_t
-	nscopes() const noexcept
-	{
-		JLM_ASSERT(vmaps_.size() == regions_.size());
-		return vmaps_.size();
-	}
+  inline size_t
+  nscopes() const noexcept
+  {
+    JLM_ASSERT(vmaps_.size() == regions_.size());
+    return vmaps_.size();
+  }
 
-	inline jlm::vmap &
-	vmap(size_t n) noexcept
-	{
-		JLM_ASSERT(n < nscopes());
-		return *vmaps_[n];
-	}
+  inline jlm::vmap &
+  vmap(size_t n) noexcept
+  {
+    JLM_ASSERT(n < nscopes());
+    return *vmaps_[n];
+  }
 
-	inline jlm::vmap &
-	vmap() noexcept
-	{
-		JLM_ASSERT(nscopes() > 0);
-		return vmap(nscopes()-1);
-	}
+  inline jlm::vmap &
+  vmap() noexcept
+  {
+    JLM_ASSERT(nscopes() > 0);
+    return vmap(nscopes()-1);
+  }
 
-	inline jive::region *
-	region(size_t n) noexcept
-	{
-		JLM_ASSERT(n < nscopes());
-		return regions_[n];
-	}
+  inline jive::region *
+  region(size_t n) noexcept
+  {
+    JLM_ASSERT(n < nscopes());
+    return regions_[n];
+  }
 
-	inline jive::region *
-	region() noexcept
-	{
-		JLM_ASSERT(nscopes() > 0);
-		return region(nscopes()-1);
-	}
+  inline jive::region *
+  region() noexcept
+  {
+    JLM_ASSERT(nscopes() > 0);
+    return region(nscopes()-1);
+  }
 
-	inline void
-	push_scope(jive::region * region)
-	{
-		vmaps_.push_back(std::make_unique<jlm::vmap>());
-		regions_.push_back(region);
-	}
+  inline void
+  push_scope(jive::region * region)
+  {
+    vmaps_.push_back(std::make_unique<jlm::vmap>());
+    regions_.push_back(region);
+  }
 
-	inline void
-	pop_scope()
-	{
-		vmaps_.pop_back();
-		regions_.pop_back();
-	}
+  inline void
+  pop_scope()
+  {
+    vmaps_.pop_back();
+    regions_.pop_back();
+  }
 
-	const ipgraph_module &
-	module() const noexcept
-	{
-		return module_;
-	}
+  const ipgraph_module &
+  module() const noexcept
+  {
+    return module_;
+  }
 
 private:
-	const ipgraph_module & module_;
-	std::vector<std::unique_ptr<jlm::vmap>> vmaps_;
-	std::vector<jive::region*> regions_;
+  const ipgraph_module & module_;
+  std::vector<std::unique_ptr<jlm::vmap>> vmaps_;
+  std::vector<jive::region*> regions_;
+};
+
+class ControlFlowRestructuringStatistics final : public Statistics {
+public:
+	~ControlFlowRestructuringStatistics() override
+	= default;
+
+	ControlFlowRestructuringStatistics(
+    filepath sourceFileName,
+    std::string functionName)
+	: Statistics(StatisticsDescriptor::StatisticsId::ControlFlowRecovery)
+  , NumNodes_(0)
+	, FunctionName_(std::move(functionName))
+	, SourceFileName_(std::move(sourceFileName))
+	{}
+
+	void
+	Start(const jlm::cfg & cfg) noexcept
+	{
+		NumNodes_ = cfg.nnodes();
+		Timer_.start();
+	}
+
+	void
+	End() noexcept
+	{
+		Timer_.stop();
+	}
+
+	std::string
+	ToString() const override
+	{
+		return strfmt("ControlFlowRestructuring ",
+                  SourceFileName_.to_str(), " ",
+                  FunctionName_, " ",
+                  "#Nodes:", NumNodes_, " ",
+                  "Time[ns]:", Timer_.ns());
+	}
+
+  static std::unique_ptr<ControlFlowRestructuringStatistics>
+  Create(
+    filepath sourceFileName,
+    std::string functionName)
+  {
+    return std::make_unique<ControlFlowRestructuringStatistics>(
+      std::move(sourceFileName),
+      std::move(functionName));
+  }
+
+private:
+	size_t NumNodes_;
+	jlm::timer Timer_;
+	std::string FunctionName_;
+	filepath SourceFileName_;
+};
+
+class AggregationStatistics final : public Statistics {
+public:
+	~AggregationStatistics() override
+	= default;
+
+	AggregationStatistics(
+    filepath sourceFileName,
+    std::string functionName)
+	: Statistics(StatisticsDescriptor::StatisticsId::Aggregation)
+  , NumNodes_(0)
+	, FunctionName_(std::move(functionName))
+	, SourceFileName_(std::move(sourceFileName))
+	{}
+
+	void
+	Start(const jlm::cfg & cfg) noexcept
+	{
+		NumNodes_ = cfg.nnodes();
+		Timer_.start();
+	}
+
+	void
+	End() noexcept
+	{
+		Timer_.stop();
+	}
+
+	std::string
+	ToString() const override
+	{
+		return strfmt("Aggregation ",
+                  SourceFileName_.to_str(), " ",
+                  FunctionName_, " ",
+                  "#Nodes:", NumNodes_, " ",
+                  "Time[ns]:", Timer_.ns());
+	}
+
+  static std::unique_ptr<AggregationStatistics>
+  Create(
+    filepath sourceFileName,
+    std::string functionName)
+  {
+    return std::make_unique<AggregationStatistics>(
+      std::move(sourceFileName),
+      std::move(functionName));
+  }
+
+private:
+	size_t NumNodes_;
+	jlm::timer Timer_;
+	std::string FunctionName_;
+	filepath SourceFileName_;
+};
+
+class AnnotationStatistics final : public Statistics {
+public:
+	~AnnotationStatistics() override
+	= default;
+
+	AnnotationStatistics(
+    filepath sourceFileName,
+    std::string functionName)
+	: Statistics(StatisticsDescriptor::StatisticsId::Annotation)
+  , NumThreeAddressCodes_(0)
+	, FunctionName_(std::move(functionName))
+	, SourceFileName_(std::move(sourceFileName))
+	{}
+
+	void
+	Start(const aggnode & node) noexcept
+	{
+		NumThreeAddressCodes_ = jlm::ntacs(node);
+		Timer_.start();
+	}
+
+	void
+	End() noexcept
+	{
+		Timer_.stop();
+	}
+
+  std::string
+	ToString() const override
+	{
+		return strfmt("Annotation ",
+                  SourceFileName_.to_str(), " ",
+                  FunctionName_, " ",
+                  "#ThreeAddressCodes:", NumThreeAddressCodes_, " ",
+                  "Time[ns]:", Timer_.ns());
+	}
+
+  static std::unique_ptr<AnnotationStatistics>
+  Create(
+    filepath sourceFileName,
+    std::string functionName)
+  {
+    return std::make_unique<AnnotationStatistics>(
+      std::move(sourceFileName),
+      std::move(functionName));
+  }
+
+private:
+	size_t NumThreeAddressCodes_;
+	jlm::timer Timer_;
+	std::string FunctionName_;
+	filepath SourceFileName_;
+};
+
+class AggregationTreeToLambdaStatistics final : public Statistics {
+public:
+	~AggregationTreeToLambdaStatistics() override
+	= default;
+
+	AggregationTreeToLambdaStatistics(
+    filepath sourceFileName,
+    std::string functionName)
+	: Statistics(StatisticsDescriptor::StatisticsId::JlmToRvsdgConversion)
+  , FunctionName_(std::move(functionName))
+	, SourceFileName_(std::move(sourceFileName))
+	{}
+
+	void
+	Start() noexcept
+	{
+		Timer_.start();
+	}
+
+	void
+	End() noexcept
+	{
+		Timer_.stop();
+	}
+
+	std::string
+	ToString() const override
+	{
+		return strfmt("ControlFlowGraphToLambda ",
+                  SourceFileName_.to_str(), " ",
+                  FunctionName_, " ",
+                  "Time[ns]:", Timer_.ns());
+	}
+
+  static std::unique_ptr<AggregationTreeToLambdaStatistics>
+  Create(
+    filepath sourceFileName,
+    std::string functionName)
+  {
+    return std::make_unique<AggregationTreeToLambdaStatistics>(
+      std::move(sourceFileName),
+      std::move(functionName));
+  }
+
+private:
+	jlm::timer Timer_;
+	std::string FunctionName_;
+	filepath SourceFileName_;
+};
+
+class DataNodeToDeltaStatistics final : public Statistics {
+public:
+  ~DataNodeToDeltaStatistics() override
+  = default;
+
+  DataNodeToDeltaStatistics(
+    filepath sourceFileName,
+    std::string dataNodeName)
+  : Statistics(StatisticsDescriptor::StatisticsId::DataNodeToDelta)
+  , NumInitializationThreeAddressCodes_(0)
+  , DataNodeName_(std::move(dataNodeName))
+  , SourceFileName_(std::move(sourceFileName))
+  {}
+
+  void
+  Start(size_t numInitializationThreeAddressCodes) noexcept
+  {
+    NumInitializationThreeAddressCodes_ = numInitializationThreeAddressCodes;
+    Timer_.start();
+  }
+
+  void
+  End() noexcept
+  {
+    Timer_.stop();
+  }
+
+  std::string
+  ToString() const override
+  {
+    return strfmt("DataNodeToDeltaStatistics ",
+                  SourceFileName_.to_str(), " ",
+                  DataNodeName_, " ",
+                  "#InitializationThreeAddressCodes:", NumInitializationThreeAddressCodes_, " ",
+                  "Time[ns]:", Timer_.ns());
+  }
+
+  static std::unique_ptr<DataNodeToDeltaStatistics>
+  Create(
+    filepath sourceFileName,
+    std::string dataNodeName)
+  {
+    return std::make_unique<DataNodeToDeltaStatistics>(
+      std::move(sourceFileName),
+      std::move(dataNodeName));
+  }
+
+private:
+  jlm::timer Timer_;
+  size_t NumInitializationThreeAddressCodes_;
+  std::string DataNodeName_;
+  filepath SourceFileName_;
+};
+
+class InterProceduralGraphToRvsdgStatistics final : public Statistics {
+public:
+	~InterProceduralGraphToRvsdgStatistics() override
+	= default;
+
+  explicit
+	InterProceduralGraphToRvsdgStatistics(filepath sourceFileName)
+	: Statistics(StatisticsDescriptor::StatisticsId::RvsdgConstruction)
+  , NumThreeAddressCodes_(0)
+	, NumRvsdgNodes_(0)
+	, SourceFileName_(std::move(sourceFileName))
+	{}
+
+	void
+	Start(const ipgraph_module & interProceduralGraphModule) noexcept
+	{
+		NumThreeAddressCodes_ = jlm::ntacs(interProceduralGraphModule);
+		Timer_.start();
+	}
+
+	void
+	End(const jive::graph & graph) noexcept
+	{
+		Timer_.stop();
+		NumRvsdgNodes_ = jive::nnodes(graph.root());
+	}
+
+	std::string
+	ToString() const override
+	{
+		return strfmt("InterProceduralGraphToRvsdg ",
+                  SourceFileName_.to_str(), " ",
+                  "#ThreeAddressCodes:", NumThreeAddressCodes_, " ",
+                  "#RvsdgNodes:", NumRvsdgNodes_, " ",
+                  "Time[ns]:", Timer_.ns());
+	}
+
+  static std::unique_ptr<InterProceduralGraphToRvsdgStatistics>
+  Create(filepath sourceFileName)
+  {
+    return std::make_unique<InterProceduralGraphToRvsdgStatistics>(std::move(sourceFileName));
+  }
+
+private:
+	size_t NumThreeAddressCodes_;
+	size_t NumRvsdgNodes_;
+	jlm::timer Timer_;
+	filepath SourceFileName_;
+};
+
+class StatisticsCollector final
+{
+public:
+  explicit
+  StatisticsCollector(
+    const StatisticsDescriptor & statisticsDescriptor,
+    filepath sourceFileName)
+  : SourceFileName_(std::move(sourceFileName))
+  , StatisticsDescriptor_(statisticsDescriptor)
+  {}
+
+  void
+  CollectControlFlowRestructuringStatistics(
+    const std::function<void(jlm::cfg*)> & restructureControlFlowGraph,
+    jlm::cfg & cfg,
+    std::string functionName)
+  {
+    auto & statistics = Create<ControlFlowRestructuringStatistics>(std::move(functionName));
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId())) {
+      restructureControlFlowGraph(&cfg);
+      return;
+    }
+
+    statistics.Start(cfg);
+    restructureControlFlowGraph(&cfg);
+    statistics.End();
+  }
+
+  std::unique_ptr<aggnode>
+  CollectAggregationStatistics(
+    const std::function<std::unique_ptr<aggnode>(jlm::cfg&)> & aggregateControlFlowGraph,
+    jlm::cfg & cfg,
+    std::string functionName)
+  {
+    auto & statistics = Create<AggregationStatistics>(std::move(functionName));
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId()))
+      return aggregateControlFlowGraph(cfg);
+
+    statistics.Start(cfg);
+    auto aggregationTreeRoot = aggregateControlFlowGraph(cfg);
+    statistics.End();
+
+    return aggregationTreeRoot;
+  }
+
+  demandmap
+  CollectAnnotationStatistics(
+    const std::function<demandmap(const aggnode&)> & annotateAggregationTree,
+    const aggnode & aggregationTreeRoot,
+    std::string functionName)
+  {
+    auto & statistics = Create<AnnotationStatistics>(std::move(functionName));
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId()))
+      return annotateAggregationTree(aggregationTreeRoot);
+
+    statistics.Start(aggregationTreeRoot);
+    auto demandMap = annotateAggregationTree(aggregationTreeRoot);
+    statistics.End();
+
+    return demandMap;
+  }
+
+  void
+  CollectAggregationTreeToLambdaStatistics(
+    const std::function<void()> & convertAggregationTreeToLambda,
+    std::string functionName)
+  {
+    auto & statistics = Create<AggregationTreeToLambdaStatistics>(std::move(functionName));
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId()))
+      return convertAggregationTreeToLambda();
+
+    statistics.Start();
+    convertAggregationTreeToLambda();
+    statistics.End();
+  }
+
+  jive::output *
+  CollectDataNodeToDeltaStatistics(
+    const std::function<jive::output*()> & convertDataNodeToDelta,
+    std::string dataNodeName,
+    size_t NumInitializationThreeAddressCodes)
+  {
+    auto & statistics = Create<DataNodeToDeltaStatistics>(std::move(dataNodeName));
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId()))
+      return convertDataNodeToDelta();
+
+    statistics.Start(NumInitializationThreeAddressCodes);
+    auto output = convertDataNodeToDelta();
+    statistics.End();
+
+    return output;
+  }
+
+  std::unique_ptr<RvsdgModule>
+  CollectInterProceduralGraphToRvsdgStatistics(
+    const std::function<std::unique_ptr<RvsdgModule>(const ipgraph_module&)> & convertInterProceduralGraphModule,
+    const ipgraph_module & interProceduralGraphModule)
+  {
+    auto & statistics = CreateInterProceduralGraphToRvsdgStatistics();
+    if (!StatisticsDescriptor_.IsPrintable(statistics.GetStatisticsId()))
+      return convertInterProceduralGraphModule(interProceduralGraphModule);
+
+    statistics.Start(interProceduralGraphModule);
+    auto rvsdgModule = convertInterProceduralGraphModule(interProceduralGraphModule);
+    statistics.End(rvsdgModule->Rvsdg());
+
+    return rvsdgModule;
+  }
+
+  void
+  PrintStatistics() const noexcept
+  {
+    for (auto & statistics : Statistics_)
+      StatisticsDescriptor_.PrintStatistics(*statistics);
+  }
+
+private:
+  template<class T> T &
+  Create(std::string functionName)
+  {
+    auto statistics = T::Create(
+      SourceFileName_,
+      std::move(functionName));
+
+    auto tmp = statistics.get();
+    Statistics_.push_back(std::move(statistics));
+
+    return *tmp;
+  }
+
+  InterProceduralGraphToRvsdgStatistics &
+  CreateInterProceduralGraphToRvsdgStatistics()
+  {
+    auto statistics = InterProceduralGraphToRvsdgStatistics::Create(SourceFileName_);
+
+    auto tmp = statistics.get();
+    Statistics_.push_back(std::move(statistics));
+
+    return *tmp;
+  }
+
+  const filepath SourceFileName_;
+  std::vector<std::unique_ptr<Statistics>> Statistics_;
+  const StatisticsDescriptor & StatisticsDescriptor_;
 };
 
 static bool
@@ -382,6 +652,27 @@ convert_branch(const jlm::tac & tac, jive::region * region, jlm::vmap & vmap)
 	JLM_ASSERT(is<branch_op>(tac.operation()));
 }
 
+template<class NODE> static void
+Convert(
+  const jlm::tac & threeAddressCode,
+  jive::region * region,
+  jlm::vmap & variableMap)
+{
+  std::vector<jive::output*> operands;
+  for (size_t n = 0; n < threeAddressCode.noperands(); n++) {
+    auto operand = threeAddressCode.operand(n);
+    operands.push_back(variableMap.lookup(operand));
+  }
+
+  auto results = NODE::Create(operands);
+
+  JLM_ASSERT(results.size() == threeAddressCode.nresults());
+  for (size_t n = 0; n < threeAddressCode.nresults(); n++) {
+    auto result = threeAddressCode.result(n);
+    variableMap.insert(result, results[n]);
+  }
+}
+
 static void
 convert_tac(const jlm::tac & tac, jive::region * region, jlm::vmap & vmap)
 {
@@ -392,6 +683,7 @@ convert_tac(const jlm::tac & tac, jive::region * region, jlm::vmap & vmap)
 	  {std::type_index(typeid(assignment_op)), convert_assignment}
 	, {std::type_index(typeid(select_op)), convert_select}
 	, {std::type_index(typeid(branch_op)), convert_branch}
+  , {typeid(CallOperation), Convert<CallNode>}
 	});
 
 	auto & op = tac.operation();
@@ -421,7 +713,6 @@ static void
 convert_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap);
 
@@ -429,7 +720,6 @@ static void
 convert_entry_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -467,7 +757,6 @@ static void
 convert_exit_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -488,7 +777,6 @@ static void
 convert_block_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -501,21 +789,19 @@ static void
 convert_linear_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
 	JLM_ASSERT(is<linearaggnode>(&node));
 
 	for (const auto & child : node)
-		convert_node(child, dm, function, lambda, svmap);
+		convert_node(child, dm, lambda, svmap);
 }
 
 static void
 convert_branch_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -545,7 +831,7 @@ convert_branch_node(
 		for (const auto & pair : evmap)
 			svmap.vmap().insert(pair.first, pair.second->argument(n));
 
-		convert_node(*node.child(n), dm, function, lambda, svmap);
+		convert_node(*node.child(n), dm, lambda, svmap);
 
 		for (const auto & v : ds->bottom)
 			xvmap[v].push_back(svmap.vmap().lookup(v));
@@ -563,7 +849,6 @@ static void
 convert_loop_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -595,7 +880,7 @@ convert_loop_node(
 
 	/* convert loop body */
 	JLM_ASSERT(node.nchildren() == 1);
-	convert_node(*node.child(0), dm, function, lambda, svmap);
+	convert_node(*node.child(0), dm, lambda, svmap);
 
 	/* update loop variables */
 	for (const auto & v : ds->top) {
@@ -625,7 +910,6 @@ static void
 convert_node(
 	const aggnode & node,
 	const demandmap & dm,
-	const jlm::function_node & function,
 	lambda::node * lambda,
 	scoped_vmap & svmap)
 {
@@ -634,7 +918,6 @@ convert_node(
 		std::function<void(
 			const aggnode&,
 			const demandmap&,
-			const function_node&,
 			lambda::node*,
 			scoped_vmap&)
 		>
@@ -645,87 +928,150 @@ convert_node(
 	});
 
 	JLM_ASSERT(map.find(typeid(node)) != map.end());
-	map[typeid(node)](node, dm, function, lambda, svmap);
+	map[typeid(node)](node, dm, lambda, svmap);
+}
+
+static void
+RestructureControlFlowGraph(
+  jlm::cfg & controlFlowGraph,
+  const std::string & functionName,
+  StatisticsCollector & statisticsCollector)
+{
+  auto restructureControlFlowGraph = [](jlm::cfg * controlFlowGraph)
+  {
+    restructure(controlFlowGraph);
+    straighten(*controlFlowGraph);
+  };
+
+  statisticsCollector.CollectControlFlowRestructuringStatistics(
+    restructureControlFlowGraph,
+    controlFlowGraph,
+    functionName);
+}
+
+static std::unique_ptr<aggnode>
+AggregateControlFlowGraph(
+  jlm::cfg & controlFlowGraph,
+  const std::string & functionName,
+  StatisticsCollector & statisticsCollector)
+{
+  auto aggregateControlFlowGraph = [](jlm::cfg & controlFlowGraph)
+  {
+    auto aggregationTreeRoot = aggregate(controlFlowGraph);
+    aggnode::normalize(*aggregationTreeRoot);
+
+    return aggregationTreeRoot;
+  };
+
+  auto aggregationTreeRoot = statisticsCollector.CollectAggregationStatistics(
+    aggregateControlFlowGraph,
+    controlFlowGraph,
+    functionName);
+
+  return aggregationTreeRoot;
+}
+
+static demandmap
+AnnotateAggregationTree(
+  const aggnode & aggregationTreeRoot,
+  const std::string & functionName,
+  StatisticsCollector & statisticsCollector)
+{
+  auto demandMap = statisticsCollector.CollectAnnotationStatistics(
+    annotate,
+    aggregationTreeRoot,
+    functionName);
+
+  return demandMap;
+}
+
+static lambda::output *
+ConvertAggregationTreeToLambda(
+  const aggnode & aggregationTreeRoot,
+  const demandmap & demandMap,
+  scoped_vmap & scopedVariableMap,
+  const std::string & functionName,
+  const FunctionType & functionType,
+  const linkage & functionLinkage,
+  const attributeset & functionAttributes,
+  StatisticsCollector & statisticsCollector)
+{
+  auto lambdaNode = lambda::node::create(
+    scopedVariableMap.region(),
+    functionType,
+    functionName,
+    functionLinkage,
+    functionAttributes);
+
+  auto convertAggregationTreeToLambda = [&]()
+  {
+    convert_node(aggregationTreeRoot, demandMap, lambdaNode, scopedVariableMap);
+  };
+
+  statisticsCollector.CollectAggregationTreeToLambdaStatistics(
+    convertAggregationTreeToLambda,
+    functionName);
+
+  return lambdaNode->output();
 }
 
 static jive::output *
 convert_cfg(
-	const jlm::function_node & function,
-	jive::region * region,
+	const jlm::function_node & functionNode,
 	scoped_vmap & svmap,
-	const StatisticsDescriptor & sd)
+	StatisticsCollector & statisticsCollector)
 {
-	auto cfg = function.cfg();
+  auto & functionName = functionNode.name();
+	auto & controlFlowGraph = *functionNode.cfg();
 
-	destruct_ssa(*cfg);
-	straighten(*cfg);
-	purge(*cfg);
+	destruct_ssa(controlFlowGraph);
+	straighten(controlFlowGraph);
+	purge(controlFlowGraph);
 
-	{
-		cfrstat stat(source_filename, function.name());
-		stat.start(*cfg);
-		restructure(cfg);
-		straighten(*cfg);
-		stat.end();
-		if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::ControlFlowRecovery))
-			sd.print_stat(stat);
-	}
+  RestructureControlFlowGraph(
+    controlFlowGraph,
+    functionName,
+    statisticsCollector);
 
-	std::unique_ptr<aggnode> root;
-	{
-		aggregation_stat stat(source_filename, function.name());
-		stat.start(*cfg);
-		root = aggregate(*cfg);
-		aggnode::normalize(*root);
-		stat.end();
-		if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::Aggregation))
-			sd.print_stat(stat);
-	}
+  auto aggregationTreeRoot = AggregateControlFlowGraph(
+    controlFlowGraph,
+    functionName,
+    statisticsCollector);
 
-	demandmap dm;
-	{
-		annotation_stat stat(source_filename, function.name());
-		stat.start(*root);
-		dm = annotate(*root);
-		stat.end();
-		if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::Annotation))
-			sd.print_stat(stat);
-	}
+  auto demandMap = AnnotateAggregationTree(
+    *aggregationTreeRoot,
+    functionName,
+    statisticsCollector);
 
-	auto & name = function.name();
-	auto & fcttype = function.fcttype();
-	auto & linkage = function.linkage();
-	auto & attributes = function.attributes();
-	auto lambda = lambda::node::create(svmap.region(), fcttype, name, linkage, attributes);
+  auto lambdaOutput = ConvertAggregationTreeToLambda(
+    *aggregationTreeRoot,
+    demandMap,
+    svmap,
+    functionName,
+    functionNode.fcttype(),
+    functionNode.linkage(),
+    functionNode.attributes(),
+    statisticsCollector);
 
-	{
-		jlm_rvsdg_conversion_stat stat(source_filename, function.name());
-		stat.start();
-		convert_node(*root, dm, function, lambda, svmap);
-		stat.end();
-		if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::JlmToRvsdgConversion))
-			sd.print_stat(stat);
-	}
-
-	return lambda->output();
+	return lambdaOutput;
 }
 
 static jive::output *
 construct_lambda(
 	const ipgraph_node * node,
-	jive::region * region,
 	scoped_vmap & svmap,
-	const StatisticsDescriptor & sd)
+  StatisticsCollector & statisticsCollector)
 {
 	JLM_ASSERT(dynamic_cast<const function_node*>(node));
 	auto & function = *static_cast<const function_node*>(node);
+  auto region = svmap.region();
 
 	if (function.cfg() == nullptr) {
 		jlm::impport port(function.type(), function.name(), function.linkage());
 		return region->graph()->add_import(port);
 	}
 
-	return convert_cfg(function, region, svmap, sd);
+	return convert_cfg(function, svmap, statisticsCollector);
 }
 
 static jive::output *
@@ -741,51 +1087,69 @@ convert_initialization(const data_node_init & init, jive::region * region, scope
 static jive::output *
 convert_data_node(
 	const jlm::ipgraph_node * node,
-	jive::region * region,
 	scoped_vmap & svmap,
-	const StatisticsDescriptor&)
+	StatisticsCollector & statisticsCollector)
 {
 	JLM_ASSERT(dynamic_cast<const data_node*>(node));
 	auto n = static_cast<const data_node*>(node);
-	auto init = n->initialization();
-	auto & m = svmap.module();
+  auto dataNodeInitialization = n->initialization();
 
-	/* data node without initialization */
-	if (!init) {
-		jlm::impport port(n->type(), n->name(), n->linkage());
-		return region->graph()->add_import(port);
-	}
+  auto convertDataNodeToDeltaNode = [&]() -> jive::output*
+  {
+    auto & m = svmap.module();
+    auto region = svmap.region();
 
-	/* data node with initialization */
-	auto delta = delta::node::create(region, n->type(), n->name(), n->linkage(), n->constant());
-	auto & pv = svmap.vmap();
-	svmap.push_scope(delta->subregion());
+    /* data node without initialization */
+    if (!dataNodeInitialization) {
+      jlm::impport port(n->type(), n->name(), n->linkage());
+      return region->graph()->add_import(port);
+    }
 
-	/* add dependencies */
-	for (const auto & dp : *node) {
-		auto v = m.variable(dp);
-		auto argument = delta->add_ctxvar(pv.lookup(v));
-		svmap.vmap().insert(v, argument);
-	}
+    /* data node with initialization */
+    auto delta = delta::node::create(
+      region,
+      n->type(),
+      n->name(),
+      n->linkage(),
+      n->constant());
+    auto & pv = svmap.vmap();
+    svmap.push_scope(delta->subregion());
 
-	auto data = delta->finalize(convert_initialization(*init, delta->subregion(), svmap));
-	svmap.pop_scope();
+    /* add dependencies */
+    for (const auto & dp : *node) {
+      auto v = m.variable(dp);
+      auto argument = delta->add_ctxvar(pv.lookup(v));
+      svmap.vmap().insert(v, argument);
+    }
 
-	return data;
+    auto deltaOutput = delta->finalize(convert_initialization(
+      *dataNodeInitialization,
+      delta->subregion(),
+      svmap));
+    svmap.pop_scope();
+
+    return deltaOutput;
+  };
+
+  auto deltaOutput = statisticsCollector.CollectDataNodeToDeltaStatistics(
+    convertDataNodeToDeltaNode,
+    n->name(),
+    dataNodeInitialization ? dataNodeInitialization->tacs().size() : 0);
+
+	return deltaOutput;
 }
 
 static jive::output *
 handleSingleNode(
 	const ipgraph_node & node,
-	jive::region * region,
 	scoped_vmap & svmap,
-	const StatisticsDescriptor & sd)
+	StatisticsCollector & statisticsCollector)
 {
 	jive::output * output = nullptr;
 	if (auto functionNode = dynamic_cast<const function_node*>(&node)) {
-		output = construct_lambda(functionNode, region, svmap, sd);
+		output = construct_lambda(functionNode, svmap, statisticsCollector);
 	} else if (auto dataNode = dynamic_cast<const data_node*>(&node)) {
-		output = convert_data_node(dataNode, region, svmap, sd);
+		output = convert_data_node(dataNode, svmap, statisticsCollector);
 	} else {
 		JLM_UNREACHABLE("This should have never happened.");
 	}
@@ -798,7 +1162,7 @@ handle_scc(
 	const std::unordered_set<const jlm::ipgraph_node*> & scc,
 	jive::graph * graph,
 	scoped_vmap & svmap,
-	const StatisticsDescriptor & sd)
+	StatisticsCollector & statisticsCollector)
 {
 	auto & module = svmap.module();
 
@@ -809,7 +1173,7 @@ handle_scc(
 	if (scc.size() == 1 && !(*scc.begin())->is_selfrecursive()) {
 		auto & node = *scc.begin();
 
-		auto output = handleSingleNode(*node, graph->root(), svmap, sd);
+		auto output = handleSingleNode(*node, svmap, statisticsCollector);
 
 		auto v = module.variable(node);
 		JLM_ASSERT(v);
@@ -851,7 +1215,7 @@ handle_scc(
 
 	/* convert SCC nodes */
 	for (const auto & node : scc) {
-		auto output = handleSingleNode(*node, pb.subregion(), svmap, sd);
+		auto output = handleSingleNode(*node, svmap, statisticsCollector);
 		recvars[module.variable(node)]->set_rvorigin(output);
 	}
 
@@ -869,10 +1233,15 @@ handle_scc(
 }
 
 static std::unique_ptr<RvsdgModule>
-convert_module(const ipgraph_module & im, const StatisticsDescriptor & sd)
+convert_module(
+  const ipgraph_module & interProceduralGraphModule,
+  StatisticsCollector & statisticsCollector)
 {
-	auto rm = RvsdgModule::Create(im.source_filename(), im.target_triple(), im.data_layout());
-	auto graph = &rm->Rvsdg();
+	auto rvsdgModule = RvsdgModule::Create(
+    interProceduralGraphModule.source_filename(),
+    interProceduralGraphModule.target_triple(),
+    interProceduralGraphModule.data_layout());
+	auto graph = &rvsdgModule->Rvsdg();
 
 	auto nf = graph->node_normal_form(typeid(jive::operation));
 	nf->set_mutable(false);
@@ -880,31 +1249,37 @@ convert_module(const ipgraph_module & im, const StatisticsDescriptor & sd)
 	/* FIXME: we currently cannot handle flattened_binary_op in jlm2llvm pass */
 	jive::binary_op::normal_form(graph)->set_flatten(false);
 
-	scoped_vmap svmap(im, graph->root());
+	scoped_vmap svmap(interProceduralGraphModule, graph->root());
 
 	/* convert ipgraph nodes */
-	auto sccs = im.ipgraph().find_sccs();
+	auto sccs = interProceduralGraphModule.ipgraph().find_sccs();
 	for (const auto & scc : sccs)
-		handle_scc(scc, graph, svmap, sd);
+		handle_scc(scc, graph, svmap, statisticsCollector);
 
-	return rm;
+	return rvsdgModule;
 }
 
 std::unique_ptr<RvsdgModule>
-construct_rvsdg(const ipgraph_module & im, const StatisticsDescriptor & sd)
+construct_rvsdg(
+  const ipgraph_module & interProceduralGraphModule,
+  const StatisticsDescriptor & statisticsDescriptor)
 {
-	source_filename = im.source_filename().to_str();
+  StatisticsCollector statisticsCollector(
+    statisticsDescriptor,
+    interProceduralGraphModule.source_filename());
 
-	rvsdg_construction_stat stat(im.source_filename());
+  auto convertInterProceduralGraphModule = [&](const ipgraph_module & interProceduralGraphModule)
+  {
+    return convert_module(interProceduralGraphModule, statisticsCollector);
+  };
 
-	stat.start(im);
-	auto rm = convert_module(im, sd);
-	stat.end(rm->Rvsdg());
+  auto rvsdgModule = statisticsCollector.CollectInterProceduralGraphToRvsdgStatistics(
+    convertInterProceduralGraphModule,
+    interProceduralGraphModule);
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::RvsdgConstruction))
-		sd.print_stat(stat);
+  statisticsCollector.PrintStatistics();
 
-	return rm;
+  return rvsdgModule;
 }
 
 }

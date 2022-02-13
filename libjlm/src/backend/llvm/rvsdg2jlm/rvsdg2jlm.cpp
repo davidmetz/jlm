@@ -31,7 +31,8 @@ public:
 	{}
 
 	rvsdg_destruction_stat(const jlm::filepath & filename)
-	: ntacs_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::RvsdgDestruction)
+  , ntacs_(0)
 	, nnodes_(0)
 	, filename_(filename)
 	{}
@@ -569,8 +570,7 @@ rvsdg2jlm(const RvsdgModule & rm, const StatisticsDescriptor & sd)
 	auto im = convert_rvsdg(rm);
 	stat.end(*im);
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::RvsdgConstruction))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 
 	return im;
 }

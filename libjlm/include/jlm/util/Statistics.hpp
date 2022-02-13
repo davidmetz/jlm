@@ -3,8 +3,8 @@
  * See COPYING for terms of redistribution.
  */
 
-#ifndef JLM_UTIL_STATS_HPP
-#define JLM_UTIL_STATS_HPP
+#ifndef JLM_UTIL_STATISTICS_HPP
+#define JLM_UTIL_STATISTICS_HPP
 
 #include <jlm/util/file.hpp>
 
@@ -12,14 +12,7 @@
 
 namespace jlm {
 
-class Statistics {
-public:
-	virtual
-	~Statistics();
-
-	virtual std::string
-	ToString() const = 0;
-};
+class Statistics;
 
 class StatisticsDescriptor final {
 public:
@@ -30,6 +23,7 @@ public:
     BasicEncoderEncoding,
     CommonNodeElimination,
     ControlFlowRecovery,
+    DataNodeToDelta,
     DeadNodeElimination,
     FunctionInlining,
     InvariantValueReduction,
@@ -88,11 +82,18 @@ public:
     printStatistics_ = std::move(printStatistics);
   }
 
+  /** \brief Prints statistics to file.
+   *
+   * Prints \p statistics to the statistics file iff the \p statistics'
+   * StatisticsId was set with SetPrintStatisticsIds().
+   *
+   * @param statistics The statistics that is printed.
+   *
+   * @see SetPrintStatisticsIds()
+   * @see IsPrintable()
+   */
 	void
-	print_stat(const Statistics & s) const noexcept
-	{
-		fprintf(file_.fd(), "%s\n", s.ToString().c_str());
-	}
+	PrintStatistics(const Statistics & statistics) const noexcept;
 
   bool
   IsPrintable(StatisticsId id) const
@@ -103,6 +104,29 @@ public:
 private:
 	jlm::file file_;
   std::unordered_set<StatisticsId> printStatistics_;
+};
+
+class Statistics {
+public:
+  virtual
+  ~Statistics();
+
+  explicit
+  Statistics(const StatisticsDescriptor::StatisticsId & statisticsId)
+  : StatisticsId_(statisticsId)
+  {}
+
+  StatisticsDescriptor::StatisticsId
+  GetStatisticsId() const noexcept
+  {
+    return StatisticsId_;
+  }
+
+  virtual std::string
+  ToString() const = 0;
+
+private:
+  StatisticsDescriptor::StatisticsId StatisticsId_;
 };
 
 }

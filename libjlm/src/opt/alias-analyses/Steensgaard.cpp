@@ -34,7 +34,8 @@ public:
 
   explicit
   SteensgaardAnalysisStatistics(jlm::filepath sourceFile)
-  : numNodesBefore_(0)
+  : Statistics(StatisticsDescriptor::StatisticsId::SteensgaardAnalysis)
+  , numNodesBefore_(0)
   , sourceFile_(std::move(sourceFile))
   {}
 
@@ -76,7 +77,8 @@ public:
 
   explicit
   SteensgaardPointsToGraphConstructionStatistics(jlm::filepath sourceFile)
-  : sourceFile_(std::move(sourceFile))
+  : Statistics(StatisticsDescriptor::StatisticsId::SteensgaardPointsToGraphConstruction)
+  , sourceFile_(std::move(sourceFile))
   , numDisjointSets_(0)
   , numLocations_(0)
   , numRegisterNodes_(0)
@@ -755,6 +757,8 @@ Steensgaard::join(Location & x, Location & y)
 void
 Steensgaard::Analyze(const jive::simple_node & node)
 {
+  auto AnalyzeCall = [](auto & s, auto & n) { s.AnalyzeCall(*static_cast<const CallNode*>(&n)); };
+
 	static std::unordered_map<
 		std::type_index
 	, std::function<void(Steensgaard&, const jive::simple_node&)>> nodes
@@ -763,7 +767,7 @@ Steensgaard::Analyze(const jive::simple_node & node)
 	, {typeid(malloc_op),             [](auto & s, auto & n){ s.AnalyzeMalloc(n);                }}
 	, {typeid(load_op),               [](auto & s, auto & n){ s.AnalyzeLoad(n);                  }}
 	, {typeid(store_op),              [](auto & s, auto & n){ s.AnalyzeStore(n);                 }}
-	, {typeid(call_op),               [](auto & s, auto & n){ s.AnalyzeCall(n);                  }}
+	, {typeid(CallOperation),         AnalyzeCall                                                 }
 	, {typeid(getelementptr_op),      [](auto & s, auto & n){ s.AnalyzeGep(n);                   }}
 	, {typeid(bitcast_op),            [](auto & s, auto & n){ s.AnalyzeBitcast(n);               }}
 	, {typeid(bits2ptr_op),           [](auto & s, auto & n){ s.AnalyzeBits2ptr(n);              }}
@@ -892,11 +896,9 @@ Steensgaard::AnalyzeStore(const jive::simple_node & node)
 }
 
 void
-Steensgaard::AnalyzeCall(const jive::simple_node & node)
+Steensgaard::AnalyzeCall(const CallNode & callNode)
 {
-	JLM_ASSERT(is<call_op>(&node));
-
-	auto handle_direct_call = [&](const jive::simple_node & call, const lambda::node & lambda)
+	auto handle_direct_call = [&](const CallNode & call, const lambda::node & lambda)
 	{
 		/*
 			FIXME: What about varargs
@@ -921,7 +923,7 @@ Steensgaard::AnalyzeCall(const jive::simple_node & node)
 
 		/* handle call node results */
 		auto subregion = lambda.subregion();
-		JLM_ASSERT(subregion->nresults() == node.noutputs());
+		JLM_ASSERT(subregion->nresults() == callNode.noutputs());
 		for (size_t n = 0; n < call.noutputs(); n++) {
 			auto callResult = call.output(n);
 			auto lambdaResult = subregion->result(n)->origin();
@@ -938,7 +940,7 @@ Steensgaard::AnalyzeCall(const jive::simple_node & node)
 		}
 	};
 
-	auto handle_indirect_call = [&](const jive::simple_node & call)
+	auto handle_indirect_call = [&](const CallNode & call)
 	{
 		/*
 			Nothing can be done for the call/lambda arguments, as it is
@@ -955,12 +957,12 @@ Steensgaard::AnalyzeCall(const jive::simple_node & node)
 		}
 	};
 
-	if (auto lambda = is_direct_call(node)) {
-		handle_direct_call(node, *lambda);
+	if (auto lambda = CallNode::IsDirectCall(callNode)) {
+		handle_direct_call(callNode, *lambda);
 		return;
 	}
 
-	handle_indirect_call(node);
+	handle_indirect_call(callNode);
 }
 
 void
@@ -1386,8 +1388,7 @@ Steensgaard::Analyze(
 	Analyze(module.Rvsdg());
 //	std::cout << locationSet_.to_dot() << std::flush;
   steensgardStatistics.end();
-  if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::SteensgaardAnalysis))
-    sd.print_stat(steensgardStatistics);
+  sd.PrintStatistics(steensgardStatistics);
 
 
   /**
@@ -1398,8 +1399,7 @@ Steensgaard::Analyze(
 	auto pointsToGraph = ConstructPointsToGraph(locationSet_);
 //	std::cout << PointsToGraph::ToDot(*pointsToGraph) << std::flush;
   ptgConstructionStatistics.stop(*pointsToGraph);
-  if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::SteensgaardPointsToGraphConstruction))
-    sd.print_stat(ptgConstructionStatistics);
+  sd.PrintStatistics(ptgConstructionStatistics);
 
 	return pointsToGraph;
 }

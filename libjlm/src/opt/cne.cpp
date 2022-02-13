@@ -24,7 +24,8 @@ public:
 	{}
 
 	cnestat()
-	: nnodes_before_(0), nnodes_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::CommonNodeElimination)
+  , nnodes_before_(0), nnodes_after_(0)
 	, ninputs_before_(0), ninputs_after_(0)
 	{}
 
@@ -564,8 +565,7 @@ cne(RvsdgModule & rm, const StatisticsDescriptor & sd)
 	divert(graph.root(), ctx);
 	stat.end_divert_stat(graph);
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::CommonNodeElimination))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 }
 
 /* cne class */

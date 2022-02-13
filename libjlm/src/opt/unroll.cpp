@@ -30,7 +30,8 @@ public:
 	{}
 
 	unrollstat()
-	: nnodes_before_(0), nnodes_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::LoopUnrolling)
+  , nnodes_before_(0), nnodes_after_(0)
 	{}
 
 	void
@@ -536,9 +537,7 @@ loopunroll::run(RvsdgModule & module, const StatisticsDescriptor & sd)
 	unroll(graph.root(), factor_);
 	stat.end(module.Rvsdg());
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::LoopUnrolling))
-		sd.print_stat(stat);
-
+  sd.PrintStatistics(stat);
 }
 
 }

@@ -100,7 +100,7 @@ jlm::hls::convert_prints(jive::region *region, jive::output * printf) {
 				auto op = jlm::zext_op(bt->nbits(), 64);
 				val = jive::simple_node::create_normalized(region, op, {val})[0];
 			}
-			jlm::call_op::create(printf_local, {bc, val});
+			jlm::CallNode::Create(printf_local, {bc, val});
 			node->output(0)->divert_users(node->input(0)->origin());
 			jive::remove(node);
 		}

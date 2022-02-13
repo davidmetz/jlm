@@ -22,7 +22,8 @@ public:
 	{}
 
 	redstat()
-	: nnodes_before_(0), nnodes_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::ReduceNodes)
+  , nnodes_before_(0), nnodes_after_(0)
 	, ninputs_before_(0), ninputs_after_(0)
 	{}
 
@@ -136,8 +137,7 @@ reduce(RvsdgModule & rm, const StatisticsDescriptor & sd)
 	graph.normalize();
 	stat.end(graph);
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::ReduceNodes))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 }
 
 /* nodereduction class */

@@ -24,7 +24,9 @@ public:
 	{}
 
 	ilnstat()
-	: nnodes_before_(0), nnodes_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::FunctionInlining)
+  , nnodes_before_(0)
+  , nnodes_after_(0)
 	{}
 
 	void
@@ -97,7 +99,7 @@ route_to_region(jive::output * output, jive::region * region)
 static std::vector<jive::output*>
 route_dependencies(const lambda::node * lambda, const jive::simple_node * apply)
 {
-	JLM_ASSERT(is<call_op>(apply));
+	JLM_ASSERT(is<CallOperation>(apply));
 
 	/* collect origins of dependencies */
 	std::vector<jive::output*> deps;
@@ -114,7 +116,7 @@ route_dependencies(const lambda::node * lambda, const jive::simple_node * apply)
 void
 inlineCall(jive::simple_node * call, const lambda::node * lambda)
 {
-	JLM_ASSERT(is<call_op>(call));
+	JLM_ASSERT(is<CallOperation>(call));
 
 	auto deps = route_dependencies(lambda, call);
 	JLM_ASSERT(lambda->ncvarguments() == deps.size());
@@ -166,8 +168,7 @@ inlining(RvsdgModule & rm, const StatisticsDescriptor & sd)
 	inlining(graph);
 	stat.stop(graph);
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::FunctionInlining))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 }
 
 /* fctinline class */

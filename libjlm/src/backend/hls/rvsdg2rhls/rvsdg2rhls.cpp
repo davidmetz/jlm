@@ -107,7 +107,7 @@ namespace jlm {
 				for (size_t n = 0; n < structnode->nsubregions(); n++) {
 					inline_calls(structnode->subregion(n));
 				}
-			} else if (dynamic_cast<const jlm::call_op *>(&(node->operation()))) {
+			} else if (dynamic_cast<const jlm::CallOperation *>(&(node->operation()))) {
 				auto func = trace_call(node->input(0));
 				auto ln = dynamic_cast<const jive::structural_output *>(func)->node();
 				jlm::inlineCall(dynamic_cast<jive::simple_node *>(node), dynamic_cast<const lambda::node *>(ln));

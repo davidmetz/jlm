@@ -17,48 +17,33 @@ namespace lambda {
 	class node;
 }
 
-/* call operator */
-
-class call_op final : public jive::simple_op {
+/** \brief Call operation class
+ *
+ */
+class CallOperation final : public jive::simple_op {
 public:
-	virtual
-	~call_op();
+	~CallOperation() override;
 
-	inline
-	call_op(const FunctionType & functionType)
+	explicit
+	CallOperation(const FunctionType & functionType)
 	: simple_op(create_srcports(functionType), create_dstports(functionType))
 	{}
 
- 	virtual bool
+	bool
  	operator==(const operation & other) const noexcept override;
 
-	virtual std::string
+	std::string
 	debug_string() const override;
 
 	const FunctionType &
-	fcttype() const noexcept
+	GetFunctionType() const noexcept
 	{
 		auto at = static_cast<const ptrtype*>(&argument(0).type());
 		return *static_cast<const FunctionType*>(&at->pointee_type());
 	}
 
-	virtual std::unique_ptr<jive::operation>
+	std::unique_ptr<jive::operation>
 	copy() const override;
-
-	static inline std::vector<jive::output*>
-	create(jive::output * function, const std::vector<jive::output*> & arguments)
-	{
-		auto at = dynamic_cast<const ptrtype*>(&function->type());
-		if (!at) throw jlm::error("expected pointer type.");
-
-		auto ft = dynamic_cast<const FunctionType*>(&at->pointee_type());
-		if (!ft) throw jlm::error("expected function type.");
-
-		call_op op(*ft);
-		std::vector<jive::output*> operands({function});
-		operands.insert(operands.end(), arguments.begin(), arguments.end());
-		return jive::simple_node::create_normalized(function->region(), op, operands);
-	}
 
 	static std::unique_ptr<tac>
 	create(
@@ -71,7 +56,7 @@ public:
 		auto ft = dynamic_cast<const FunctionType*>(&at->pointee_type());
 		if (!ft) throw jlm::error("Expected function type.");
 
-		call_op op(*ft);
+		CallOperation op(*ft);
 		std::vector<const variable*> operands({function});
 		operands.insert(operands.end(), arguments.begin(), arguments.end());
 		return tac::create(op, operands);
@@ -99,29 +84,207 @@ private:
 	}
 };
 
-/**
-* \brief Traces function input of call node
-*
-* Traces the function input of a call node upwards, trying to
-* find the corresponding lambda output. The function can handle
-* invariant gamma exit variables and invariant theta loop variables.
-*
-* \param node A call node.
-*
-* \return The traced output.
-*/
-jive::output *
-trace_function_input(const jive::simple_node & node);
+/** \brief Call node
+ *
+ */
+class CallNode final : public jive::simple_node {
+private:
+  CallNode(
+    jive::region * region,
+    CallOperation & operation,
+    const std::vector<jive::output*> & operands)
+    : simple_node(region, operation, operands)
+  {}
 
-/**
-* \brief Checks if a node is a direct call node.
-*
-* \param node A simple node
-*
-* \return The corresponding lambda node if its a direct call, otherwise NULL.
-*/
-lambda::node *
-is_direct_call(const jive::simple_node & node);
+public:
+  const CallOperation&
+  GetOperation() const noexcept
+  {
+    return *static_cast<const CallOperation*>(&operation());
+  }
+
+  size_t
+  NumArguments() const noexcept
+  {
+    return ninputs()-1;
+  }
+
+  jive::input *
+  Argument(size_t n) const
+  {
+    return input(n);
+  }
+
+  size_t
+  NumResults() const noexcept
+  {
+    return noutputs();
+  }
+
+  jive::output *
+  Result(size_t n) const noexcept
+  {
+    return output(n);
+  }
+
+  jive::input *
+  GetFunctionInput() const noexcept
+  {
+    auto function = input(0);
+    JLM_ASSERT(is<ptrtype>(function->type()));
+    auto pointerType = static_cast<const ptrtype*>(&function->type());
+    JLM_ASSERT(is<FunctionType>(pointerType->pointee_type()));
+    return function;
+  }
+
+  jive::input *
+  GetIoStateInput() const noexcept
+  {
+    auto iOState = input(ninputs()-3);
+    JLM_ASSERT(is<iostatetype>(iOState->type()));
+    return iOState;
+  }
+
+  jive::input *
+  GetMemoryStateInput() const noexcept
+  {
+    auto memoryState = input(ninputs()-2);
+    JLM_ASSERT(is<MemoryStateType>(memoryState->type()));
+    return memoryState;
+  }
+
+  jive::input *
+  GetLoopStateInput() const noexcept
+  {
+    auto loopState = input(ninputs()-1);
+    JLM_ASSERT(is<loopstatetype>(loopState->type()));
+    return loopState;
+  }
+
+  jive::output *
+  GetIoStateOutput() const noexcept
+  {
+    auto iOState = output(noutputs()-3);
+    JLM_ASSERT(is<iostatetype>(iOState->type()));
+    return iOState;
+  }
+
+  jive::output *
+  GetMemoryStateOutput() const noexcept
+  {
+    auto memoryState = output(noutputs()-2);
+    JLM_ASSERT(is<MemoryStateType>(memoryState->type()));
+    return memoryState;
+  }
+
+  jive::output *
+  GetLoopStateOutput() const noexcept
+  {
+    auto loopState = output(noutputs()-1);
+    JLM_ASSERT(is<loopstatetype>(loopState->type()));
+    return loopState;
+  }
+
+  static std::vector<jive::output*>
+  Create(
+    jive::output * function,
+    std::vector<jive::output*> arguments)
+  {
+    auto functionType = CheckAndExtractFunctionType(function);
+
+    CallOperation callOperation(functionType);
+    std::vector<jive::output*> operands({function});
+    operands.insert(operands.end(), arguments.begin(), arguments.end());
+    return jive::simple_node::create_normalized(function->region(), callOperation, operands);
+  }
+
+  static std::vector<jive::output*>
+  Create(std::vector<jive::output*> operands)
+  {
+    JLM_ASSERT(!operands.empty());
+    return Create(operands[0], {std::next(operands.begin()), operands.end()});
+  }
+
+  /**
+  * \brief Traces function input of call node
+  *
+  * Traces the function input of a call node upwards, trying to
+  * find the corresponding lambda output. The function can handle
+  * invariant gamma exit variables and invariant theta loop variables.
+  *
+  * \param callNode A call node.
+  *
+  * \return The traced output.
+  */
+  static jive::output *
+  TraceFunctionInput(const CallNode & callNode);
+
+  /**
+  * \brief Checks if a node is a direct call node.
+  *
+  * \param callNode A simple node
+  *
+  * \return The corresponding lambda node if its a direct call, otherwise NULL.
+  */
+  static lambda::node *
+  IsDirectCall(const CallNode & callNode);
+
+private:
+  static const FunctionType &
+  CheckAndExtractFunctionType(const jive::output * function)
+  {
+    auto CheckArgumentTypes = [](const FunctionType & functionType)
+    {
+      if (functionType.NumArguments() < 3)
+        throw error("Expected at least three argument types.");
+
+      auto loopStateArgumentIndex = functionType.NumArguments()-1;
+      auto memoryStateArgumentIndex = functionType.NumArguments()-2;
+      auto iOStateArgumentIndex = functionType.NumArguments()-3;
+
+      if (!is<loopstatetype>(functionType.ArgumentType(loopStateArgumentIndex)))
+        throw error("Expected loop state type.");
+
+      if (!is<MemoryStateType>(functionType.ArgumentType(memoryStateArgumentIndex)))
+        throw error("Expected memory state type.");
+
+      if (!is<iostatetype>(functionType.ArgumentType(iOStateArgumentIndex)))
+        throw error("Expected IO state type.");
+    };
+
+    auto CheckResultTypes = [](const FunctionType & functionType)
+    {
+      if (functionType.NumResults() < 3)
+        throw error("Expected at least three result types.");
+
+      auto loopStateResultIndex = functionType.NumResults()-1;
+      auto memoryStateResultIndex = functionType.NumResults()-2;
+      auto iOStateResultIndex = functionType.NumResults()-3;
+
+      if (!is<loopstatetype>(functionType.ResultType(loopStateResultIndex)))
+        throw error("Expected loop state type.");
+
+      if (!is<MemoryStateType>(functionType.ResultType(memoryStateResultIndex)))
+        throw error("Expected memory state type.");
+
+      if (!is<iostatetype>(functionType.ResultType(iOStateResultIndex)))
+        throw error("Expected IO state type.");
+    };
+
+    auto pointerType = dynamic_cast<const ptrtype*>(&function->type());
+    if (!pointerType)
+      throw jlm::error("Expected pointer type.");
+
+    auto functionType = dynamic_cast<const FunctionType*>(&pointerType->pointee_type());
+    if (!functionType)
+      throw jlm::error("Expected function type.");
+
+    CheckArgumentTypes(*functionType);
+    CheckResultTypes(*functionType);
+
+    return *functionType;
+  }
+};
 
 }
 

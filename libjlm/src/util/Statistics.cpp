@@ -7,7 +7,14 @@
 
 namespace jlm {
 
+void
+StatisticsDescriptor::PrintStatistics(const Statistics & s) const noexcept
+{
+  if (IsPrintable(s.GetStatisticsId()))
+    fprintf(file_.fd(), "%s\n", s.ToString().c_str());
+}
+
 Statistics::~Statistics()
-{}
+= default;
 
 }

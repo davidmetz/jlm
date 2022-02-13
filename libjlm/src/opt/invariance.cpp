@@ -25,7 +25,8 @@ public:
 	{}
 
 	invstat()
-	: nnodes_before_(0), nnodes_after_(0)
+	: Statistics(StatisticsDescriptor::StatisticsId::InvariantValueReduction)
+  , nnodes_before_(0), nnodes_after_(0)
 	, ninputs_before_(0), ninputs_after_(0)
 	{}
 
@@ -125,8 +126,7 @@ invariance(RvsdgModule & rm, const StatisticsDescriptor & sd)
 	invariance(rm.Rvsdg().root());
 	stat.end(rm.Rvsdg());
 
-	if (sd.IsPrintable(StatisticsDescriptor::StatisticsId::InvariantValueReduction))
-		sd.print_stat(stat);
+  sd.PrintStatistics(stat);
 }
 
 /* ivr class */
