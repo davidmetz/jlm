@@ -627,9 +627,9 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 			return origin;
 		}
 
-		// Here we instead need to go through the arguments
-		// and their potentially associated results to find the
-		// correct result associated with the sought argument
+		// Need to go through the arguments and their
+		// potentially associated results to find the correct
+		// result associated with the sought argument
 		int resultIndex = 0;
 		for (size_t i = 0; i <= arg->index(); i++) {
 			auto tmp = region->argument(i);
@@ -809,24 +809,25 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 	for (size_t i = 0; i < subRegion->nresults(); i++) {
 		auto result = subRegion->result(i);
 		auto origin = result->origin();
-		jive::simple_node * source;
+		jive::simple_output *output;
 		if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
-			// The RVSDG node producing the value to be connected to the output
-			source = o->node();
+			// We have found the source output
+			output = o;
 		} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
-			std::cout << "\nStructural output";
-			auto tmp = TraceStructuralOutput(o);
-			source = tmp->node();
+			// Need to trace through the region to find the source node
+			output = TraceStructuralOutput(o);
 		} else {
 			throw std::logic_error("Unsupported output");
 		}
+		// Get the node of the output
+		jive::simple_node *source = output->node();
 		// Get the corresponding InstanceOp
 		auto sourceNode = instances[source];
 		// Calculate the result port of the instance:
 		//   2 for clock and reset +
 		//   Number of inputs of the node +
 		//   The index of the output of the node
-		auto sourceIndex = 2 + source->ninputs() + origin->index();
+		auto sourceIndex = 2 + source->ninputs() + output->index();
 		auto sourcePort = sourceNode->getResult(sourceIndex);
 
 		// Calculate the result port of the region:
@@ -852,7 +853,7 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
 
 	// We are only expecting hls::loop_node to have a structural output
 	if (!dynamic_cast<hls::loop_node *>(node)) {
-		throw std::logic_error("Execpted a hls::loop_node but found: " + node->operation().debug_string());
+		throw std::logic_error("Expected a hls::loop_node but found: " + node->operation().debug_string());
 	}
 	// loop nodes has a single region
 	auto region = node->subregion(0);
@@ -862,7 +863,7 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
 			// Check if connected to a nested regions output
 			auto origin = region->result(i)->origin();
 			if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
-				// Need to trace the output of the structural node
+				// Need to trace the output of the nested structural node
 				return TraceStructuralOutput(o);
 			} else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
 				// Found the source node
