@@ -596,7 +596,8 @@ jlm::hls::MLIRGenImpl::MlirGen(hls::loop_node *loopNode, mlir::Block *body, mlir
 			Connect(body, instances[sn]->getResult(0), clock);
 			Connect(body, instances[sn]->getResult(1), reset);
 		} else if (auto oln = dynamic_cast<hls::loop_node *>(node)) {
-			MlirGen(oln, body, circuitBody);
+			auto inst = MlirGen(oln, body, circuitBody);
+			instances.merge(inst);
 		} else {
 			throw jlm::error("Unimplemented op (unexpected structural node) : " +
 					 node->operation().debug_string());
@@ -705,11 +706,7 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 			Connect(body, instances[sn]->getResult(1), reset);
 		} else if (auto oln = dynamic_cast<hls::loop_node *>(node)) {
 			auto inst = MlirGen(oln, body, circuitBody);
-			// merge() fails during compilation
-			// So copying one element at a time
-			for (auto element : inst) {
-				instances[element.first] = element.second;
-			}
+			instances.merge(inst);
 		} else {
 			throw jlm::error("Unimplemented op (unexpected structural node) : " +
 					 node->operation().debug_string());
@@ -775,6 +772,23 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 				} else {
 					throw std::logic_error("Unsupported output");
 				}
+			} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+				// Need to trace through the region to find the source node
+				auto output = TraceStructuralOutput(o);
+				// Get the node of the output
+				jive::simple_node *source = output->node();
+				// Get the corresponding InstanceOp
+				auto sourceNode = instances[source];
+				// Calculate the result port of the instance:
+				//   2 for clock and reset +
+				//   Number of inputs of the node +
+				//   The index of the output of the node
+				auto sourceIndex = 2 + source->ninputs() + output->index();
+				auto sourcePort = sourceNode->getResult(sourceIndex);
+				auto sinkPort = sinkNode->getResult(i+2);
+				Connect(body, sinkPort, sourcePort);
+			} else {
+				throw std::logic_error("Unsupported output");
 			}
 			// Connect the memory port to those instances that need it
 			if (dynamic_cast<const jlm::load_op *>(&(rvsdgNode->operation()))) {
