@@ -21,7 +21,7 @@
 #include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/util/Statistics.hpp>
 #include <jlm/frontend/llvm/llvm2jlm/module.hpp>
-#include <jlm/frontend/llvm/jlm2rvsdg/module.hpp>
+#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/dot-hls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/firrtl-hls.hpp>
@@ -90,11 +90,11 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     }
 }
 void
-dump_xml(std::unique_ptr<jlm::RvsdgModule> &rm, const std::string &suffix = "") {
-	auto source_file_name = rm->SourceFileName().name();
+dump_xml(std::unique_ptr<jlm::RvsdgModule> &rvsdgModule, const std::string &suffix = "") {
+	auto source_file_name = rvsdgModule->SourceFileName().name();
     std::string file_name = source_file_name.substr(0, source_file_name.find_last_of('.')) + suffix + ".rvsdg";
     auto xml_file = fopen(file_name.c_str(), "w");
-    jive::view_xml(rm->Rvsdg().root(), xml_file);
+    jive::view_xml(rvsdgModule->Rvsdg().root(), xml_file);
     fclose(xml_file);
 }
 
@@ -117,11 +117,11 @@ main(int argc, char **argv) {
     /* LLVM to JLM pass */
     auto jm = jlm::convert_module(*lm);
 //    jlm::print(*jm, stdout);
-    auto rm = jlm::construct_rvsdg(*jm, flags.sd);
+    auto rvsdgModule = jlm::ConvertInterProceduralGraphModule(*jm, flags.sd);
 
-//    dump_xml(rm);
-//    jive::view(rm->graph()->root(), stdout);
-    auto rhls = jlm::hls::rvsdg2rhls(*rm, flags.hls_function);
+//    dump_xml(rvsdgModule);
+//    jive::view(rvsdgModule->graph()->root(), stdout);
+    auto rhls = jlm::hls::rvsdg2rhls(*rvsdgModule, flags.hls_function);
 //    jive::view(rhls->graph()->root(), stdout);
 //    dump_xml(rhls, "_hls");	// run conversion on copy
 
@@ -142,10 +142,10 @@ main(int argc, char **argv) {
     vhls.run(*rhls);
 
     // non-hls part
-	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rm, flags.sd);
+	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rvsdgModule, flags.sd);
 	auto lm2 = jlm::jlm2llvm::convert(*jm2, ctx);
 	std::error_code EC;
-	llvm::raw_fd_ostream os(rm->SourceFileName().base()+".rest.ll", EC);
+	llvm::raw_fd_ostream os(rvsdgModule->SourceFileName().base()+".rest.ll", EC);
 	lm2->print(os, nullptr);
 
     return 0;
