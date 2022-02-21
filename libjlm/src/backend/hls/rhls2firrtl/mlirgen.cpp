@@ -39,6 +39,24 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddAddOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsub_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddSubOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddMulOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
+	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto sintOp = AddAsSIntOp(body, input0);
+		auto padOp = AddPadOp(body, sintOp, op->ndstbits());
+		auto uintOp = AddAsUIntOp(body, padOp);
+		Connect(body, outData, uintOp);
 	} else if (auto op = dynamic_cast<const jive::bitconstant_op *>(&(node->operation()))) {
 		auto value = op->value();
 		auto size = value.nbits();
@@ -72,6 +90,35 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 			}
 			*/
 		}
+	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
+		throw std::logic_error("GEP generation has not been verified yet");
+
+		// Start of with base pointer
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		mlir::Value result = AddCvtOp(body, input0);
+
+		//TODO: support structs
+		const jive::type *pointeeType = &op->pointee_type();
+		for (size_t i = 1; i < node->ninputs(); i++) {
+			int bits = JlmSize(pointeeType);
+			if (dynamic_cast<const jive::bittype *>(pointeeType)) {
+				;
+			} else if (auto arrayType = dynamic_cast<const jlm::arraytype *>(pointeeType)) {
+				pointeeType = &arrayType->element_type();
+			} else {
+				throw std::logic_error(pointeeType->debug_string() + " pointer not implemented!");
+			}
+			// GEP inputs are signed
+			auto input = GetSubfield(body, inBundles[i], 2);
+			auto asSInt = AddAsSIntOp(body, input);
+			int bytes = bits / 8;
+			auto constantOp = GetConstant(body, 64, bytes);
+			auto cvtOp = AddCvtOp(body, constantOp);
+			auto offset = AddMulOp(body, asSInt, cvtOp);
+			result = AddAddOp(body, result, offset);
+		}
+		auto asUInt = AddAsUIntOp(body, result);
+		Connect(body, outData, asUInt);
 	} else {
 		throw std::logic_error("Simple node " + node->operation().debug_string() + " not implemented!");
 	}
@@ -201,6 +248,11 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 	}
 
 	return module;
+}
+
+circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenLoad(const jive::simple_node *node) {
+	throw std::logic_error("Load operations not implemented!");
 }
 
 circt::firrtl::FModuleOp
@@ -544,8 +596,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
 		return MlirGenFork(node);
 	} else if (dynamic_cast<const jlm::load_op *>(&(node->operation()))) {
-		//return mem_node_to_firrtl(n);
-		throw std::logic_error(node->operation().debug_string() + " not implemented!");
+		return MlirGenLoad(node);
 	} else if (dynamic_cast<const jlm::store_op *>(&(node->operation()))) {
 		//return mem_node_to_firrtl(n);
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");
@@ -1394,6 +1445,25 @@ jlm::hls::MLIRGenImpl::AddAddOp(mlir::Block *body, mlir::Value first, mlir::Valu
 	return op;
 }
 
+circt::firrtl::SubPrimOp
+jlm::hls::MLIRGenImpl::AddSubOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::SubPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::MulPrimOp
+jlm::hls::MLIRGenImpl::AddMulOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::MulPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
 
 circt::firrtl::EQPrimOp
 jlm::hls::MLIRGenImpl::AddEqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
@@ -1435,6 +1505,36 @@ jlm::hls::MLIRGenImpl::AddAsSIntOp(mlir::Block *body, mlir::Value value) {
 	return op;
 }
 
+circt::firrtl::AsUIntPrimOp
+jlm::hls::MLIRGenImpl::AddAsUIntOp(mlir::Block *body, mlir::Value value) {
+	auto op = builder.create<circt::firrtl::AsUIntPrimOp>(
+				location,
+				value);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::PadPrimOp
+jlm::hls::MLIRGenImpl::AddPadOp(mlir::Block *body, mlir::Value value, int amount) {
+	// mlir::IntType and firrtl::IntType is not the the same
+	// Here we need to use the mlir version
+	auto intType = builder.getIntegerType(amount);
+	auto op = builder.create<circt::firrtl::PadPrimOp>(
+				location,
+				value,
+				builder.getIntegerAttr(intType, amount));
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::CvtPrimOp
+jlm::hls::MLIRGenImpl::AddCvtOp(mlir::Block *body, mlir::Value value) {
+	auto op = builder.create<circt::firrtl::CvtPrimOp>(
+				location,
+				value);
+	body->push_back(op);
+	return op;
+}
 
 circt::firrtl::WireOp
 jlm::hls::MLIRGenImpl::AddWireOp(mlir::Block *body, std::string name, int size) {
@@ -1632,7 +1732,7 @@ jlm::hls::MLIRGenImpl::JlmSize(const jive::type *type) {
 	} else if (dynamic_cast<const jive::statetype *>(type)) {
 		return 1;
 	} else {
-		throw std::logic_error(type->debug_string() + " size of not implemented!");
+		throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
 	}
 }
 

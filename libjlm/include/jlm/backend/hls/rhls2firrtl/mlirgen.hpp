@@ -60,6 +60,7 @@ namespace jlm {
 			// Operations
 			circt::firrtl::FModuleOp MlirGenSink(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenFork(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenLoad(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPredicationBuffer(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBuffer(const jive::simple_node *node);
@@ -95,6 +96,12 @@ namespace jlm {
 			circt::firrtl::AddPrimOp AddAddOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
+			circt::firrtl::SubPrimOp AddSubOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::MulPrimOp AddMulOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
 			circt::firrtl::EQPrimOp AddEqOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
@@ -106,6 +113,13 @@ namespace jlm {
 							mlir::Value high,
 							mlir::Value low);
 			circt::firrtl::AsSIntPrimOp AddAsSIntOp(mlir::Block *body,
+							mlir::Value value);
+			circt::firrtl::AsUIntPrimOp AddAsUIntOp(mlir::Block *body,
+							mlir::Value value);
+			circt::firrtl::PadPrimOp AddPadOp(mlir::Block *body,
+							mlir::Value value,
+							int amount);
+			circt::firrtl::CvtPrimOp AddCvtOp(mlir::Block *body,
 							mlir::Value value);
 			circt::firrtl::WireOp AddWireOp(mlir::Block *body,
 							std::string name,
