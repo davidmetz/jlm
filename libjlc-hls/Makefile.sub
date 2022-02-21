@@ -19,7 +19,7 @@ namespace jlm {\n \
 \n \
   filepath firtoolpath(\"$(FIRTOOL)\");\n \
   filepath verilatorpath(\"$(VERILATOR_BIN)\");\n \
-  filepath verilatorrootpath(\"$(VERILATOR_PATH)\");\n \
+  filepath verilatorrootpath(\"$(VERILATOR_ROOT)\");\n \
 \n \
 }\n \
 \n \
@@ -60,6 +60,6 @@ $(JLM_ROOT)/bin/jlc-hls: $(patsubst %.cpp, $(JLM_ROOT)/%.o, $(JLC_HLS_SRC)) $(JL
 .PHONY: libjlchls-clean
 libjlchls-clean:
 	@find  $(JLM_ROOT)/libjlc-hls/ -name "*.o" -o -name "*.la" -o -name "*.a" | grep -v external | xargs rm -rf
-	@rm -f $(LLVMPATHSFILE)
+	@rm -f $(TOOLPATHSFILE)
 	@rm -rf $(JLM_ROOT)/libjlc-hls.a
 	@rm -rf $(JLM_ROOT)/bin/jlc-hls
