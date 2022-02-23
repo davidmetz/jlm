@@ -1,13 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
+include(../IncludeLLVM.cmake)
 
-find_package(LLVM 10 REQUIRED CONFIG)
+find_package(MLIR REQUIRED CONFIG PATHS ${CIRCT_PATH}/llvm/build/lib/cmake)
 
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "Found MLIR ${MLIR_PACKAGE_VERSION}")
+message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 
-include_directories(${LLVM_INCLUDE_DIRS})
-separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
-add_definitions(${LLVM_DEFINITIONS_LIST})
+separate_arguments(MLIR_DEFINITIONS_LIST NATIVE_COMMAND ${MLIR_DEFINITIONS})
+include_directories(${MLIR_INCLUDE_DIRS})
+add_definitions(${MLIR_DEFINITIONS_LIST})
+
+find_package(CIRCT REQUIRED CONFIG PATHS ${CIRCT_PATH}/build/lib/cmake)
+
+message(STATUS "Found CIRCT ${CIRCT_PACKAGE_VERSION}")
+message(STATUS "Using CIRCTConfig.cmake in: ${CIRCT_DIR}")
+
+separate_arguments(CIRCT_DEFINITIONS_LIST NATIVE_COMMAND ${CIRCT_DEFINITIONS})
+include_directories(${CIRCT_INCLUDE_DIRS})
+add_definitions(${CIRCT_DEFINITIONS_LIST})
 
 add_library(jlm STATIC
         src/common.cpp
@@ -20,14 +30,12 @@ add_library(jlm STATIC
         src/driver/command.cpp
         src/driver/passgraph.cpp
 
-        src/frontend/llvm/jlm2rvsdg/module.cpp
+        src/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.cpp
         src/frontend/llvm/jlm2rvsdg/restructuring.cpp
-        src/frontend/llvm/llvm2jlm/instruction.cpp
-        src/frontend/llvm/llvm2jlm/module.cpp
         src/frontend/llvm/llvm2jlm/type.cpp
 
         src/ir/aggregation.cpp
-        src/ir/annotation.cpp
+        src/ir/Annotation.cpp
         src/ir/attribute.cpp
         src/ir/basic-block.cpp
         src/ir/cfg.cpp
@@ -43,22 +51,25 @@ add_library(jlm STATIC
         src/ir/operators/lambda.cpp
         src/ir/operators/load.cpp
         src/ir/operators/operators.cpp
+        src/ir/operators/Phi.cpp
         src/ir/operators/sext.cpp
         src/ir/operators/store.cpp
         src/ir/print.cpp
-        src/ir/rvsdg-module.cpp
+        src/ir/RvsdgModule.cpp
         src/ir/ssa.cpp
         src/ir/tac.cpp
         src/ir/types.cpp
         src/ir/variable.cpp
+        src/ir/hls/hls.cpp
 
-        src/opt/alias-analyses/encoders.cpp
-        src/opt/alias-analyses/operators.cpp
+        src/opt/alias-analyses/BasicEncoder.cpp
+        src/opt/alias-analyses/MemoryStateEncoder.cpp
+        src/opt/alias-analyses/Operators.cpp
         src/opt/alias-analyses/Optimization.cpp
-        src/opt/alias-analyses/pointsto-graph.cpp
-        src/opt/alias-analyses/steensgaard.cpp
+        src/opt/alias-analyses/PointsToGraph.cpp
+        src/opt/alias-analyses/Steensgaard.cpp
         src/opt/cne.cpp
-        src/opt/dne.cpp
+        src/opt/DeadNodeElimination.cpp
         src/opt/inlining.cpp
         src/opt/invariance.cpp
         src/opt/inversion.cpp
@@ -68,9 +79,7 @@ add_library(jlm STATIC
         src/opt/reduction.cpp
         src/opt/unroll.cpp
 
-        src/util/stats.cpp
-
-        src/ir/hls/hls.cpp
+        src/util/Statistics.cpp
 
         src/backend/hls/rvsdg2rhls/add-triggers.cpp
         src/backend/hls/rvsdg2rhls/gamma-conv.cpp
@@ -87,12 +96,24 @@ add_library(jlm STATIC
 
         src/backend/hls/rhls2firrtl/base-hls.cpp
         src/backend/hls/rhls2firrtl/dot-hls.cpp
-        src/backend/hls/rhls2firrtl/firrtl-hls.cpp
         src/backend/hls/rhls2firrtl/verilator-harness-hls.cpp
+        src/backend/hls/rhls2firrtl/firrtl-hls.cpp
+
+        # TODO: make conditional
+        src/backend/hls/rhls2firrtl/mlirgen.cpp
+        src/frontend/llvm/llvm2jlm/module-llvm14.cpp
+        src/frontend/llvm/llvm2jlm/instruction-llvm14.cpp
         )
 
 target_link_libraries(jlm jive)
 target_include_directories(jlm PUBLIC include)
 
-llvm_map_components_to_libnames(llvm_libs support core irreader)
+# Link LLVM, MLIR and CIRCT
+set(llvm_libs ${LLVM_AVAILABLE_LIBS})
 target_link_libraries(jlm ${llvm_libs})
+get_property(mlir_libs GLOBAL PROPERTY MLIR_ALL_LIBS)
+target_link_libraries(jlm ${mlir_libs})
+message(STATUS "MLIR libs: ${mlir_libs}")
+get_property(circt_libs GLOBAL PROPERTY CIRCT_ALL_LIBS)
+target_link_libraries(jlm ${circt_libs})
+message(STATUS "CIRCT libs: ${circt_libs}")

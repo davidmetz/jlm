@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-#add_subdirectory(../libjlm libjlm)
+include(../IncludeLLVM.cmake)
 
 add_executable(jlc src/command.cpp src/cmdline.cpp src/jlc.cpp)
 
