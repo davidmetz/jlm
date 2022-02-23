@@ -153,7 +153,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 			*/
 		}
 	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
-		throw std::logic_error("GEP generation has not been verified yet");
+//		throw std::logic_error("GEP generation has not been verified yet");
 
 		// Start of with base pointer
 		auto input0 = GetSubfield(body, inBundles[0], 2);
@@ -180,7 +180,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 			result = AddAddOp(body, result, offset);
 		}
 		auto asUInt = AddAsUIntOp(body, result);
-		Connect(body, outData, asUInt);
+		Connect(body, outData, AddBitsOp(body, asUInt, 63, 0));
 	} else {
 		throw std::logic_error("Simple node " + node->operation().debug_string() + " not implemented!");
 	}
