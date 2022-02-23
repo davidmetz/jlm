@@ -1,23 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 include(../IncludeLLVM.cmake)
+include(../IncludeCIRCT.cmake)
 
-find_package(MLIR REQUIRED CONFIG PATHS ${CIRCT_PATH}/llvm/build/lib/cmake)
-
-message(STATUS "Found MLIR ${MLIR_PACKAGE_VERSION}")
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-
-separate_arguments(MLIR_DEFINITIONS_LIST NATIVE_COMMAND ${MLIR_DEFINITIONS})
-include_directories(${MLIR_INCLUDE_DIRS})
-add_definitions(${MLIR_DEFINITIONS_LIST})
-
-find_package(CIRCT REQUIRED CONFIG PATHS ${CIRCT_PATH}/build/lib/cmake)
-
-message(STATUS "Found CIRCT ${CIRCT_PACKAGE_VERSION}")
-message(STATUS "Using CIRCTConfig.cmake in: ${CIRCT_DIR}")
-
-separate_arguments(CIRCT_DEFINITIONS_LIST NATIVE_COMMAND ${CIRCT_DEFINITIONS})
-include_directories(${CIRCT_INCLUDE_DIRS})
-add_definitions(${CIRCT_DEFINITIONS_LIST})
 
 add_library(jlm STATIC
         src/common.cpp
@@ -109,8 +93,12 @@ target_link_libraries(jlm jive)
 target_include_directories(jlm PUBLIC include)
 
 # Link LLVM, MLIR and CIRCT
-set(llvm_libs ${LLVM_AVAILABLE_LIBS})
-target_link_libraries(jlm ${llvm_libs})
+#set(llvm_libs ${LLVM_AVAILABLE_LIBS})
+#target_link_libraries(jlm ${llvm_libs})
+#message(STATUS "LLVM libs: ${llvm_libs}")
+# we have to link LLVM here instead of individual libraries, because otherwise we get the issue described here:
+# https://github.com/jrprice/Oclgrind/issues/164
+target_link_libraries(jlm LLVM)
 get_property(mlir_libs GLOBAL PROPERTY MLIR_ALL_LIBS)
 target_link_libraries(jlm ${mlir_libs})
 message(STATUS "MLIR libs: ${mlir_libs}")
