@@ -27,11 +27,26 @@ jlm::hls::BaseHLS::get_node_name(const jive::node *node) {
 	if (found != node_map.end()) {
 		return found->second;
 	}
-	auto new_name = jive::detail::strfmt("node_", node->operation().debug_string(), "_", node_map.size());
+	std::string append = "";
+	auto inPorts = node->ninputs();
+	auto outPorts = node->noutputs();
+	if (inPorts) {
+		append.append("_IN");
+		append.append(std::to_string(inPorts));
+		append.append("_W");
+		append.append(std::to_string(JlmSize(&node->input(inPorts-1)->type())));
+	}
+	if (outPorts) {
+		append.append("_OUT");
+		append.append(std::to_string(outPorts));
+		append.append("_W");
+		append.append(std::to_string(JlmSize(&node->output(outPorts-1)->type())));
+	}
+	auto name = jive::detail::strfmt("op_", node->operation().debug_string(), append, "_", node_map.size());
 	// remove chars that are not valid in firrtl module names
-	std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');
-	node_map[node] = new_name;
-	return new_name;
+	std::replace_if(name.begin(), name.end(), isForbiddenChar, '_');
+	node_map[node] = name;
+	return name;
 }
 
 std::string
@@ -65,6 +80,23 @@ jlm::hls::BaseHLS::get_port_name(jive::output *port) {
 	}
 	result += jive::detail::strfmt(port->index());
 	return result;
+}
+
+int
+jlm::hls::BaseHLS::JlmSize(const jive::type *type) {
+	if (auto bt = dynamic_cast<const jive::bittype *>(type)) {
+		return bt->nbits();
+	} else if (auto at = dynamic_cast<const jlm::arraytype *>(type)) {
+		return JlmSize(&at->element_type()) * at->nelements();
+	} else if (dynamic_cast<const jlm::ptrtype *>(type)) {
+		return 64;
+	} else if (auto ct = dynamic_cast<const jive::ctltype *>(type)) {
+		return ceil(log2(ct->nalternatives()));
+	} else if (dynamic_cast<const jive::statetype *>(type)) {
+		return 1;
+	} else {
+		throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
+	}
 }
 
 void

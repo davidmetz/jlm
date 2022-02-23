@@ -8,6 +8,7 @@
 #include <jlm/ir/RvsdgModule.hpp>
 #include <fstream>
 #include <jlm/ir/operators/lambda.hpp>
+#include <jlm/ir/operators/operators.hpp>
 
 namespace jlm {
 	namespace hls {
@@ -50,6 +51,9 @@ namespace jlm {
 
 			const jlm::lambda::node *
 			get_hls_lambda(jlm::RvsdgModule &rm);
+
+			int
+			JlmSize(const jive::type *type);
 
 			void
 			create_node_names(jive::region *r);
