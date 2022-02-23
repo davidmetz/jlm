@@ -14,6 +14,7 @@ help:
 	@echo "all                    Compile jlm in release mode, and run unit and C tests"
 	@echo "release                Alias for jlm-release"
 	@echo "debug                  Alias for jlm-debug and check"
+	@echo "docs                   Generate doxygen documentation."
 	@echo "clean                  Alias for jlm-clean"
 	@$(HELP_TEXT_JIVE)
 
@@ -23,7 +24,6 @@ include $(JLM_ROOT)/Makefile.sub
 include $(JLM_ROOT)/tests/Makefile.sub
 
 # LLVM related variables
-LLVMCONFIG ?= llvm-config
 CLANG_BIN=$(shell $(LLVMCONFIG) --bindir)
 CC=$(CLANG)
 CXX=$(CLANG_BIN)/clang++
@@ -36,6 +36,9 @@ release: jlm-release
 
 .PHONY: debug
 debug: jlm-debug check
+
+.PHONY: docs
+docs: jlm-docs-build
 
 %.la: %.cpp
 	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) -o $@ $<

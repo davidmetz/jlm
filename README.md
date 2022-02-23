@@ -6,15 +6,22 @@ Regionalized Value State Dependence Graph (RVSDG) as intermediate representation
 
 ## Dependencies
 * Clang/LLVM 11
+* Doxygen 1.9.1
 
 ## Bootstrap
 ```
 export LLVMCONFIG=<path-to-llvm-config>
-make submodule
 make all
 ```
 Please ensure that `LLVMCONFIG` is set to the correct version of `llvm-config` as stated in
 dependencies.
+
+## Documentation
+Invoke the following command to generate the doxygen documentation:
+```
+make docs
+```
+The documentation can then be found at `docs/html/index.html`
 
 ## Publications
 An introduction to the RVSDG and the optimizations supported by jlm can be found in the 

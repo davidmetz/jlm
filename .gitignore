@@ -12,3 +12,4 @@ libjlc/include/jlc/llvmpaths.hpp
 libjlc-hls/include/jlc-hls/toolpaths.hpp
 .idea
 cmake-build-debug
+docs/html
