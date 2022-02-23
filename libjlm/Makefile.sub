@@ -3,12 +3,14 @@
 
 ifdef CIRCT_LLVM
 $(info Support for LLVM 14 and CIRCT enabled)
+$(shell echo "#include \"mlirgen-circt.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
 LLVM_VER_SRC = \
 libjlm/src/backend/hls/rhls2firrtl/mlirgen.cpp \
 libjlm/src/frontend/llvm/llvm2jlm/module-llvm14.cpp \
 libjlm/src/frontend/llvm/llvm2jlm/instruction-llvm14.cpp
 else
 $(info Support for LLVM 11 enabled)
+$(shell echo "#include \"mlirgen-llvm.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
 LLVM_VER_SRC = \
 libjlm/src/frontend/llvm/llvm2jlm/module.cpp \
 libjlm/src/frontend/llvm/llvm2jlm/instruction.cpp

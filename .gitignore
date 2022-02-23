@@ -13,3 +13,4 @@ libjlc-hls/include/jlc-hls/toolpaths.hpp
 .idea
 cmake-build-debug
 docs/html
+libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp
