@@ -51,6 +51,68 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddMulOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddDivOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitshr_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddDShrOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitashr_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto sIntOp0 = AddAsSIntOp(body, input0);
+		auto shrOp = AddDShrOp(body, sIntOp0, input1);
+		auto uIntOp = AddAsUIntOp(body, shrOp);
+		// Connect the op to the output data
+		Connect(body, outData, uIntOp);
+	} else if (dynamic_cast<const jive::bitshl_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto bitsOp = AddBitsOp(body, input1, 7, 0);
+		auto op = AddDShlOp(body, input0, bitsOp);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsmod_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto sIntOp0 = AddAsSIntOp(body, input0);
+		auto sIntOp1 = AddAsSIntOp(body, input1);
+		auto remOp = AddRemOp(body, sIntOp0, sIntOp1);
+		auto uIntOp = AddAsUIntOp(body, remOp);
+		Connect(body, outData, uIntOp);
+	} else if (dynamic_cast<const jive::biteq_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddEqOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsgt_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddGtOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddGeqOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitsle_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddLeqOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	} else if (dynamic_cast<const jlm::zext_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		Connect(body, outData, input0);
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto sintOp = AddAsSIntOp(body, input0);
@@ -485,6 +547,119 @@ jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
+	// Create the module and its input/output ports
+	auto module = nodeToModule(node);
+	auto body = module.getBody();
+
+	auto zeroBitValue = GetConstant(body, 1, 0);
+	auto oneBitValue  = GetConstant(body, 1, 1);
+
+	auto inputs = node->ninputs();
+	auto outBundle = module.getArgument(2+inputs);
+	auto outReady = GetSubfield(body, outBundle, 0);
+	// Out valid
+	auto outValid = GetSubfield(body, outBundle, 1);
+	Connect(body, outValid, zeroBitValue);
+	// Out data
+	auto invalid = GetInvalid(body, JlmSize(&node->output(0)->type()));
+	auto outData = GetSubfield(body, outBundle, 2);
+	Connect(body, outData, invalid);
+	// Input ready 0
+	auto inBundle0 = module.getArgument(2);
+	auto inReady0 = GetSubfield(body, inBundle0, 0);
+	auto inValid0 = GetSubfield(body, inBundle0, 1);
+	auto inData0  = GetSubfield(body, inBundle0, 2);
+	Connect(body, inReady0, zeroBitValue);
+
+	// Add discard registers
+	auto clock = GetClockSignal(module);
+	auto reset = GetResetSignal(module);
+	llvm::SmallVector<circt::firrtl::RegResetOp> discardRegs;
+	llvm::SmallVector<circt::firrtl::WireOp> discardWires;
+	mlir::Value anyDiscardReg = GetConstant(body, 1, 0);
+	for (size_t i=1; i<inputs; i++) {
+		std::string regName("i");
+		regName.append(std::to_string(i));
+		regName.append("_discard_reg");
+		auto reg = builder.create<circt::firrtl::RegResetOp>(
+				location,
+				GetIntType(1),
+				clock,
+				reset,
+				zeroBitValue,
+				builder.getStringAttr(regName));
+		body->push_back(reg);
+		discardRegs.push_back(reg);
+		anyDiscardReg = AddOrOp(body, anyDiscardReg, reg);
+
+		std::string wireName("i");
+		wireName.append(std::to_string(i));
+		wireName.append("_discard");
+		auto wire = AddWireOp(body, wireName, 1);
+	        discardWires.push_back(wire);
+		Connect(body, wire, reg);
+		Connect(body, reg, wire);
+	}
+	auto notAnyDiscardReg = AddNotOp(body, anyDiscardReg);
+
+	auto processedReg = builder.create<circt::firrtl::RegResetOp>(
+				location,
+				GetIntType(1),
+				clock,
+				reset,
+				zeroBitValue,
+				builder.getStringAttr("processed_reg"));
+	body->push_back(processedReg);
+	auto notProcessedReg = AddNotOp(body, processedReg);
+
+	for (size_t i=1; i<inputs; i++) {
+		auto inBundle = module.getArgument(2+i);
+		auto inReady = GetSubfield(body, inBundle, 0);
+		auto inValid = GetSubfield(body, inBundle, 1);
+		auto inData  = GetSubfield(body, inBundle, 2);
+
+		Connect(body, inReady, discardWires[i-1]);
+
+		// First when
+		auto andOp = AddAndOp(body, inReady, inValid);
+		auto whenOp = AddWhenOp(body, andOp, false);
+		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, discardRegs[i-1], zeroBitValue);
+
+		// Second when
+		auto constant = GetConstant(body, 64, i-1);
+		auto eqOp = AddEqOp(body, inData0, constant);
+		auto andOp0 = AddAndOp(body, inValid0, eqOp);
+		auto andOp1 = AddAndOp(body, notAnyDiscardReg, andOp0);
+		whenOp = AddWhenOp(body, andOp1, false);
+		thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, outValid, inValid);
+		Connect(thenBody, outData, inData);
+		Connect(thenBody, inReady, outReady);
+		auto andOp2 = AddAndOp(thenBody, outReady, inValid);
+		Connect(thenBody, inReady0, andOp2);
+
+		// Nested when
+		whenOp = AddWhenOp(thenBody, notProcessedReg, false);
+		thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, processedReg, oneBitValue);
+		for (size_t j = 1; j < inputs; ++j) {
+			if (i != j) {
+				Connect(thenBody, discardWires[j-1], oneBitValue);
+			}
+		}
+	}
+
+	auto andOp = AddAndOp(body, outValid, outReady);
+	auto whenOp = AddWhenOp(body, andOp, false);
+	auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+	Connect(thenBody, processedReg, zeroBitValue);
+
+	return module;
+}
+
+circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenNDMux(const jive::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
@@ -502,45 +677,30 @@ jlm::hls::MLIRGenImpl::MlirGenNDMux(const jive::simple_node *node) {
 	auto outData = GetSubfield(body, outBundle, 2);
 	Connect(body, outData, invalid);
 
-	auto constant0 = GetConstant(body, JlmSize(&node->input(0)->type()), 0);
-	auto constant1 = GetConstant(body, JlmSize(&node->input(0)->type()), 1);
-
 	auto inBundle0 = module.getArgument(2);
 	auto inReady0 = GetSubfield(body, inBundle0, 0);
 	auto inValid0 = GetSubfield(body, inBundle0, 1);
 	Connect(body, inReady0, zeroBitValue);
 	auto inData0 = GetSubfield(body, inBundle0, 2);
 
-	auto inBundle1 = module.getArgument(3);
-	auto inReady1 = GetSubfield(body, inBundle1, 0);
-	auto inValid1 = GetSubfield(body, inBundle1, 1);
-	auto inData1 = GetSubfield(body, inBundle1, 2);
-	Connect(body, inReady1, zeroBitValue);
-	auto eqOp = AddEqOp(body, inData0, constant0);
-	auto andOp = AddAndOp(body, inValid0, eqOp);
-	auto whenOp = AddWhenOp(body, andOp, false);
-	auto thenBody = whenOp.getThenBodyBuilder().getBlock();
-	Connect(thenBody, outValid, inValid1);
-	Connect(thenBody, outData, inData1);
-	Connect(thenBody, inReady1, outReady);
-	auto whenAnd = AddAndOp(thenBody, outReady, inValid1);
-	Connect(thenBody, inReady0, whenAnd);
-
-	auto inBundle2 = module.getArgument(4);
-	auto inReady2 = GetSubfield(body, inBundle2, 0);
-	auto inValid2 = GetSubfield(body, inBundle2, 1);
-	auto inData2 = GetSubfield(body, inBundle2, 2);
-	Connect(body, inReady2, zeroBitValue);
-	eqOp = AddEqOp(body, inData0, constant1);
-	andOp = AddAndOp(body, inValid0, eqOp);
-	whenOp = AddWhenOp(body, andOp, false);
-	thenBody = whenOp.getThenBodyBuilder().getBlock();
-	Connect(thenBody, outValid, inValid2);
-	Connect(thenBody, outData, inData2);
-	Connect(thenBody, inReady2, outReady);
-	whenAnd = AddAndOp(thenBody, outReady, inValid2);
-	Connect(thenBody, inReady0, whenAnd);
-
+	// We have already handled the first input (i.e., i == 0)
+	for (size_t i = 1; i < inputs; i++) {
+		auto inBundle = module.getArgument(2+i);
+		auto inReady = GetSubfield(body, inBundle, 0);
+		auto inValid = GetSubfield(body, inBundle, 1);
+		auto inData = GetSubfield(body, inBundle, 2);
+		Connect(body, inReady, zeroBitValue);
+		auto constant = GetConstant(body, JlmSize(&node->input(0)->type()), i-1);
+		auto eqOp = AddEqOp(body, inData0, constant);
+		auto andOp = AddAndOp(body, inValid0, eqOp);
+		auto whenOp = AddWhenOp(body, andOp, false);
+		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, outValid, inValid);
+		Connect(thenBody, outData, inData);
+		Connect(thenBody, inReady, outReady);
+		auto whenAnd = AddAndOp(thenBody, outReady, inValid);
+		Connect(thenBody, inReady0, whenAnd);
+	}
 	return module;
 }
 
@@ -622,10 +782,8 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");
 	} else if (auto o = dynamic_cast<const hls::mux_op *>(&(node->operation()))) {
 		if (o->discarding) {
-			// return dmux_to_firrtl(n);
-			throw std::logic_error(node->operation().debug_string() + " not implemented!");
+			return MlirGenDMux(node);
 		} else {
-			// return ndmux_to_firrtl(n);
 		        return MlirGenNDMux(node);
 		}
 	}
@@ -1406,6 +1564,18 @@ jlm::hls::MLIRGenImpl::PartialConnect(mlir::Block *body, mlir::Value sink, mlir:
 				source));
 }
 
+circt::firrtl::BitsPrimOp
+jlm::hls::MLIRGenImpl::AddBitsOp(mlir::Block *body, mlir::Value value, int high, int low) {
+	auto intType = builder.getIntegerType(0);
+	auto op = builder.create<circt::firrtl::BitsPrimOp>(
+				location,
+				value,
+				builder.getIntegerAttr(intType, high),
+				builder.getIntegerAttr(intType, low));
+	body->push_back(op);
+	return op;
+}
+
 circt::firrtl::AndPrimOp
 jlm::hls::MLIRGenImpl::AddAndOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
 	auto op = builder.create<circt::firrtl::AndPrimOp>(
@@ -1465,6 +1635,46 @@ jlm::hls::MLIRGenImpl::AddMulOp(mlir::Block *body, mlir::Value first, mlir::Valu
 	return op;
 }
 
+circt::firrtl::DivPrimOp
+jlm::hls::MLIRGenImpl::AddDivOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::DivPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::DShrPrimOp
+jlm::hls::MLIRGenImpl::AddDShrOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::DShrPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::DShlPrimOp
+jlm::hls::MLIRGenImpl::AddDShlOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::DShlPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::RemPrimOp
+jlm::hls::MLIRGenImpl::AddRemOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::RemPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
 circt::firrtl::EQPrimOp
 jlm::hls::MLIRGenImpl::AddEqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
 	auto op = builder.create<circt::firrtl::EQPrimOp>(
@@ -1475,9 +1685,39 @@ jlm::hls::MLIRGenImpl::AddEqOp(mlir::Block *body, mlir::Value first, mlir::Value
 	return op;
 }
 
+circt::firrtl::GTPrimOp
+jlm::hls::MLIRGenImpl::AddGtOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::GTPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::GEQPrimOp
+jlm::hls::MLIRGenImpl::AddGeqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::GEQPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
 circt::firrtl::LTPrimOp
 jlm::hls::MLIRGenImpl::AddLtOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
 	auto op = builder.create<circt::firrtl::LTPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::LEQPrimOp
+jlm::hls::MLIRGenImpl::AddLeqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::LEQPrimOp>(
 				location,
 				first,
 				second);
@@ -1718,26 +1958,9 @@ jlm::hls::MLIRGenImpl::GetIntType(const jive::type *type, int extend) {
 	return circt::firrtl::IntType::get(builder.getContext(), false, JlmSize(type)+extend);
 }
 
-// Return the bit width of the jive::type
-int
-jlm::hls::MLIRGenImpl::JlmSize(const jive::type *type) {
-	if (auto bt = dynamic_cast<const jive::bittype *>(type)) {
-		return bt->nbits();
-	} else if (auto at = dynamic_cast<const jlm::arraytype *>(type)) {
-		return JlmSize(&at->element_type()) * at->nelements();
-	} else if (dynamic_cast<const jlm::ptrtype *>(type)) {
-		return 64;
-	} else if (auto ct = dynamic_cast<const jive::ctltype *>(type)) {
-		return ceil(log2(ct->nalternatives()));
-	} else if (dynamic_cast<const jive::statetype *>(type)) {
-		return 1;
-	} else {
-		throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
-	}
-}
-
 std::string
 jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
+
 	std::string append = "";
 	auto inPorts = node->ninputs();
 	auto outPorts = node->noutputs();
@@ -1758,7 +1981,6 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
 	std::replace_if(name.begin(), name.end(), isForbiddenChar, '_');
 	return name;
 }
-
 
 bool
 jlm::hls::MLIRGenImpl::IsIdentityMapping(const jive::match_op &op) {

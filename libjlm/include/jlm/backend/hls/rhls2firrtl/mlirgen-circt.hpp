@@ -64,6 +64,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPredicationBuffer(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBuffer(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenDMux(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenNDMux(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBranch(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenSimpleNode(const jive::simple_node *node);
@@ -85,6 +86,10 @@ namespace jlm {
 			void Connect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			void PartialConnect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			// Primary operations
+			circt::firrtl::BitsPrimOp AddBitsOp(mlir::Block *body,
+							mlir::Value value,
+							int high,
+							int low);
 			circt::firrtl::AndPrimOp AddAndOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
@@ -102,10 +107,31 @@ namespace jlm {
 			circt::firrtl::MulPrimOp AddMulOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
+			circt::firrtl::DivPrimOp AddDivOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::DShrPrimOp AddDShrOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::DShlPrimOp AddDShlOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::RemPrimOp AddRemOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
 			circt::firrtl::EQPrimOp AddEqOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
+			circt::firrtl::GTPrimOp AddGtOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::GEQPrimOp AddGeqOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
 			circt::firrtl::LTPrimOp AddLtOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::LEQPrimOp AddLeqOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
 			circt::firrtl::MuxPrimOp AddMuxOp(mlir::Block *body,
@@ -143,7 +169,6 @@ namespace jlm {
 			circt::firrtl::FModuleOp nodeToModule(const jive::simple_node *node);
 			circt::firrtl::IntType GetIntType(int size);
 			circt::firrtl::IntType GetIntType(const jive::type *type, int extend = 0);
-			int JlmSize(const jive::type *type);
 			std::string GetModuleName(const jive::node *node);
 			bool IsIdentityMapping(const jive::match_op &op);
 
