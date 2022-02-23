@@ -166,7 +166,7 @@ namespace jlm {
 			circt::firrtl::BundleType::BundleElement GetValidElement();
 			mlir::BlockArgument GetClockSignal(circt::firrtl::FModuleOp module);
 			mlir::BlockArgument GetResetSignal(circt::firrtl::FModuleOp module);
-			circt::firrtl::FModuleOp nodeToModule(const jive::simple_node *node);
+			circt::firrtl::FModuleOp nodeToModule(const jive::simple_node *node, bool mem=false);
 			circt::firrtl::IntType GetIntType(int size);
 			circt::firrtl::IntType GetIntType(const jive::type *type, int extend = 0);
 			std::string GetModuleName(const jive::node *node);

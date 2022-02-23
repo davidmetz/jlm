@@ -314,7 +314,155 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 
 circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenLoad(const jive::simple_node *node) {
-	throw std::logic_error("Load operations not implemented!");
+    // Create the module and its input/output ports
+    auto module = nodeToModule(node, true);
+    auto body = module.getBody();
+
+    InitializeMemReq(module);
+
+    // Input signals
+    auto inBundle0 = module.getArgument(2);
+    auto inReady0 = GetSubfield(body, inBundle0, 0);
+    auto inValid0 = GetSubfield(body, inBundle0, 1);
+    auto inData0  = GetSubfield(body, inBundle0, 2);
+
+    auto inBundle1 = module.getArgument(3);
+    auto inReady1 = GetSubfield(body, inBundle1, 0);
+    auto inValid1 = GetSubfield(body, inBundle1, 1);
+    auto inData1  = GetSubfield(body, inBundle1, 2);
+    // Output signals
+    auto outBundle0 = module.getArgument(4);
+    auto outReady0 = GetSubfield(body, outBundle0, 0);
+    auto outValid0 = GetSubfield(body, outBundle0, 1);
+    auto outData0  = GetSubfield(body, outBundle0, 2);
+
+    auto outBundle1 = module.getArgument(5);
+    auto outReady1 = GetSubfield(body, outBundle1, 0);
+    auto outValid1 = GetSubfield(body, outBundle1, 1);
+    auto outData1  = GetSubfield(body, outBundle1, 2);
+
+    // Mem signals
+    auto args = module.getArguments().size();
+    mlir::BlockArgument memReq = module.getArgument(args - 2);
+    mlir::BlockArgument memRes = module.getArgument(args - 1);
+
+    auto memReqReady = GetSubfield(body, memReq, 0);
+    auto memReqValid = GetSubfield(body, memReq, 1);
+    auto memReqAddr  = GetSubfield(body, memReq, 2);
+    auto memReqData  = GetSubfield(body, memReq, 3);
+    auto memReqWrite = GetSubfield(body, memReq, 4);
+    auto memReqWidth = GetSubfield(body, memReq, 5);
+
+    auto memResValid = GetSubfield(body, memRes, 0);
+    auto memResData  = GetSubfield(body, memRes, 1);
+
+
+    auto clock = GetClockSignal(module);
+    auto reset = GetResetSignal(module);
+    auto zeroBitValue = GetConstant(body, 1, 0);
+    auto oneBitValue = GetConstant(body, 1, 1);
+
+    // Registers
+    llvm::SmallVector<circt::firrtl::RegResetOp> oValidRegs;
+    llvm::SmallVector<circt::firrtl::RegResetOp> oDataRegs;
+    for (size_t i=0; i<node->noutputs(); i++) {
+        std::string validName("o");
+        validName.append(std::to_string(i));
+        validName.append("_valid_reg");
+        auto validReg = builder.create<circt::firrtl::RegResetOp>(
+                location,
+                GetIntType(1),
+                clock,
+                reset,
+                zeroBitValue,
+                builder.getStringAttr(validName));
+        body->push_back(validReg);
+        oValidRegs.push_back(validReg);
+
+        auto zeroValue = GetConstant(body, JlmSize(&node->output(i)->type()), 0);
+        std::string dataName("o");
+        dataName.append(std::to_string(i));
+        dataName.append("_data_reg");
+        auto dataReg = builder.create<circt::firrtl::RegResetOp>(
+                location,
+                GetIntType(&node->output(i)->type()),
+                clock,
+                reset,
+                zeroValue,
+                builder.getStringAttr(dataName));
+        body->push_back(dataReg);
+        oDataRegs.push_back(dataReg);
+    }
+    auto sentReg = builder.create<circt::firrtl::RegResetOp>(
+            location,
+            GetIntType(1),
+            clock,
+            reset,
+            zeroBitValue,
+            builder.getStringAttr("sent_reg"));
+    body->push_back(sentReg);
+
+    mlir::Value canRequest = AddNotOp(body, sentReg);
+    canRequest = AddAndOp(body, canRequest, inValid0);
+    canRequest = AddAndOp(body, canRequest, inValid1);
+    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[0]));
+    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[1]));
+    // TODO: named node?
+
+    // block until all inputs and no outputs are valid
+    Connect(body, memReqValid, canRequest);
+    Connect(body, memReqAddr, inData0);
+    Connect(body, memReqWrite, zeroBitValue);
+    int bit_width;
+    if (auto bt = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
+        bit_width = bt->nbits();
+    } else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
+        bit_width = 64;
+    } else {
+        throw jlm::error("unknown width for mem request");
+    }
+    int log2_bytes = log2(bit_width / 8);
+    // TODO: should this be 4?
+    Connect(body, memReqWidth, GetConstant(body, 3, log2_bytes));
+
+    // mem req fire
+    auto whenReqFireOp = AddWhenOp(body, memReqReady, false);
+    auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
+    Connect(whenReqFireBody, sentReg, oneBitValue);
+    Connect(whenReqFireBody, oValidRegs[1], oneBitValue);
+    Connect(whenReqFireBody, oDataRegs[1], inData1);
+
+    // mem res fire
+    auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, memResValid), false);
+    auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
+    Connect(whenResFireBody, sentReg, zeroBitValue);
+    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
+    if(bit_width!=64){
+        Connect(whenResFireBody, oDataRegs[0], AddBitsOp(whenResFireBody, memResData, bit_width-1, 0));
+    } else{
+        Connect(whenResFireBody, oDataRegs[0], memResData);
+    }
+
+    // handshaking
+    Connect(body, inReady0, memReqReady);
+    Connect(body, inReady1, memReqReady);
+
+    Connect(body, outValid0, oValidRegs[0]);
+    Connect(body, outValid1, oValidRegs[1]);
+    Connect(body, outData0, oDataRegs[0]);
+    Connect(body, outData1, oDataRegs[1]);
+    Connect(
+            //when o0 fires
+            AddWhenOp(body, AddAndOp(body, outReady0, outValid0), false).getThenBodyBuilder().getBlock(),
+            oValidRegs[0], zeroBitValue
+            );
+    Connect(
+            //when o1 fires
+            AddWhenOp(body, AddAndOp(body, outReady1, outValid1), false).getThenBodyBuilder().getBlock(),
+            oValidRegs[1], zeroBitValue
+            );
+
+    return module;
 }
 
 circt::firrtl::FModuleOp
@@ -1004,13 +1152,13 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 				// mem_res (last argument of the region and result of the instance)
 				auto sourceIndex = body->getArguments().size();
 				auto sinkIndex = 2 + rvsdgNode->ninputs() + rvsdgNode->noutputs() - 1;
-				auto resSourcePort = body->getArgument(sourceIndex);
-				auto resSinkPort = sinkNode->getResult(sinkIndex);
+				auto resSourcePort = body->getArgument(sourceIndex-1);
+				auto resSinkPort = sinkNode->getResult(sinkIndex+2);
 				Connect(body, resSinkPort, resSourcePort);
 				// mem_req (second to last argument of the region and result of the instance)
 				// The direction is inverted compared to mem_res
-				auto reqSinkPort = body->getArgument(sourceIndex-1);
-				auto reqSourcePort = sinkNode->getResult(sinkIndex-1);
+				auto reqSinkPort = body->getArgument(sourceIndex-2);
+				auto reqSourcePort = sinkNode->getResult(sinkIndex+1);
 				Connect(body, reqSinkPort, reqSourcePort);
 			} else if (dynamic_cast<const jlm::store_op *>(&(rvsdgNode->operation()))) {
 				// mem_res (last argument of the region and result of the instance)
@@ -1566,7 +1714,7 @@ jlm::hls::MLIRGenImpl::PartialConnect(mlir::Block *body, mlir::Value sink, mlir:
 
 circt::firrtl::BitsPrimOp
 jlm::hls::MLIRGenImpl::AddBitsOp(mlir::Block *body, mlir::Value value, int high, int low) {
-	auto intType = builder.getIntegerType(0);
+	auto intType = builder.getIntegerType(32);
 	auto op = builder.create<circt::firrtl::BitsPrimOp>(
 				location,
 				value,
@@ -1905,7 +2053,7 @@ jlm::hls::MLIRGenImpl::InitializeMemReq(circt::firrtl::FModuleOp module) {
 // bundle for each node input and output bundle for each node output
 // Returns a circt::firrtl::FModuleOp with an empty body
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::nodeToModule(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::nodeToModule(const jive::simple_node *node, bool mem) {
 	// Generate a vector with all inputs and outputs of the module
 	llvm::SmallVector<circt::firrtl::PortInfo> ports;
 
@@ -1931,6 +2079,11 @@ jlm::hls::MLIRGenImpl::nodeToModule(const jive::simple_node *node) {
 			name,
 			GetIntType(&node->output(i)->type()));
 	}
+
+    if(mem){
+        AddMemReqPort(&ports);
+        AddMemResPort(&ports);
+    }
 
 	// Creat a name for the module
 	auto nodeName = GetModuleName(node);
