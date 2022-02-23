@@ -381,10 +381,16 @@ lllnkcmd::run() const {
 		if(ofile.at(0)!='/'){
 			ofile = gcd() + "/" + ofile;
 		}
+        std::string verilator_root;
+        if(verilatorrootpath.to_str().size()){
+            verilator_root = strfmt(
+                "VERILATOR_ROOT="
+                , verilatorrootpath.to_str()
+                , " "
+            );
+        }
 		return strfmt(
-				"VERILATOR_ROOT="
-				, verilatorrootpath.to_str()
-				, " "
+                verilator_root
 				,verilatorpath.to_str()
 				, " --cc"
 				, " --build"
