@@ -1970,13 +1970,10 @@ jlm::hls::MLIRGenImpl::AddAsUIntOp(mlir::Block *body, mlir::Value value) {
 
 circt::firrtl::PadPrimOp
 jlm::hls::MLIRGenImpl::AddPadOp(mlir::Block *body, mlir::Value value, int amount) {
-	// mlir::IntType and firrtl::IntType is not the the same
-	// Here we need to use the mlir version
-	auto intType = builder.getIntegerType(32, false);
 	auto op = builder.create<circt::firrtl::PadPrimOp>(
 				location,
 				value,
-				builder.getIntegerAttr(intType, amount));
+				amount);
 	body->push_back(op);
 	return op;
 }
