@@ -60,7 +60,7 @@ namespace jlm {
 			// Operations
 			circt::firrtl::FModuleOp MlirGenSink(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenFork(const jive::simple_node *node);
-			circt::firrtl::FModuleOp MlirGenLoad(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenMem(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPredicationBuffer(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBuffer(const jive::simple_node *node);

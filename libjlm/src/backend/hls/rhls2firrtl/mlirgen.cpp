@@ -313,30 +313,49 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenLoad(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, true);
     auto body = module.getBody();
 
+    // Check if it's a load or store operation
+    bool store = dynamic_cast<const jlm::store_op *>(&(node->operation()));
+
     InitializeMemReq(module);
 
+    int argument = 2;
     // Input signals
-    auto inBundle0 = module.getArgument(2);
+    auto inBundle0 = module.getArgument(argument++);
     auto inReady0 = GetSubfield(body, inBundle0, 0);
     auto inValid0 = GetSubfield(body, inBundle0, 1);
     auto inData0  = GetSubfield(body, inBundle0, 2);
 
-    auto inBundle1 = module.getArgument(3);
+    auto inBundle1 = module.getArgument(argument++);
     auto inReady1 = GetSubfield(body, inBundle1, 0);
     auto inValid1 = GetSubfield(body, inBundle1, 1);
     auto inData1  = GetSubfield(body, inBundle1, 2);
+
+    // Stores also have a data input that needs to be handled
+    // The input is not used by loads but code below reference
+    // these variables so we need to define them
+    mlir::BlockArgument inBundle2 = NULL;
+    circt::firrtl::SubfieldOp inReady2 = NULL;
+    circt::firrtl::SubfieldOp inValid2 = NULL;
+    circt::firrtl::SubfieldOp inData2 = NULL;
+    if (store) {
+	    inBundle2 = module.getArgument(argument++);
+	    inReady2 = GetSubfield(body, inBundle2, 0);
+	    inValid2 = GetSubfield(body, inBundle2, 1);
+	    inData2  = GetSubfield(body, inBundle2, 2);
+    }
+
     // Output signals
-    auto outBundle0 = module.getArgument(4);
+    auto outBundle0 = module.getArgument(argument++);
     auto outReady0 = GetSubfield(body, outBundle0, 0);
     auto outValid0 = GetSubfield(body, outBundle0, 1);
     auto outData0  = GetSubfield(body, outBundle0, 2);
 
-    auto outBundle1 = module.getArgument(5);
+    auto outBundle1 = module.getArgument(argument++);
     auto outReady1 = GetSubfield(body, outBundle1, 0);
     auto outValid1 = GetSubfield(body, outBundle1, 1);
     auto outData1  = GetSubfield(body, outBundle1, 2);
@@ -405,62 +424,90 @@ jlm::hls::MLIRGenImpl::MlirGenLoad(const jive::simple_node *node) {
     mlir::Value canRequest = AddNotOp(body, sentReg);
     canRequest = AddAndOp(body, canRequest, inValid0);
     canRequest = AddAndOp(body, canRequest, inValid1);
-    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[0]));
-    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[1]));
+    if (store) {
+	    canRequest = AddAndOp(body, canRequest, inValid2);
+    }
+    for (size_t i = 0; i < node->noutputs(); i++) {
+	    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
+    }
     // TODO: named node?
 
-    // block until all inputs and no outputs are valid
+    // Block until all inputs and no outputs are valid
     Connect(body, memReqValid, canRequest);
     Connect(body, memReqAddr, inData0);
-    Connect(body, memReqWrite, zeroBitValue);
-    int bit_width;
-    if (auto bt = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
-        bit_width = bt->nbits();
-    } else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
-        bit_width = 64;
+
+    int bitWidth;
+    if (store) {
+	    Connect(body, memReqWrite, oneBitValue);
+	    Connect(body, memReqData, inData1);
     } else {
-        throw jlm::error("unknown width for mem request");
+	    Connect(body, memReqWrite, zeroBitValue);
+	    auto invalid = GetInvalid(body, 32);
+	    Connect(body, memReqData, invalid);
+	    if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
+		    bitWidth = bitType->nbits();
+	    } else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
+		    bitWidth = 64;
+	    } else {
+		    throw jlm::error("unknown width for mem request");
+	    }
     }
-    int log2_bytes = log2(bit_width / 8);
+
+    int log2Bytes = log2(bitWidth / 8);
     // TODO: should this be 4?
-    Connect(body, memReqWidth, GetConstant(body, 3, log2_bytes));
+    Connect(body, memReqWidth, GetConstant(body, 3, log2Bytes));
 
     // mem req fire
     auto whenReqFireOp = AddWhenOp(body, memReqReady, false);
     auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
     Connect(whenReqFireBody, sentReg, oneBitValue);
-    Connect(whenReqFireBody, oValidRegs[1], oneBitValue);
-    Connect(whenReqFireBody, oDataRegs[1], inData1);
+    if (store) {
+	    Connect(whenReqFireBody, oValidRegs[0], oneBitValue);
+	    Connect(whenReqFireBody, oDataRegs[0], inData2);
+    } else {
+	    Connect(whenReqFireBody, oValidRegs[1], oneBitValue);
+	    Connect(whenReqFireBody, oDataRegs[1], inData1);
+    }
 
-    // mem res fire
+    // mem_res fire
     auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, memResValid), false);
     auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
     Connect(whenResFireBody, sentReg, zeroBitValue);
-    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
-    if(bit_width!=64){
-        Connect(whenResFireBody, oDataRegs[0], AddBitsOp(whenResFireBody, memResData, bit_width-1, 0));
-    } else{
-        Connect(whenResFireBody, oDataRegs[0], memResData);
+    if (!store) {
+	    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
+	    if(bitWidth!=64){
+		    auto bitsOp = AddBitsOp(whenResFireBody, memResData, bitWidth-1, 0);
+		    Connect(whenResFireBody, oDataRegs[0], bitsOp);
+	    } else{
+		    Connect(whenResFireBody, oDataRegs[0], memResData);
+	    }
     }
 
-    // handshaking
+    // Handshaking
     Connect(body, inReady0, memReqReady);
     Connect(body, inReady1, memReqReady);
+    if (store) {
+	    Connect(body, inReady2, memReqReady);
+    }
 
     Connect(body, outValid0, oValidRegs[0]);
-    Connect(body, outValid1, oValidRegs[1]);
     Connect(body, outData0, oDataRegs[0]);
-    Connect(body, outData1, oDataRegs[1]);
+    auto andOp = AddAndOp(body, outReady0, outValid0);
     Connect(
-            //when o0 fires
-            AddWhenOp(body, AddAndOp(body, outReady0, outValid0), false).getThenBodyBuilder().getBlock(),
+            // When o0 fires
+            AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
             oValidRegs[0], zeroBitValue
             );
-    Connect(
-            //when o1 fires
-            AddWhenOp(body, AddAndOp(body, outReady1, outValid1), false).getThenBodyBuilder().getBlock(),
-            oValidRegs[1], zeroBitValue
+    if (!store) {
+	    Connect(body, outValid1, oValidRegs[1]);
+	    Connect(body, outData1, oDataRegs[1]);
+	    auto andOp = AddAndOp(body, outReady1, outValid1);
+	    Connect(
+		    // When o1 fires
+		    AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
+		    oValidRegs[1], zeroBitValue
             );
+    }
 
     return module;
 }
@@ -904,10 +951,9 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
 		return MlirGenFork(node);
 	} else if (dynamic_cast<const jlm::load_op *>(&(node->operation()))) {
-		return MlirGenLoad(node);
+		return MlirGenMem(node);
 	} else if (dynamic_cast<const jlm::store_op *>(&(node->operation()))) {
-		//return mem_node_to_firrtl(n);
-		throw std::logic_error(node->operation().debug_string() + " not implemented!");
+		return MlirGenMem(node);
 	} else if (dynamic_cast<const hls::predicate_buffer_op *>(&(node->operation()))) {
 		return MlirGenPredicationBuffer(node);
 	} else if (dynamic_cast<const hls::buffer_op *>(&(node->operation()))) {
@@ -1070,7 +1116,13 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 		}
 	}
 
-	// Then we wire them up
+	// Need to keep track of memory operations such that they can be connected
+	// to the main memory port.
+	//
+	// TODO: The use of unorderd_maps for tracking instances maybe can break the
+	//       memory order, i.e., not adhear to WAR, RAW, and WAW
+	std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> memInstances;
+	// Wire up the instances
 	for (const auto & instance : instances) {
 		// RVSDG node
 		auto rvsdgNode = instance.first;
@@ -1147,33 +1199,47 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 			} else {
 				throw std::logic_error("Unsupported output");
 			}
-			// Connect the memory port to those instances that need it
+			// Memory instances will need to be connected to the main memory ports
+			// So we keep track of them so we later can connect them
 			if (dynamic_cast<const jlm::load_op *>(&(rvsdgNode->operation()))) {
-				// mem_res (last argument of the region and result of the instance)
-				auto sourceIndex = body->getArguments().size();
-				auto sinkIndex = 2 + rvsdgNode->ninputs() + rvsdgNode->noutputs() - 1;
-				auto resSourcePort = body->getArgument(sourceIndex-1);
-				auto resSinkPort = sinkNode->getResult(sinkIndex+2);
-				Connect(body, resSinkPort, resSourcePort);
-				// mem_req (second to last argument of the region and result of the instance)
-				// The direction is inverted compared to mem_res
-				auto reqSinkPort = body->getArgument(sourceIndex-2);
-				auto reqSourcePort = sinkNode->getResult(sinkIndex+1);
-				Connect(body, reqSinkPort, reqSourcePort);
+				memInstances.insert(instance);
 			} else if (dynamic_cast<const jlm::store_op *>(&(rvsdgNode->operation()))) {
-				// mem_res (last argument of the region and result of the instance)
-				auto sourceIndex = body->getArguments().size();
-				auto sinkIndex = 2 + rvsdgNode->ninputs() + rvsdgNode->noutputs() - 1;
-				auto resSourcePort = body->getArgument(sourceIndex);
-				auto resSinkPort = sinkNode->getResult(sinkIndex);
-				Connect(body, resSinkPort, resSourcePort);
-				// mem_req (second to last argument of the region and result of the instance)
-				// The direction is inverted compared to mem_res
-				auto reqSinkPort = body->getArgument(sourceIndex-1);
-				auto reqSourcePort = sinkNode->getResult(sinkIndex-1);
-				Connect(body, reqSinkPort, reqSourcePort);
+				memInstances.insert(instance);
 			}
 		}
+	}
+
+	// Connect memory instances to the main memory ports
+	mlir::Value previousGranted = GetConstant(body, 1, 0);
+	for (const auto & instance : memInstances) {
+		// RVSDG node
+		auto rvsdgNode = instance.first;
+		// Corresponding InstanceOp
+		auto node = instance.second;
+
+		// Get the index to the last port of the subregion and the node
+		auto mainIndex = body->getArguments().size();
+		auto nodeIndex = 2 + rvsdgNode->ninputs() + rvsdgNode->noutputs() - 1;
+
+		// mem_res (last argument of the region and result of the instance)
+		auto mainMemRes = body->getArgument(mainIndex-1);
+		auto nodeMemRes = node->getResult(nodeIndex+2);
+		Connect(body, nodeMemRes, mainMemRes);
+
+		// mem_req (second to last argument of the region and result of the instance)
+		// The arbitration is prioritized for now so the first memory operation
+		// (as given by memInstances) that makes a request will be granted.
+		auto mainMemReq = body->getArgument(mainIndex-2);
+		auto nodeMemReq = node->getResult(nodeIndex+1);
+		auto memReqReady = GetSubfield(body, nodeMemReq, 0);
+		Connect(body, memReqReady, GetConstant(body, 1, 0));
+		auto memReqValid = GetSubfield(body, nodeMemReq, 1);
+		auto notOp = AddNotOp(body, previousGranted);
+		previousGranted = AddAndOp(body, notOp, memReqValid);
+		auto whenOp = AddWhenOp(body, previousGranted, false);
+		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+		// The direction is inverted compared to mem_res
+		Connect(thenBody, mainMemReq, nodeMemReq);
 	}
 
 	// Connect the results of the region
@@ -2175,6 +2241,7 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 		module.emitError("module verification error");
 		return;
 	}
+
 	// Print the FIRRTL IR
 	module.print(llvm::outs());
 
