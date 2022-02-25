@@ -440,6 +440,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
     if (store) {
 	    Connect(body, memReqWrite, oneBitValue);
 	    Connect(body, memReqData, inData1);
+	    bitWidth = dynamic_cast<const jive::bittype *>(&node->input(1)->type())->nbits();
     } else {
 	    Connect(body, memReqWrite, zeroBitValue);
 	    auto invalid = GetInvalid(body, 32);
@@ -1129,6 +1130,14 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 		// Corresponding InstanceOp
 		auto sinkNode = instance.second;
 
+		// Memory instances will need to be connected to the main memory ports
+		// So we keep track of them to handle them later
+		if (dynamic_cast<const jlm::load_op *>(&(rvsdgNode->operation()))) {
+		  memInstances.insert(instance);
+		} else if (dynamic_cast<const jlm::store_op *>(&(rvsdgNode->operation()))) {
+		  memInstances.insert(instance);
+		}
+
 		// Go through each of the inputs of the RVSDG node and try to connect
 		// the corresponding port on the InstanceOp
 		for (size_t i = 0; i < rvsdgNode->ninputs(); i++) {
@@ -1137,6 +1146,7 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 			// Get the RVSDG node that's the origin of this input
 			jive::simple_input *input = rvsdgNode->input(i);
 			auto origin = input->origin();
+
 			// If the origin is a jive::simple_node then we connect the source output
 			// with the sink input
 			if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
@@ -1152,7 +1162,14 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 
 				auto sourcePort = sourceNode->getResult(sourceIndex);
 				auto sinkPort = sinkNode->getResult(i+2);
-				Connect(body, sinkPort, sourcePort);
+
+				// If the source is a load operation then its output will be
+				// 64 bits wide. The default width of operations is 32 bits so
+				// the port widths will differ and cause errors.
+				if (dynamic_cast<const jlm::load_op *>(&(source->operation())))
+					PartialConnect(body, sinkPort, sourcePort);
+				else
+					Connect(body, sinkPort, sourcePort);
 			} else if (auto o = dynamic_cast<jive::argument *>(origin)) {
 				auto origin = TraceArgument(o);
 				if (auto o = dynamic_cast<jive::argument *>(origin)) {
@@ -1177,7 +1194,14 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 					auto sourceNode = instances[source];
 					auto sourcePort = sourceNode->getResult(sourceIndex);
 					auto sinkPort = sinkNode->getResult(i+2);
-					Connect(body, sinkPort, sourcePort);
+
+					// If the source is a load operation then its output will be
+					// 64 bits wide. The default width of operations is 32 bits so
+					// the port widths will differ and cause errors.
+					if (dynamic_cast<const jlm::load_op *>(&(source->operation())))
+						PartialConnect(body, sinkPort, sourcePort);
+					else
+						Connect(body, sinkPort, sourcePort);
 				} else {
 					throw std::logic_error("Unsupported output");
 				}
@@ -1198,13 +1222,6 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 				Connect(body, sinkPort, sourcePort);
 			} else {
 				throw std::logic_error("Unsupported output");
-			}
-			// Memory instances will need to be connected to the main memory ports
-			// So we keep track of them so we later can connect them
-			if (dynamic_cast<const jlm::load_op *>(&(rvsdgNode->operation()))) {
-				memInstances.insert(instance);
-			} else if (dynamic_cast<const jlm::store_op *>(&(rvsdgNode->operation()))) {
-				memInstances.insert(instance);
 			}
 		}
 	}
@@ -1606,7 +1623,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 	auto srMemReqValid = GetSubfield(body, srMemReqBundle, 1);
 	auto srMemReqAddr  = GetSubfield(body, srMemReqBundle, 2);
 	auto srMemReqData  = GetSubfield(body, srMemReqBundle, 3);
-	auto srMemReqWrite = GetSubfield(body,srMemReqBundle, 4);
+	auto srMemReqWrite = GetSubfield(body, srMemReqBundle, 4);
 	auto srMemReqWidth = GetSubfield(body, srMemReqBundle, 5);
 
 	Connect(body, srMemResValid, memResValid);
