@@ -62,6 +62,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp MlirGenFork(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenMem(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenPrint(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPredicationBuffer(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBuffer(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenDMux(const jive::simple_node *node);
@@ -93,6 +94,9 @@ namespace jlm {
 			circt::firrtl::AndPrimOp AddAndOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
+			circt::firrtl::XorPrimOp AddXorOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
 			circt::firrtl::OrPrimOp AddOrOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
@@ -120,6 +124,9 @@ namespace jlm {
 							mlir::Value first,
 							mlir::Value second);
 			circt::firrtl::EQPrimOp AddEqOp(mlir::Block *body,
+							mlir::Value first,
+							mlir::Value second);
+			circt::firrtl::NEQPrimOp AddNeqOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
 			circt::firrtl::GTPrimOp AddGtOp(mlir::Block *body,

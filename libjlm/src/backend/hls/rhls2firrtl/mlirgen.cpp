@@ -45,6 +45,24 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddSubOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
+	} else if (dynamic_cast<const jive::bitand_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddAndOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
+	}  else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddXorOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
+	}   else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddOrOp(body, input0, input1);
+		// Connect the op to the output data
+		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
@@ -92,10 +110,22 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddEqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
+	}  else if (dynamic_cast<const jive::bitne_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddNeqOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsgt_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
 		auto op = AddGtOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
+	}  else if (dynamic_cast<const jive::bitult_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto op = AddLtOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
@@ -113,6 +143,11 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (dynamic_cast<const jlm::zext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		Connect(body, outData, input0);
+	} else if (dynamic_cast<const jlm::trunc_op *>(&(node->operation()))) {
+        auto inData = GetSubfield(body, inBundles[0], 2);
+        int inSize = JlmSize(&node->input(0)->type());
+        int outSize = JlmSize(&node->output(0)->type());
+        Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto sintOp = AddAsSIntOp(body, input0);
@@ -141,20 +176,24 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto inData = GetSubfield(body, inBundles[0], 2);
 		auto outData = GetSubfield(body, outBundle, 2);
 		if (IsIdentityMapping(*op)) {
-			Connect(body, outData, inData);
+            int inSize = JlmSize(&node->input(0)->type());
+            int outSize = JlmSize(&node->output(0)->type());
+            if(inSize == outSize){
+                Connect(body, outData, inData);
+            } else{
+                Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
+            }
 		} else {
-			throw std::logic_error("This version of match operation has not been implemented " + node->operation().debug_string() + " not implemented!");
-			/*
-			result = UInt(64, o->default_alternative());
-			for (auto it = o->begin(); it != o->end(); it++) {
-				result = "mux(eq(" + UInt(64, it->first) + ", " + data(n->input(0)) + "), " + UInt(64, it->second) + ", " +
-					result + ")";
+            auto size = op->nbits();
+			mlir::Value result = GetConstant(body, size, op->default_alternative());
+			for (auto it = op->begin(); it != op->end(); it++) {
+                auto comparison = AddEqOp(body, inData, GetConstant(body, size, it->first));
+                auto value = GetConstant(body, size, it->second);
+                result = AddMuxOp(body, comparison, value, result);
 			}
-			*/
+            Connect(body,outData,result);
 		}
 	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
-//		throw std::logic_error("GEP generation has not been verified yet");
-
 		// Start of with base pointer
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		mlir::Value result = AddCvtOp(body, input0);
@@ -543,6 +582,42 @@ jlm::hls::MLIRGenImpl::MlirGenTrigger(const jive::simple_node *node) {
 	Connect(body, outValid, andOp2);
 	Connect(body, outData, inData1);
 
+	return module;
+}
+
+circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
+	// Create the module and its input/output ports
+	auto module = nodeToModule(node);
+	auto body = module.getBody();
+
+    auto clock = GetClockSignal(module);
+    auto reset = GetResetSignal(module);
+
+	// Input signals
+	auto inBundle = module.getArgument(2);
+	auto inReady = GetSubfield(body, inBundle, 0);
+	auto inValid = GetSubfield(body, inBundle, 1);
+	auto inData = GetSubfield(body, inBundle, 2);
+        // Output signals
+	auto outBundle = module.getArgument(3);
+//	auto outReady = GetSubfield(body, outBundle, 0);
+//	auto outValid = GetSubfield(body, outBundle, 1);
+//	auto outData  = GetSubfield(body, outBundle, 2);
+
+    Connect(body, outBundle, inBundle);
+    auto trigger = AddAndOp(
+            body,
+            AddAndOp(body, inReady, inValid),
+            AddNotOp(body, reset)
+    );
+    auto pn = dynamic_cast<const jlm::hls::print_op *>(&node->operation());
+    auto formatString = "print node " + std::to_string(pn->id()) + ": %x\n";
+    auto name = "print_node_" + std::to_string(pn->id());
+    auto printValue = AddPadOp(body, inData, 64);
+    llvm::SmallVector<mlir::Value> operands;
+    operands.push_back(printValue);
+    body->push_back(builder.create<circt::firrtl::PrintFOp>(location, clock, trigger, formatString, operands, name));
 	return module;
 }
 
@@ -967,8 +1042,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		//return sink_to_firrtl(n);
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");
 	} else if (dynamic_cast<const hls::print_op *>(&(node->operation()))) {
-		//return print_to_firrtl(n);
-		throw std::logic_error(node->operation().debug_string() + " not implemented!");
+        return MlirGenPrint(node);
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
 		//return fork_to_firrtl(n);
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");
@@ -1817,6 +1891,16 @@ jlm::hls::MLIRGenImpl::AddAndOp(mlir::Block *body, mlir::Value first, mlir::Valu
 	return op;
 }
 
+circt::firrtl::XorPrimOp
+jlm::hls::MLIRGenImpl::AddXorOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::XorPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
 circt::firrtl::OrPrimOp
 jlm::hls::MLIRGenImpl::AddOrOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
 	auto op = builder.create<circt::firrtl::OrPrimOp>(
@@ -1909,6 +1993,16 @@ jlm::hls::MLIRGenImpl::AddRemOp(mlir::Block *body, mlir::Value first, mlir::Valu
 circt::firrtl::EQPrimOp
 jlm::hls::MLIRGenImpl::AddEqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
 	auto op = builder.create<circt::firrtl::EQPrimOp>(
+				location,
+				first,
+				second);
+	body->push_back(op);
+	return op;
+}
+
+circt::firrtl::NEQPrimOp
+jlm::hls::MLIRGenImpl::AddNeqOp(mlir::Block *body, mlir::Value first, mlir::Value second) {
+	auto op = builder.create<circt::firrtl::NEQPrimOp>(
 				location,
 				first,
 				second);
@@ -2253,7 +2347,7 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 	// Verify the module
 	if (failed(mlir::verify(module))) {
 		module.emitError("module verification error");
-		return;
+        throw std::logic_error("Verification of firrtl failed");
 	}
 
 	// Print the FIRRTL IR
