@@ -3,8 +3,8 @@
  * See COPYING for terms of redistribution.
  */
 
-#ifndef JLM_FRONTEND_LLVM_LLVM2JLM_MODULE_HPP
-#define JLM_FRONTEND_LLVM_LLVM2JLM_MODULE_HPP
+#ifndef JLM_FRONTEND_LLVM_LLVM2JLM_LLVMMODULECONVERSION_HPP
+#define JLM_FRONTEND_LLVM_LLVM2JLM_LLVMMODULECONVERSION_HPP
 
 #include <jlm/ir/attribute.hpp>
 
@@ -21,10 +21,10 @@ namespace jlm {
 class ipgraph_module;
 
 attribute::kind
-convert_attribute_kind(const llvm::Attribute::AttrKind & kind);
+ConvertAttributeKind(const llvm::Attribute::AttrKind & kind);
 
 std::unique_ptr<ipgraph_module>
-convert_module(llvm::Module & module);
+ConvertLlvmModule(llvm::Module & module);
 
 }
 

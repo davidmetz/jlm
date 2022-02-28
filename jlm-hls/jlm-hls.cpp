@@ -20,8 +20,8 @@
 #include <jlm/ir/print.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/util/Statistics.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
-#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/rvsdg2rhls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/dot-hls.hpp>
 #include <jlm/backend/hls/rhls2firrtl/firrtl-hls.hpp>
@@ -103,21 +103,22 @@ main(int argc, char **argv) {
     cmdflags flags;
     parse_cmdflags(argc, argv, flags);
 
+    
     llvm::LLVMContext ctx;
     llvm::SMDiagnostic err;
-    auto lm = llvm::parseIRFile(flags.file, err, ctx);
+    auto llvmModule = llvm::parseIRFile(flags.file, err, ctx);
     // TODO: fix this hack
-	jlm::filepath ff(flags.file);
-    lm->setSourceFileName(/*ff.path()+*/"jlm_hls");
-    if (!lm) {
+    jlm::filepath ff(flags.file);
+    llvmModule->setSourceFileName(/*ff.path()+*/"jlm_hls");
+    if (!llvmModule) {
         err.print(argv[0], llvm::errs());
         exit(1);
     }
-
+    
     /* LLVM to JLM pass */
-    auto jm = jlm::convert_module(*lm);
+    auto jlmModule = jlm::ConvertLlvmModule(*llvmModule);
 //    jlm::print(*jm, stdout);
-    auto rvsdgModule = jlm::ConvertInterProceduralGraphModule(*jm, flags.sd);
+    auto rvsdgModule = jlm::ConvertInterProceduralGraphModule(*jlmModule, flags.sd);
 
 //    dump_xml(rvsdgModule);
 //    jive::view(rvsdgModule->graph()->root(), stdout);
@@ -125,9 +126,6 @@ main(int argc, char **argv) {
 //    jive::view(rhls->graph()->root(), stdout);
 //    dump_xml(rhls, "_hls");	// run conversion on copy
 
-
-    // TODO
-    // Fix such that this if statement works when using --circt as a command line argument
     if (flags.circt) {
 	jlm::hls::MLIRGen hls;
 	hls.run(*rhls);

@@ -6,7 +6,7 @@
 #include <test-registry.hpp>
 #include <test-util.hpp>
 
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 #include <jlm/ir/print.hpp>
 
 #include <llvm/IR/BasicBlock.h>
@@ -42,10 +42,10 @@ test()
 	auto llvmModule = setup(ctx);
 	jlm::print(*llvmModule);
 
-	auto ipgModule = jlm::convert_module(*llvmModule);
+	auto ipgModule = jlm::ConvertLlvmModule(*llvmModule);
 	jlm::print(*ipgModule, stdout);
 
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/llvm-jlm/test-endless-loop", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-endless-loop", test)

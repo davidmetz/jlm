@@ -167,11 +167,14 @@ convert_attribute_kind(const jlm::attribute::kind & kind)
     {attribute::kind::always_inline,                    ak::AlwaysInline},
     {attribute::kind::arg_mem_only,                     ak::ArgMemOnly},
     {attribute::kind::builtin,                          ak::Builtin},
+    {attribute::kind::ByRef,                            ak::ByRef},
     {attribute::kind::by_val,                           ak::ByVal},
     {attribute::kind::cold,                             ak::Cold},
     {attribute::kind::convergent,                       ak::Convergent},
     {attribute::kind::dereferenceable,                  ak::Dereferenceable},
     {attribute::kind::dereferenceable_or_null,          ak::DereferenceableOrNull},
+		{attribute::kind::ElementType,                      ak::ElementType},
+    {attribute::kind::Hot,                              ak::Hot},
     {attribute::kind::imm_arg,                          ak::ImmArg},
     {attribute::kind::in_alloca,                        ak::InAlloca},
     {attribute::kind::in_reg,                           ak::InReg},
@@ -180,10 +183,12 @@ convert_attribute_kind(const jlm::attribute::kind & kind)
     {attribute::kind::inline_hint,                      ak::InlineHint},
     {attribute::kind::jump_table,                       ak::JumpTable},
     {attribute::kind::min_size,                         ak::MinSize},
+    {attribute::kind::MustProgress,                     ak::MustProgress},
     {attribute::kind::naked,                            ak::Naked},
     {attribute::kind::nest,                             ak::Nest},
     {attribute::kind::no_alias,                         ak::NoAlias},
     {attribute::kind::no_builtin,                       ak::NoBuiltin},
+    {attribute::kind::NoCallback,                       ak::NoCallback},
     {attribute::kind::no_capture,                       ak::NoCapture},
     {attribute::kind::no_cf_check,                      ak::NoCfCheck},
     {attribute::kind::no_duplicate,                     ak::NoDuplicate},
@@ -191,9 +196,11 @@ convert_attribute_kind(const jlm::attribute::kind & kind)
     {attribute::kind::no_implicit_float,                ak::NoImplicitFloat},
     {attribute::kind::no_inline,                        ak::NoInline},
     {attribute::kind::NoMerge,                          ak::NoMerge},
+    {attribute::kind::NoProfile,                        ak::NoProfile},
     {attribute::kind::no_recurse,                       ak::NoRecurse},
     {attribute::kind::no_red_zone,                      ak::NoRedZone},
     {attribute::kind::no_return,                        ak::NoReturn},
+		{attribute::kind::NoSanitizeCoverage,               ak::NoSanitizeCoverage},
     {attribute::kind::no_sync,                          ak::NoSync},
     {attribute::kind::NoUndef,                          ak::NoUndef},
     {attribute::kind::no_unwind,                        ak::NoUnwind},
@@ -224,9 +231,11 @@ convert_attribute_kind(const jlm::attribute::kind & kind)
     {attribute::kind::stack_protect_strong,             ak::StackProtectStrong},
     {attribute::kind::strict_fp,                        ak::StrictFP},
     {attribute::kind::struct_ret,                       ak::StructRet},
+    {attribute::kind::SwiftAsync,                       ak::SwiftAsync},
     {attribute::kind::swift_error,                      ak::SwiftError},
     {attribute::kind::swift_self,                       ak::SwiftSelf},
     {attribute::kind::uwtable,                          ak::UWTable},
+		{attribute::kind::VScaleRange,                      ak::VScaleRange},
     {attribute::kind::will_return,                      ak::WillReturn},
     {attribute::kind::write_only,                       ak::WriteOnly},
     {attribute::kind::zext,                             ak::ZExt},
@@ -434,13 +443,20 @@ convert_ipgraph(const jlm::ipgraph & clg, context & ctx)
 	for (const auto & node : jm.ipgraph()) {
 		auto v = jm.variable(&node);
 
-		if (auto n = dynamic_cast<const data_node*>(&node)) {
-			JLM_ASSERT(jive::is<ptrtype>(n->type()));
-			auto pt = static_cast<const jlm::ptrtype*>(&n->type());
+		if (auto dataNode = dynamic_cast<const data_node*>(&node)) {
+			JLM_ASSERT(jive::is<ptrtype>(dataNode->type()));
+			auto pt = static_cast<const jlm::ptrtype*>(&dataNode->type());
 			auto type = convert_type(pt->pointee_type(), ctx);
+			auto linkage = convert_linkage(dataNode->linkage());
 
-			auto linkage = convert_linkage(n->linkage());
-			auto gv = new llvm::GlobalVariable(lm, type, n->constant(), linkage, nullptr, n->name());
+			auto gv = new llvm::GlobalVariable(
+        lm,
+        type,
+        dataNode->constant(),
+        linkage,
+        nullptr,
+        dataNode->name());
+      gv->setSection(dataNode->Section());
 			ctx.insert(v, gv);
 		} else if (auto n = dynamic_cast<const function_node*>(&node)) {
 			auto type = convert_type(n->fcttype(), ctx);

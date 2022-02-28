@@ -5,7 +5,7 @@
 
 #include <test-registry.hpp>
 
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 
 #include <llvm/IR/Attributes.h>
 
@@ -15,7 +15,7 @@ TestAttributeKindConversion()
   typedef llvm::Attribute::AttrKind ak;
 
   for (int attributeKind = ak::None; attributeKind != ak::EndAttrKinds; attributeKind++) {
-    jlm::convert_attribute_kind(static_cast<ak>(attributeKind));
+    jlm::ConvertAttributeKind(static_cast<ak>(attributeKind));
   }
 }
 
@@ -27,4 +27,4 @@ test()
   return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/llvm-jlm/TestAttributeConversion", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/TestAttributeConversion", test)

@@ -7,7 +7,6 @@
 #include <jlm/ir/cfg.hpp>
 #include <jlm/ir/cfg-structure.hpp>
 #include <jlm/ir/cfg-node.hpp>
-#include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/operators/operators.hpp>
 
 #include <jive/rvsdg/control.hpp>
@@ -446,7 +445,7 @@ restructure_branches(jlm::cfg_node * entry, jlm::cfg_node * exit)
 }
 
 void
-restructure_loops(jlm::cfg * cfg)
+RestructureLoops(jlm::cfg * cfg)
 {
 	JLM_ASSERT(is_closed(*cfg));
 
@@ -458,7 +457,7 @@ restructure_loops(jlm::cfg * cfg)
 }
 
 void
-restructure_branches(jlm::cfg * cfg)
+RestructureBranches(jlm::cfg * cfg)
 {
 	JLM_ASSERT(is_acyclic(*cfg));
 	restructure_branches(cfg->entry(), cfg->exit());
@@ -473,7 +472,7 @@ restructure(jlm::cfg_node * entry, jlm::cfg_node * exit, std::vector<tcloop> & t
 }
 
 void
-restructure(jlm::cfg * cfg)
+RestructureControlFlow(jlm::cfg * cfg)
 {
 	JLM_ASSERT(is_closed(*cfg));
 

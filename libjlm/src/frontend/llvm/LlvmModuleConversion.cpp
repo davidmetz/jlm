@@ -12,16 +12,13 @@
 #include <jlm/ir/ipgraph.hpp>
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/operators/operators.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/context.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/instruction.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/type.hpp>
-
-#include <jive/rvsdg/type.hpp>
+#include <jlm/frontend/llvm/LlvmConversionContext.hpp>
+#include <jlm/frontend/llvm/LlvmInstructionConversion.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
+#include <jlm/frontend/llvm/LlvmTypeConversion.hpp>
 
 #include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/CFG.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
@@ -37,7 +34,7 @@ convert_instructions(llvm::Function & function, context & ctx)
 	for (auto & bb : rpotraverser) {
 		for (auto & instruction : *bb) {
 			tacsvector_t tacs;
-			if (auto result = convert_instruction(&instruction, tacs, ctx))
+			if (auto result = ConvertInstruction(&instruction, tacs, ctx))
 				ctx.insert_value(&instruction, result);
 
 			if (auto phi = llvm::dyn_cast<llvm::PHINode>(&instruction)) {
@@ -61,7 +58,7 @@ patch_phi_operands(const std::vector<llvm::PHINode*> & phis, context & ctx)
 		for (size_t n = 0; n < phi->getNumOperands(); n++) {
 			tacsvector_t tacs;
 			auto bb = ctx.get(phi->getIncomingBlock(n));
-			operands.push_back(convert_value(phi->getIncomingValue(n), tacs, ctx));
+			operands.push_back(ConvertValue(phi->getIncomingValue(n), tacs, ctx));
 			bb->insert_before_branch(tacs);
 			nodes.push_back(bb);
 		}
@@ -83,7 +80,7 @@ convert_basic_blocks(llvm::Function & f, jlm::cfg & cfg)
 }
 
 attribute::kind
-convert_attribute_kind(const llvm::Attribute::AttrKind & kind)
+ConvertAttributeKind(const llvm::Attribute::AttrKind & kind)
 {
   typedef llvm::Attribute::AttrKind ak;
 
@@ -94,11 +91,14 @@ convert_attribute_kind(const llvm::Attribute::AttrKind & kind)
     {ak::AlwaysInline,                attribute::kind::always_inline},
     {ak::ArgMemOnly,                  attribute::kind::arg_mem_only},
     {ak::Builtin,                     attribute::kind::builtin},
+    {ak::ByRef,                       attribute::kind::ByRef},
     {ak::ByVal,                       attribute::kind::by_val},
     {ak::Cold,                        attribute::kind::cold},
     {ak::Convergent,                  attribute::kind::convergent},
     {ak::Dereferenceable,             attribute::kind::dereferenceable},
     {ak::DereferenceableOrNull,       attribute::kind::dereferenceable_or_null},
+    {ak::ElementType,                 attribute::kind::ElementType},
+    {ak::Hot,                         attribute::kind::Hot},
     {ak::ImmArg,                      attribute::kind::imm_arg},
     {ak::InAlloca,                    attribute::kind::in_alloca},
     {ak::InReg,                       attribute::kind::in_reg},
@@ -107,10 +107,12 @@ convert_attribute_kind(const llvm::Attribute::AttrKind & kind)
     {ak::InlineHint,                  attribute::kind::inline_hint},
     {ak::JumpTable,                   attribute::kind::jump_table},
     {ak::MinSize,                     attribute::kind::min_size},
+    {ak::MustProgress,                attribute::kind::MustProgress},
     {ak::Naked,                       attribute::kind::naked},
     {ak::Nest,                        attribute::kind::nest},
     {ak::NoAlias,                     attribute::kind::no_alias},
     {ak::NoBuiltin,                   attribute::kind::no_builtin},
+    {ak::NoCallback,                  attribute::kind::NoCallback},
     {ak::NoCapture,                   attribute::kind::no_capture},
     {ak::NoCfCheck,                   attribute::kind::no_cf_check},
     {ak::NoDuplicate,                 attribute::kind::no_duplicate},
@@ -118,9 +120,11 @@ convert_attribute_kind(const llvm::Attribute::AttrKind & kind)
     {ak::NoImplicitFloat,             attribute::kind::no_implicit_float},
     {ak::NoInline,                    attribute::kind::no_inline},
     {ak::NoMerge,                     attribute::kind::NoMerge},
+    {ak::NoProfile,                   attribute::kind::NoProfile},
     {ak::NoRecurse,                   attribute::kind::no_recurse},
     {ak::NoRedZone,                   attribute::kind::no_red_zone},
     {ak::NoReturn,                    attribute::kind::no_return},
+    {ak::NoSanitizeCoverage,          attribute::kind::NoSanitizeCoverage},
     {ak::NoSync,                      attribute::kind::no_sync},
     {ak::NoUndef,                     attribute::kind::NoUndef},
     {ak::NoUnwind,                    attribute::kind::no_unwind},
@@ -151,9 +155,11 @@ convert_attribute_kind(const llvm::Attribute::AttrKind & kind)
     {ak::StackProtectStrong,          attribute::kind::stack_protect_strong},
     {ak::StrictFP,                    attribute::kind::strict_fp},
     {ak::StructRet,                   attribute::kind::struct_ret},
+    {ak::SwiftAsync,                  attribute::kind::SwiftAsync},
     {ak::SwiftError,                  attribute::kind::swift_error},
     {ak::SwiftSelf,                   attribute::kind::swift_self},
     {ak::UWTable,                     attribute::kind::uwtable},
+    {ak::VScaleRange,                 attribute::kind::VScaleRange},
     {ak::WillReturn,                  attribute::kind::will_return},
     {ak::WriteOnly,                   attribute::kind::write_only},
     {ak::ZExt,                        attribute::kind::zext},
@@ -172,9 +178,14 @@ convert_attribute(const llvm::Attribute & attribute, context & ctx)
 		JLM_ASSERT(attribute.isTypeAttribute());
 
 		if (attribute.getKindAsEnum() == llvm::Attribute::AttrKind::ByVal) {
-			auto type = convert_type(attribute.getValueAsType(), ctx);
+			auto type = ConvertType(attribute.getValueAsType(), ctx);
 			return type_attribute::create_byval(std::move(type));
 		}
+
+    if (attribute.getKindAsEnum() == llvm::Attribute::AttrKind::StructRet) {
+      auto type = ConvertType(attribute.getValueAsType(), ctx);
+      return type_attribute::CreateStructRetAttribute(std::move(type));
+    }
 
 		JLM_UNREACHABLE("Unhandled attribute");
 	};
@@ -189,7 +200,7 @@ convert_attribute(const llvm::Attribute & attribute, context & ctx)
 	{
 		JLM_ASSERT(attribute.isEnumAttribute());
 
-		auto kind = convert_attribute_kind(attribute.getKindAsEnum());
+		auto kind = ConvertAttributeKind(attribute.getKindAsEnum());
 		return enum_attribute::create(kind);
 	};
 
@@ -197,7 +208,7 @@ convert_attribute(const llvm::Attribute & attribute, context & ctx)
 	{
 		JLM_ASSERT(attribute.isIntAttribute());
 
-		auto kind = convert_attribute_kind(attribute.getKindAsEnum());
+		auto kind = ConvertAttributeKind(attribute.getKindAsEnum());
 		return int_attribute::create(kind, attribute.getValueAsInt());
 	};
 
@@ -232,7 +243,7 @@ convert_argument(const llvm::Argument & argument, context & ctx)
 {
 	auto function = argument.getParent();
 	auto name = argument.getName().str();
-	auto type = convert_type(argument.getType(), ctx);
+	auto type = ConvertType(argument.getType(), ctx);
 	auto attributes = convert_attributes(function->getAttributes().getParamAttributes(
 		argument.getArgNo()), ctx);
 
@@ -350,7 +361,7 @@ create_cfg(llvm::Function & f, context & ctx)
 	/* add results */
 	const tacvariable * result = nullptr;
 	if (!f.getReturnType()->isVoidTy()) {
-		auto type = convert_type(f.getReturnType(), ctx);
+		auto type = ConvertType(f.getReturnType(), ctx);
 		entry_block->append_last(undef_constant_op::create(*type, "_r_"));
 		result = entry_block->last()->result(0);
 
@@ -416,17 +427,24 @@ declare_globals(llvm::Module & lm, context & ctx)
 	{
 		auto name = gv.getName().str();
 		auto constant = gv.isConstant();
-		auto type = convert_type(gv.getType(), ctx);
+		auto type = ConvertPointerType(gv.getType(), ctx);
 		auto linkage = convert_linkage(gv.getLinkage());
+    auto section = gv.getSection().str();
 
-		return data_node::create(ctx.module().ipgraph(), name, *type, linkage, constant);
+		return data_node::Create(
+      ctx.module().ipgraph(),
+      name,
+      *type,
+      linkage,
+      std::move(section),
+      constant);
 	};
 
 	auto create_function_node = [](const llvm::Function & f, context & ctx)
 	{
 		auto name = f.getName().str();
 		auto linkage = convert_linkage(f.getLinkage());
-		auto type = convert_type(f.getFunctionType(), ctx);
+		auto type = ConvertFunctionType(f.getFunctionType(), ctx);
 		auto attributes = convert_attributes(f.getAttributes().getFnAttributes(), ctx);
 
 		return function_node::create(ctx.module().ipgraph(), name, *type, linkage, attributes);
@@ -451,7 +469,7 @@ create_initialization(llvm::GlobalVariable & gv, context & ctx)
 		return nullptr;
 
 	auto init = gv.getInitializer();
-	auto tacs = convert_constant(init, ctx);
+	auto tacs = ConvertConstant(init, ctx);
 	if (tacs.empty())
 		return std::make_unique<data_node_init>(ctx.lookup_value(init));
 
@@ -479,7 +497,7 @@ convert_globals(llvm::Module & lm, context & ctx)
 }
 
 std::unique_ptr<ipgraph_module>
-convert_module(llvm::Module & m)
+ConvertLlvmModule(llvm::Module & m)
 {
 	filepath fp(m.getSourceFileName());
 	auto im = ipgraph_module::create(fp, m.getTargetTriple(), m.getDataLayoutStr());

@@ -5,7 +5,7 @@
 
 #include "test-registry.hpp"
 
-#include <jlm/frontend/llvm/jlm2rvsdg/restructuring.hpp>
+#include <jlm/frontend/llvm/ControlFlowRestructuring.hpp>
 #include <jlm/ir/basic-block.hpp>
 #include <jlm/ir/cfg.hpp>
 #include <jlm/ir/cfg-structure.hpp>
@@ -37,7 +37,7 @@ test_acyclic_structured()
 //	jlm::view_ascii(cfg, stdout);
 
 	size_t nnodes = cfg.nnodes();
-	restructure_branches(&cfg);
+  RestructureBranches(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 
@@ -67,7 +67,7 @@ test_acyclic_unstructured()
 
 //	jlm::view_ascii(cfg, stdout);
 
-	restructure_branches(&cfg);
+  RestructureBranches(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 
@@ -96,7 +96,7 @@ test_dowhile()
 //	jlm::view_ascii(cfg, stdout);
 
 	size_t nnodes = cfg.nnodes();
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 
@@ -123,7 +123,7 @@ test_while()
 
 //	jlm::view_ascii(cfg, stdout);
 
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 	/* FIXME: Nodes are not printed in the right order */
 //	jlm::view_ascii(cfg, stdout);
@@ -157,7 +157,7 @@ test_irreducible()
 
 //	jlm::view_ascii(cfg, stdout);
 
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 	assert(is_proper_structured(cfg));
@@ -187,7 +187,7 @@ test_acyclic_unstructured_in_dowhile()
 
 //	jlm::view_ascii(cfg, stdout);
 
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 	assert(is_proper_structured(cfg));
@@ -217,7 +217,7 @@ test_lor_before_dowhile()
 
 //	jlm::view_ascii(cfg, stdout);
 
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 //	jlm::view_ascii(cfg, stdout);
 	assert(is_proper_structured(cfg));
@@ -242,7 +242,7 @@ test_static_endless_loop()
 
 //	jlm::print_dot(cfg, stdout);
 
-	restructure(&cfg);
+  RestructureControlFlow(&cfg);
 
 //	jlm::print_dot(cfg, stdout);
 	assert(is_proper_structured(cfg));
@@ -263,4 +263,4 @@ verify()
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/jlm-rvsdg/test-restructuring", verify)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-restructuring", verify)

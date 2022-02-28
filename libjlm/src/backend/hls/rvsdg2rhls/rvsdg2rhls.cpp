@@ -131,7 +131,7 @@ namespace jlm {
 				auto rr = region->graph()->root();
 				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
 				auto delta_type = jlm::ptrtype(po->value_type());
-				auto db = delta::node::create(rr, delta_type, delta_name, linkage::external_linkage, false);
+				auto db = delta::node::Create(rr, delta_type, delta_name, linkage::external_linkage, "", false);
 				// create zero constant of allocated type
 				jive::output *cout;
 				if (auto bt = dynamic_cast<const jive::bittype *>(&po->value_type())) {
@@ -163,7 +163,7 @@ namespace jlm {
 		auto name = odn->name();
 		std::replace_if(name.begin(), name.end(), [](char c) { return c == '.'; }, '_');
 		std::cout << "renaming delta node " << odn->name() << " to " << name << "\n";
-		auto db = delta::node::create(odn->region(), odn->type(), name, linkage::external_linkage, odn->constant());
+		auto db = delta::node::Create(odn->region(), odn->type(), name, linkage::external_linkage, "", odn->constant());
 		/* add dependencies */
 		jive::substitution_map rmap;
 		for (size_t i=0; i<odn->ncvarguments(); i++) {

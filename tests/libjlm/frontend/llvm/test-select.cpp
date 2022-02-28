@@ -6,7 +6,7 @@
 #include <test-registry.hpp>
 #include <test-util.hpp>
 
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 #include <jlm/ir/print.hpp>
 #include <jlm/ir/operators/call.hpp>
 #include <jlm/ir/operators/operators.hpp>
@@ -58,7 +58,7 @@ test_scalar_select()
 	auto llmod = setup(ctx);
 	jlm::print(*llmod);
 
-	auto ipgmod = jlm::convert_module(*llmod);
+	auto ipgmod = jlm::ConvertLlvmModule(*llmod);
 	jlm::print(*ipgmod, stdout);
 
 	assert(contains<jlm::select_op>(*ipgmod, "f"));
@@ -92,7 +92,7 @@ test_vector_select()
 	auto llmod = setup(ctx);
 	jlm::print(*llmod);
 
-	auto ipgmod = jlm::convert_module(*llmod);
+	auto ipgmod = jlm::ConvertLlvmModule(*llmod);
 	jlm::print(*ipgmod, stdout);
 
 	assert(contains<jlm::vectorselect_op>(*ipgmod, "f"));
@@ -107,4 +107,4 @@ test()
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/llvm-jlm/test-select", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-select", test)

@@ -6,7 +6,7 @@
 #include <test-registry.hpp>
 #include <test-util.hpp>
 
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 #include <jlm/ir/print.hpp>
 #include <jlm/ir/operators/call.hpp>
 #include <jlm/ir/operators/operators.hpp>
@@ -61,7 +61,7 @@ test_function_call()
 	auto llmod = setup(ctx);
 	jlm::print(*llmod);
 
-	auto ipgmod = jlm::convert_module(*llmod);
+	auto ipgmod = jlm::ConvertLlvmModule(*llmod);
 	jlm::print(*ipgmod, stdout);
 
 	verify(*ipgmod);
@@ -115,7 +115,7 @@ test_malloc_call()
 	auto llmod = setup(ctx);
 	jlm::print(*llmod);
 
-	auto ipgmod = jlm::convert_module(*llmod);
+	auto ipgmod = jlm::ConvertLlvmModule(*llmod);
 	jlm::print(*ipgmod, stdout);
 
 	verify(*ipgmod);
@@ -167,7 +167,7 @@ test_free_call()
 	auto llvmmod = setup(ctx);
 	jlm::print(*llvmmod);
 
-	auto ipgmod = jlm::convert_module(*llvmmod);
+	auto ipgmod = jlm::ConvertLlvmModule(*llvmmod);
 	jlm::print(*ipgmod, stdout);
 
 	verify(*ipgmod);
@@ -183,4 +183,4 @@ test()
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/llvm-jlm/test-function-call", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-function-call", test)

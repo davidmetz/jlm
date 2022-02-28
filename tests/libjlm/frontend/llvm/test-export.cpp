@@ -8,7 +8,7 @@
 
 #include <jive/view.hpp>
 
-#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/InterProceduralGraphConversion.hpp>
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/util/Statistics.hpp>
@@ -23,7 +23,13 @@ test()
 
 	ipgraph_module im(filepath(""), "", "");
 
-	auto d = data_node::create(im.ipgraph(), "d", vt, linkage::external_linkage, false);
+	auto d = data_node::Create(
+    im.ipgraph(),
+    "d",
+    vt,
+    linkage::external_linkage,
+    "",
+    false);
 	auto f = function_node::create(im.ipgraph(), "f", ft, linkage::external_linkage);
 
 	im.create_global_value(d);
@@ -44,4 +50,4 @@ test()
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/jlm-rvsdg/test-export", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-export", test)

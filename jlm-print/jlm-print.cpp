@@ -5,14 +5,13 @@
 
 #include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
 #include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
-#include <jlm/frontend/llvm/llvm2jlm/module.hpp>
-#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/LlvmModuleConversion.hpp>
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/print.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 #include <jlm/util/Statistics.hpp>
 
-#include <jive/rvsdg/graph.hpp>
 #include <jive/view.hpp>
 
 #include <llvm/IR/LLVMContext.h>
@@ -174,7 +173,7 @@ main (int argc, char ** argv)
 	}
 
 	/* LLVM to JLM pass */
-	auto jm = jlm::convert_module(*lm);
+	auto jm = jlm::ConvertLlvmModule(*lm);
 	if (flags.l2j)
 		jlm::print(*jm, stdout);
 	if (flags.l2jdot)

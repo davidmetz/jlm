@@ -3,10 +3,10 @@
  * See COPYING for terms of redistribution.
  */
 
-#ifndef JLM_FRONTEND_LLVM_LLVM2JLM_CONTEXT_HPP
-#define JLM_FRONTEND_LLVM_LLVM2JLM_CONTEXT_HPP
+#ifndef JLM_FRONTEND_LLVM_LLVM2JLM_LLVMCONVERSIONCONTEXT_HPP
+#define JLM_FRONTEND_LLVM_LLVM2JLM_LLVMCONVERSIONCONTEXT_HPP
 
-#include <jlm/frontend/llvm/llvm2jlm/type.hpp>
+#include <jlm/frontend/llvm/LlvmTypeConversion.hpp>
 #include <jlm/ir/cfg-node.hpp>
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/tac.hpp>
@@ -206,7 +206,7 @@ public:
 		auto dcl = jive::rcddeclaration::create();
 		declarations_[type] = dcl.get();
 		for (size_t n = 0; n < type->getNumElements(); n++)
-			dcl->append(*convert_type(type->getElementType(n), *this));
+			dcl->append(*ConvertType(type->getElementType(n), *this));
 
 		dcls.push_back(std::move(dcl));
 		return declarations_[type];

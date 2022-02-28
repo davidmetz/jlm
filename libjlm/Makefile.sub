@@ -2,18 +2,17 @@
 # See COPYING for terms of redistribution.
 
 ifdef CIRCT_LLVM
-$(info Support for LLVM 14 and CIRCT enabled)
-$(shell echo "#include \"mlirgen-circt.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
-LLVM_VER_SRC = \
-libjlm/src/backend/hls/rhls2firrtl/mlirgen.cpp \
-libjlm/src/frontend/llvm/llvm2jlm/module-llvm14.cpp \
-libjlm/src/frontend/llvm/llvm2jlm/instruction-llvm14.cpp
+  $(info Support for LLVM 14 and CIRCT enabled)
+  $(shell echo "#include \"mlirgen-circt.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
+  LLVM_VER_SRC = \
+    libjlm/src/frontend/llvm/LlvmModuleConversion-llvm14.cpp \
+    libjlm/src/backend/hls/rhls2firrtl/mlirgen.cpp
+
 else
-$(info Support for LLVM 11 enabled)
-$(shell echo "#include \"mlirgen-llvm.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
-LLVM_VER_SRC = \
-libjlm/src/frontend/llvm/llvm2jlm/module.cpp \
-libjlm/src/frontend/llvm/llvm2jlm/instruction.cpp
+  $(info Support for LLVM 13 enabled)
+  $(shell echo "#include \"mlirgen-llvm.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
+  LLVM_VER_SRC = \
+    libjlm/src/frontend/llvm/LlvmModuleConversion.cpp
 endif
 
 LIBJLM_SRC = \
@@ -27,9 +26,10 @@ LIBJLM_SRC = \
 	libjlm/src/driver/command.cpp \
 	libjlm/src/driver/passgraph.cpp \
 	\
-	libjlm/src/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.cpp \
-	libjlm/src/frontend/llvm/jlm2rvsdg/restructuring.cpp \
-	libjlm/src/frontend/llvm/llvm2jlm/type.cpp \
+	libjlm/src/frontend/llvm/ControlFlowRestructuring.cpp \
+	libjlm/src/frontend/llvm/InterProceduralGraphConversion.cpp \
+	libjlm/src/frontend/llvm/LlvmInstructionConversion.cpp \
+	libjlm/src/frontend/llvm/LlvmTypeConversion.cpp \
 	\
 	libjlm/src/ir/aggregation.cpp \
 	libjlm/src/ir/Annotation.cpp \

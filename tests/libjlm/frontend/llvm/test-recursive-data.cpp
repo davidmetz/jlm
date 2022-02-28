@@ -9,7 +9,7 @@
 
 #include <jive/view.hpp>
 
-#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
+#include <jlm/frontend/llvm/InterProceduralGraphConversion.hpp>
 #include <jlm/ir/ipgraph-module.hpp>
 #include <jlm/ir/print.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
@@ -23,10 +23,28 @@ test()
 	valuetype vt;
 	ipgraph_module im(filepath(""), "", "");
 
-	auto d0 = data_node::create(im.ipgraph(), "d0", vt, linkage::external_linkage, false);
+	auto d0 = data_node::Create(
+    im.ipgraph(),
+    "d0",
+    vt,
+    linkage::external_linkage,
+    "",
+    false);
 
-	auto d1 = data_node::create(im.ipgraph(), "d1", vt, linkage::external_linkage, false);
-	auto d2 = data_node::create(im.ipgraph(), "d2", vt, linkage::external_linkage, false);
+	auto d1 = data_node::Create(
+    im.ipgraph(),
+    "d1",
+    vt,
+    linkage::external_linkage,
+    "",
+    false);
+	auto d2 = data_node::Create(
+    im.ipgraph(),
+    "d2",
+    vt,
+    linkage::external_linkage,
+    "",
+    false);
 
 	auto v0 = im.create_global_value(d0);
 	auto v1 = im.create_global_value(d1);
@@ -52,4 +70,4 @@ test()
 	return 0;
 }
 
-JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/jlm-rvsdg/test-recursive-data", test)
+JLM_UNIT_TEST_REGISTER("libjlm/frontend/llvm/test-recursive-data", test)

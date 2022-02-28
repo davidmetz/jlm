@@ -3,8 +3,8 @@
  * See COPYING for terms of redistribution.
  */
 
-#include <jlm/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.hpp>
-#include <jlm/frontend/llvm/jlm2rvsdg/restructuring.hpp>
+#include <jlm/frontend/llvm/ControlFlowRestructuring.hpp>
+#include <jlm/frontend/llvm/InterProceduralGraphConversion.hpp>
 
 #include <jlm/ir/aggregation.hpp>
 #include <jlm/ir/Annotation.hpp>
@@ -987,7 +987,7 @@ RestructureControlFlowGraph(
 {
   auto restructureControlFlowGraph = [](jlm::cfg * controlFlowGraph)
   {
-    restructure(controlFlowGraph);
+    RestructureControlFlow(controlFlowGraph);
     straighten(*controlFlowGraph);
   };
 
@@ -1161,11 +1161,12 @@ ConvertDataNode(
     /*
      * data node with initialization
      */
-    auto deltaNode = delta::node::create(
+    auto deltaNode = delta::node::Create(
       &region,
       dataNode.type(),
       dataNode.name(),
       dataNode.linkage(),
+      dataNode.Section(),
       dataNode.constant());
     auto & outerVariableMap = regionalizedVariableMap.GetTopVariableMap();
     regionalizedVariableMap.PushRegion(*deltaNode->subregion());
