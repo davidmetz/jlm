@@ -14,9 +14,10 @@ add_library(jlm STATIC
         src/driver/command.cpp
         src/driver/passgraph.cpp
 
-        src/frontend/llvm/jlm2rvsdg/InterProceduralGraphConversion.cpp
-        src/frontend/llvm/jlm2rvsdg/restructuring.cpp
-        src/frontend/llvm/llvm2jlm/type.cpp
+        src/frontend/llvm/ControlFlowRestructuring.cpp
+        src/frontend/llvm/InterProceduralGraphConversion.cpp
+        src/frontend/llvm/LlvmInstructionConversion.cpp
+        src/frontend/llvm/LlvmTypeConversion.cpp
 
         src/ir/aggregation.cpp
         src/ir/Annotation.cpp
@@ -85,8 +86,7 @@ add_library(jlm STATIC
 
         # TODO: make conditional
         src/backend/hls/rhls2firrtl/mlirgen.cpp
-        src/frontend/llvm/llvm2jlm/module-llvm14.cpp
-        src/frontend/llvm/llvm2jlm/instruction-llvm14.cpp
+        src/frontend/llvm/LlvmModuleConversion-llvm14.cpp
         )
 
 target_link_libraries(jlm jive)
