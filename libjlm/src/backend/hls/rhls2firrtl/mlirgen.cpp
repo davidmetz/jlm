@@ -94,8 +94,10 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto input1 = GetSubfield(body, inBundles[1], 2);
 		auto bitsOp = AddBitsOp(body, input1, 7, 0);
 		auto op = AddDShlOp(body, input0, bitsOp);
+        int outSize = JlmSize(&node->output(0)->type());
+        auto slice = AddBitsOp(body, op, outSize - 1, 0);
 		// Connect the op to the output data
-		Connect(body, outData, op);
+		Connect(body, outData, slice);
 	} else if (dynamic_cast<const jive::bitsmod_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
@@ -174,9 +176,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (auto op = dynamic_cast<const jive::match_op *>(&(node->operation()))) {
 		auto inData = GetSubfield(body, inBundles[0], 2);
 		auto outData = GetSubfield(body, outBundle, 2);
+        int inSize = JlmSize(&node->input(0)->type());
+        int outSize = JlmSize(&node->output(0)->type());
 		if (IsIdentityMapping(*op)) {
-            int inSize = JlmSize(&node->input(0)->type());
-            int outSize = JlmSize(&node->output(0)->type());
             if(inSize == outSize){
                 Connect(body, outData, inData);
             } else{
@@ -190,6 +192,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
                 auto value = GetConstant(body, size, it->second);
                 result = AddMuxOp(body, comparison, value, result);
 			}
+            if(outSize != size){
+                result = AddBitsOp(body, result, outSize-1, 0);
+            }
             Connect(body,outData,result);
 		}
 	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
