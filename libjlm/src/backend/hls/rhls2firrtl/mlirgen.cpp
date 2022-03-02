@@ -1093,7 +1093,8 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 	auto region = arg->region();
 	auto node = region->node();
 	if (dynamic_cast<hls::loop_node *>(node)) {
-		// Check if the argument is connected to an input
+		// Check if the argument is connected to an input,
+		// i.e., if the argument exits the region
 		if (arg->input() != nullptr) {
 			// Check if we are in a nested region and directly
 			// connected to the outer regions argument
@@ -1101,6 +1102,10 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 			if (auto o = dynamic_cast<jive::argument *>(origin)) {
 				// Need to find the source of the outer regions argument
 				return TraceArgument(o);
+			} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+				// Check if we the input of one loop_node is connected to the output of another structural_node,
+				// i.e., if the input is connected to the output of another loop_node
+				return TraceStructuralOutput(o);
 			}
 			// Else we have reached the source
 			return origin;
