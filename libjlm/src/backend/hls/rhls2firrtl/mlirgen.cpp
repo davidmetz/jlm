@@ -145,7 +145,6 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		Connect(body, outData, input0);
 	} else if (dynamic_cast<const jlm::trunc_op *>(&(node->operation()))) {
         auto inData = GetSubfield(body, inBundles[0], 2);
-        int inSize = JlmSize(&node->input(0)->type());
         int outSize = JlmSize(&node->output(0)->type());
         Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
