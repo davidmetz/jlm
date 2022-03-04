@@ -35,17 +35,18 @@
 #include <jlm/backend/hls/rvsdg2rhls/add-buffers.hpp>
 #include <jlm/ir/operators/theta.hpp>
 #include <jlm/util/Statistics.hpp>
+#include "jlm/opt/DeadNodeElimination.hpp"
 
 void
 pre_opt(jlm::RvsdgModule &rm) {
 	// TODO: figure out which optimizations to use here
-//	jlm::dne dne;
+	jlm::DeadNodeElimination dne;
 	jlm::cne cne;
 	jlm::ivr ivr;
 	jlm::tginversion tgi;
 	jlm::StatisticsDescriptor sd;
 	tgi.run(rm, sd);
-//	dne.run(rm, sd);
+	dne.run(rm, sd);
 	cne.run(rm, sd);
 	ivr.run(rm, sd);
 }
