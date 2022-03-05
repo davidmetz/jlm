@@ -51,13 +51,13 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddAndOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
-	}  else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
 		auto op = AddXorOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
-	}   else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
 		auto op = AddOrOp(body, input0, input1);
@@ -94,8 +94,8 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto input1 = GetSubfield(body, inBundles[1], 2);
 		auto bitsOp = AddBitsOp(body, input1, 7, 0);
 		auto op = AddDShlOp(body, input0, bitsOp);
-        int outSize = JlmSize(&node->output(0)->type());
-        auto slice = AddBitsOp(body, op, outSize - 1, 0);
+		int outSize = JlmSize(&node->output(0)->type());
+		auto slice = AddBitsOp(body, op, outSize - 1, 0);
 		// Connect the op to the output data
 		Connect(body, outData, slice);
 	} else if (dynamic_cast<const jive::bitsmod_op *>(&(node->operation()))) {
@@ -146,9 +146,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		Connect(body, outData, input0);
 	} else if (dynamic_cast<const jlm::trunc_op *>(&(node->operation()))) {
-        auto inData = GetSubfield(body, inBundles[0], 2);
-        int outSize = JlmSize(&node->output(0)->type());
-        Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
+		auto inData = GetSubfield(body, inBundles[0], 2);
+		int outSize = JlmSize(&node->output(0)->type());
+		Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto sintOp = AddAsSIntOp(body, input0);
@@ -176,26 +176,26 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (auto op = dynamic_cast<const jive::match_op *>(&(node->operation()))) {
 		auto inData = GetSubfield(body, inBundles[0], 2);
 		auto outData = GetSubfield(body, outBundle, 2);
-        int inSize = JlmSize(&node->input(0)->type());
-        int outSize = JlmSize(&node->output(0)->type());
+		int inSize = JlmSize(&node->input(0)->type());
+		int outSize = JlmSize(&node->output(0)->type());
 		if (IsIdentityMapping(*op)) {
-            if(inSize == outSize){
-                Connect(body, outData, inData);
-            } else{
-                Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
-            }
+			if(inSize == outSize){
+				Connect(body, outData, inData);
+			} else{
+				Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
+			}
 		} else {
-            auto size = op->nbits();
+			auto size = op->nbits();
 			mlir::Value result = GetConstant(body, size, op->default_alternative());
 			for (auto it = op->begin(); it != op->end(); it++) {
-                auto comparison = AddEqOp(body, inData, GetConstant(body, size, it->first));
-                auto value = GetConstant(body, size, it->second);
-                result = AddMuxOp(body, comparison, value, result);
+				auto comparison = AddEqOp(body, inData, GetConstant(body, size, it->first));
+				auto value = GetConstant(body, size, it->second);
+				result = AddMuxOp(body, comparison, value, result);
 			}
-            if(outSize != size){
-                result = AddBitsOp(body, result, outSize-1, 0);
-            }
-            Connect(body,outData,result);
+			if((unsigned long) outSize != size){
+				result = AddBitsOp(body, result, outSize-1, 0);
+			}
+			Connect(body,outData,result);
 		}
 	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
 		// Start of with base pointer
@@ -224,6 +224,8 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		}
 		auto asUInt = AddAsUIntOp(body, result);
 		Connect(body, outData, AddBitsOp(body, asUInt, 63, 0));
+	} else if (dynamic_cast<const jlm::undef_constant_op *>(&(node->operation()))) {
+		Connect(body, outData, GetConstant(body, 1, 0));
 	} else {
 		throw std::logic_error("Simple node " + node->operation().debug_string() + " not implemented!");
 	}
@@ -357,203 +359,200 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 
 circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
-    // Create the module and its input/output ports
-    auto module = nodeToModule(node, true);
-    auto body = module.getBody();
+	// Create the module and its input/output ports
+	auto module = nodeToModule(node, true);
+	auto body = module.getBody();
 
-    // Check if it's a load or store operation
-    bool store = dynamic_cast<const jlm::store_op *>(&(node->operation()));
+	// Check if it's a load or store operation
+	bool store = dynamic_cast<const jlm::store_op *>(&(node->operation()));
 
-    InitializeMemReq(module);
+	InitializeMemReq(module);
 
-    int argument = 2;
-    // Input signals
-    auto inBundle0 = module.getArgument(argument++);
-    auto inReady0 = GetSubfield(body, inBundle0, 0);
-    auto inValid0 = GetSubfield(body, inBundle0, 1);
-    auto inData0  = GetSubfield(body, inBundle0, 2);
+	int argument = 2;
+	// Input signals
+	auto inBundle0 = module.getArgument(argument++);
+	auto inReady0 = GetSubfield(body, inBundle0, 0);
+	auto inValid0 = GetSubfield(body, inBundle0, 1);
+	auto inData0  = GetSubfield(body, inBundle0, 2);
 
-    auto inBundle1 = module.getArgument(argument++);
-    auto inReady1 = GetSubfield(body, inBundle1, 0);
-    auto inValid1 = GetSubfield(body, inBundle1, 1);
-    auto inData1  = GetSubfield(body, inBundle1, 2);
+	auto inBundle1 = module.getArgument(argument++);
+	auto inReady1 = GetSubfield(body, inBundle1, 0);
+	auto inValid1 = GetSubfield(body, inBundle1, 1);
+	auto inData1  = GetSubfield(body, inBundle1, 2);
 
-    // Stores also have a data input that needs to be handled
-    // The input is not used by loads but code below reference
-    // these variables so we need to define them
-    mlir::BlockArgument inBundle2 = NULL;
-    circt::firrtl::SubfieldOp inReady2 = NULL;
-    circt::firrtl::SubfieldOp inValid2 = NULL;
-    circt::firrtl::SubfieldOp inData2 = NULL;
-    if (store) {
-	    inBundle2 = module.getArgument(argument++);
-	    inReady2 = GetSubfield(body, inBundle2, 0);
-	    inValid2 = GetSubfield(body, inBundle2, 1);
-	    inData2  = GetSubfield(body, inBundle2, 2);
-    }
+	// Stores also have a data input that needs to be handled
+	// The input is not used by loads but code below reference
+	// these variables so we need to define them
+	mlir::BlockArgument inBundle2 = NULL;
+	circt::firrtl::SubfieldOp inReady2 = NULL;
+	circt::firrtl::SubfieldOp inValid2 = NULL;
+	circt::firrtl::SubfieldOp inData2 = NULL;
+	if (store) {
+		inBundle2 = module.getArgument(argument++);
+		inReady2 = GetSubfield(body, inBundle2, 0);
+		inValid2 = GetSubfield(body, inBundle2, 1);
+		inData2  = GetSubfield(body, inBundle2, 2);
+	}
 
-    // Output signals
-    auto outBundle0 = module.getArgument(argument++);
-    auto outReady0 = GetSubfield(body, outBundle0, 0);
-    auto outValid0 = GetSubfield(body, outBundle0, 1);
-    auto outData0  = GetSubfield(body, outBundle0, 2);
+	// Output signals
+	auto outBundle0 = module.getArgument(argument++);
+	auto outReady0 = GetSubfield(body, outBundle0, 0);
+	auto outValid0 = GetSubfield(body, outBundle0, 1);
+	auto outData0  = GetSubfield(body, outBundle0, 2);
 
-    auto outBundle1 = module.getArgument(argument++);
-    auto outReady1 = GetSubfield(body, outBundle1, 0);
-    auto outValid1 = GetSubfield(body, outBundle1, 1);
-    auto outData1  = GetSubfield(body, outBundle1, 2);
+	auto outBundle1 = module.getArgument(argument++);
+	auto outReady1 = GetSubfield(body, outBundle1, 0);
+	auto outValid1 = GetSubfield(body, outBundle1, 1);
+	auto outData1  = GetSubfield(body, outBundle1, 2);
 
-    // Mem signals
-    auto args = module.getArguments().size();
-    mlir::BlockArgument memReq = module.getArgument(args - 2);
-    mlir::BlockArgument memRes = module.getArgument(args - 1);
+	// Mem signals
+	auto args = module.getArguments().size();
+	mlir::BlockArgument memReq = module.getArgument(args - 2);
+	mlir::BlockArgument memRes = module.getArgument(args - 1);
 
-    auto memReqReady = GetSubfield(body, memReq, 0);
-    auto memReqValid = GetSubfield(body, memReq, 1);
-    auto memReqAddr  = GetSubfield(body, memReq, 2);
-    auto memReqData  = GetSubfield(body, memReq, 3);
-    auto memReqWrite = GetSubfield(body, memReq, 4);
-    auto memReqWidth = GetSubfield(body, memReq, 5);
+	auto memReqReady = GetSubfield(body, memReq, 0);
+	auto memReqValid = GetSubfield(body, memReq, 1);
+	auto memReqAddr  = GetSubfield(body, memReq, 2);
+	auto memReqData  = GetSubfield(body, memReq, 3);
+	auto memReqWrite = GetSubfield(body, memReq, 4);
+	auto memReqWidth = GetSubfield(body, memReq, 5);
 
-    auto memResValid = GetSubfield(body, memRes, 0);
-    auto memResData  = GetSubfield(body, memRes, 1);
+	auto memResValid = GetSubfield(body, memRes, 0);
+	auto memResData  = GetSubfield(body, memRes, 1);
 
+	auto clock = GetClockSignal(module);
+	auto reset = GetResetSignal(module);
+	auto zeroBitValue = GetConstant(body, 1, 0);
+	auto oneBitValue = GetConstant(body, 1, 1);
 
-    auto clock = GetClockSignal(module);
-    auto reset = GetResetSignal(module);
-    auto zeroBitValue = GetConstant(body, 1, 0);
-    auto oneBitValue = GetConstant(body, 1, 1);
+	// Registers
+	llvm::SmallVector<circt::firrtl::RegResetOp> oValidRegs;
+	llvm::SmallVector<circt::firrtl::RegResetOp> oDataRegs;
+	for (size_t i=0; i<node->noutputs(); i++) {
+		std::string validName("o");
+		validName.append(std::to_string(i));
+		validName.append("_valid_reg");
+		auto validReg = builder.create<circt::firrtl::RegResetOp>(
+					location,
+					GetIntType(1),
+					clock,
+					reset,
+					zeroBitValue,
+					builder.getStringAttr(validName));
+		body->push_back(validReg);
+		oValidRegs.push_back(validReg);
 
-    // Registers
-    llvm::SmallVector<circt::firrtl::RegResetOp> oValidRegs;
-    llvm::SmallVector<circt::firrtl::RegResetOp> oDataRegs;
-    for (size_t i=0; i<node->noutputs(); i++) {
-        std::string validName("o");
-        validName.append(std::to_string(i));
-        validName.append("_valid_reg");
-        auto validReg = builder.create<circt::firrtl::RegResetOp>(
-                location,
-                GetIntType(1),
-                clock,
-                reset,
-                zeroBitValue,
-                builder.getStringAttr(validName));
-        body->push_back(validReg);
-        oValidRegs.push_back(validReg);
+		auto zeroValue = GetConstant(body, JlmSize(&node->output(i)->type()), 0);
+		std::string dataName("o");
+		dataName.append(std::to_string(i));
+		dataName.append("_data_reg");
+		auto dataReg = builder.create<circt::firrtl::RegResetOp>(
+					location,
+					GetIntType(&node->output(i)->type()),
+					clock,
+					reset,
+					zeroValue,
+					builder.getStringAttr(dataName));
+		body->push_back(dataReg);
+		oDataRegs.push_back(dataReg);
+	}
+	auto sentReg = builder.create<circt::firrtl::RegResetOp>(
+					location,
+					GetIntType(1),
+					clock,
+					reset,
+					zeroBitValue,
+					builder.getStringAttr("sent_reg"));
+	body->push_back(sentReg);
 
-        auto zeroValue = GetConstant(body, JlmSize(&node->output(i)->type()), 0);
-        std::string dataName("o");
-        dataName.append(std::to_string(i));
-        dataName.append("_data_reg");
-        auto dataReg = builder.create<circt::firrtl::RegResetOp>(
-                location,
-                GetIntType(&node->output(i)->type()),
-                clock,
-                reset,
-                zeroValue,
-                builder.getStringAttr(dataName));
-        body->push_back(dataReg);
-        oDataRegs.push_back(dataReg);
-    }
-    auto sentReg = builder.create<circt::firrtl::RegResetOp>(
-            location,
-            GetIntType(1),
-            clock,
-            reset,
-            zeroBitValue,
-            builder.getStringAttr("sent_reg"));
-    body->push_back(sentReg);
+	mlir::Value canRequest = AddNotOp(body, sentReg);
+	canRequest = AddAndOp(body, canRequest, inValid0);
+	canRequest = AddAndOp(body, canRequest, inValid1);
+	if (store) {
+		canRequest = AddAndOp(body, canRequest, inValid2);
+	}
+	for (size_t i = 0; i < node->noutputs(); i++) {
+		canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
+	}
 
-    mlir::Value canRequest = AddNotOp(body, sentReg);
-    canRequest = AddAndOp(body, canRequest, inValid0);
-    canRequest = AddAndOp(body, canRequest, inValid1);
-    if (store) {
-	    canRequest = AddAndOp(body, canRequest, inValid2);
-    }
-    for (size_t i = 0; i < node->noutputs(); i++) {
-	    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
-    }
-    // TODO: named node?
+	// Block until all inputs and no outputs are valid
+	Connect(body, memReqValid, canRequest);
+	Connect(body, memReqAddr, inData0);
 
-    // Block until all inputs and no outputs are valid
-    Connect(body, memReqValid, canRequest);
-    Connect(body, memReqAddr, inData0);
+	int bitWidth;
+	if (store) {
+		Connect(body, memReqWrite, oneBitValue);
+		Connect(body, memReqData, inData1);
+		bitWidth = dynamic_cast<const jive::bittype *>(&node->input(1)->type())->nbits();
+	} else {
+		Connect(body, memReqWrite, zeroBitValue);
+		auto invalid = GetInvalid(body, 32);
+		Connect(body, memReqData, invalid);
+		if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
+			bitWidth = bitType->nbits();
+		} else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
+			bitWidth = 64;
+		} else {
+			throw jlm::error("unknown width for mem request");
+		}
+	}
 
-    int bitWidth;
-    if (store) {
-	    Connect(body, memReqWrite, oneBitValue);
-	    Connect(body, memReqData, inData1);
-	    bitWidth = dynamic_cast<const jive::bittype *>(&node->input(1)->type())->nbits();
-    } else {
-	    Connect(body, memReqWrite, zeroBitValue);
-	    auto invalid = GetInvalid(body, 32);
-	    Connect(body, memReqData, invalid);
-	    if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
-		    bitWidth = bitType->nbits();
-	    } else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
-		    bitWidth = 64;
-	    } else {
-		    throw jlm::error("unknown width for mem request");
-	    }
-    }
+	int log2Bytes = log2(bitWidth / 8);
+	Connect(body, memReqWidth, GetConstant(body, 3, log2Bytes));
 
-    int log2Bytes = log2(bitWidth / 8);
-    // TODO: should this be 4?
-    Connect(body, memReqWidth, GetConstant(body, 3, log2Bytes));
+	// mem_req fire
+	auto whenReqFireOp = AddWhenOp(body, memReqReady, false);
+	auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
+	Connect(whenReqFireBody, sentReg, oneBitValue);
+	if (store) {
+		Connect(whenReqFireBody, oValidRegs[0], oneBitValue);
+		Connect(whenReqFireBody, oDataRegs[0], inData2);
+	} else {
+		Connect(whenReqFireBody, oValidRegs[1], oneBitValue);
+		Connect(whenReqFireBody, oDataRegs[1], inData1);
+	}
 
-    // mem req fire
-    auto whenReqFireOp = AddWhenOp(body, memReqReady, false);
-    auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
-    Connect(whenReqFireBody, sentReg, oneBitValue);
-    if (store) {
-	    Connect(whenReqFireBody, oValidRegs[0], oneBitValue);
-	    Connect(whenReqFireBody, oDataRegs[0], inData2);
-    } else {
-	    Connect(whenReqFireBody, oValidRegs[1], oneBitValue);
-	    Connect(whenReqFireBody, oDataRegs[1], inData1);
-    }
+	// mem_res fire
+	auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, memResValid), false);
+	auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
+	Connect(whenResFireBody, sentReg, zeroBitValue);
+	if (!store) {
+		Connect(whenResFireBody, oValidRegs[0], oneBitValue);
+		if(bitWidth!=64){
+			auto bitsOp = AddBitsOp(whenResFireBody, memResData, bitWidth-1, 0);
+			Connect(whenResFireBody, oDataRegs[0], bitsOp);
+		} else{
+			Connect(whenResFireBody, oDataRegs[0], memResData);
+		}
+	}
 
-    // mem_res fire
-    auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, memResValid), false);
-    auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
-    Connect(whenResFireBody, sentReg, zeroBitValue);
-    if (!store) {
-	    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
-	    if(bitWidth!=64){
-		    auto bitsOp = AddBitsOp(whenResFireBody, memResData, bitWidth-1, 0);
-		    Connect(whenResFireBody, oDataRegs[0], bitsOp);
-	    } else{
-		    Connect(whenResFireBody, oDataRegs[0], memResData);
-	    }
-    }
+	// Handshaking
+	Connect(body, inReady0, memReqReady);
+	Connect(body, inReady1, memReqReady);
+	if (store) {
+		Connect(body, inReady2, memReqReady);
+	}
 
-    // Handshaking
-    Connect(body, inReady0, memReqReady);
-    Connect(body, inReady1, memReqReady);
-    if (store) {
-	    Connect(body, inReady2, memReqReady);
-    }
+	Connect(body, outValid0, oValidRegs[0]);
+	Connect(body, outData0, oDataRegs[0]);
+	auto andOp = AddAndOp(body, outReady0, outValid0);
+	Connect(
+		// When o0 fires
+		AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
+		oValidRegs[0], zeroBitValue
+		);
+	if (!store) {
+		Connect(body, outValid1, oValidRegs[1]);
+		Connect(body, outData1, oDataRegs[1]);
+		auto andOp = AddAndOp(body, outReady1, outValid1);
+		Connect(
+			// When o1 fires
+			AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
+			oValidRegs[1], zeroBitValue
+			);
+	}
 
-    Connect(body, outValid0, oValidRegs[0]);
-    Connect(body, outData0, oDataRegs[0]);
-    auto andOp = AddAndOp(body, outReady0, outValid0);
-    Connect(
-            // When o0 fires
-            AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
-            oValidRegs[0], zeroBitValue
-            );
-    if (!store) {
-	    Connect(body, outValid1, oValidRegs[1]);
-	    Connect(body, outData1, oDataRegs[1]);
-	    auto andOp = AddAndOp(body, outReady1, outValid1);
-	    Connect(
-		    // When o1 fires
-		    AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
-		    oValidRegs[1], zeroBitValue
-            );
-    }
-
-    return module;
+	return module;
 }
 
 circt::firrtl::FModuleOp
@@ -595,8 +594,8 @@ jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
 	auto module = nodeToModule(node);
 	auto body = module.getBody();
 
-    auto clock = GetClockSignal(module);
-    auto reset = GetResetSignal(module);
+	auto clock = GetClockSignal(module);
+	auto reset = GetResetSignal(module);
 
 	// Input signals
 	auto inBundle = module.getArgument(2);
@@ -605,23 +604,17 @@ jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
 	auto inData = GetSubfield(body, inBundle, 2);
         // Output signals
 	auto outBundle = module.getArgument(3);
-//	auto outReady = GetSubfield(body, outBundle, 0);
-//	auto outValid = GetSubfield(body, outBundle, 1);
-//	auto outData  = GetSubfield(body, outBundle, 2);
-
-    Connect(body, outBundle, inBundle);
-    auto trigger = AddAndOp(
-            body,
-            AddAndOp(body, inReady, inValid),
-            AddNotOp(body, reset)
-    );
-    auto pn = dynamic_cast<const jlm::hls::print_op *>(&node->operation());
-    auto formatString = "print node " + std::to_string(pn->id()) + ": %x\n";
-    auto name = "print_node_" + std::to_string(pn->id());
-    auto printValue = AddPadOp(body, inData, 64);
-    llvm::SmallVector<mlir::Value> operands;
-    operands.push_back(printValue);
-    body->push_back(builder.create<circt::firrtl::PrintFOp>(location, clock, trigger, formatString, operands, name));
+	Connect(body, outBundle, inBundle);
+	auto trigger = AddAndOp(body,
+				AddAndOp(body, inReady, inValid),
+				AddNotOp(body, reset));
+	auto pn = dynamic_cast<const jlm::hls::print_op *>(&node->operation());
+	auto formatString = "print node " + std::to_string(pn->id()) + ": %x\n";
+	auto name = "print_node_" + std::to_string(pn->id());
+	auto printValue = AddPadOp(body, inData, 64);
+	llvm::SmallVector<mlir::Value> operands;
+	operands.push_back(printValue);
+	body->push_back(builder.create<circt::firrtl::PrintFOp>(location, clock, trigger, formatString, operands, name));
 	return module;
 }
 
