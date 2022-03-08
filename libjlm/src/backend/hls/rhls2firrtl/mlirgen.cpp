@@ -1411,6 +1411,9 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
 // Emit a circuit
 circt::firrtl::CircuitOp
 jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
+
+    // Ensure consistent naming across runs
+    create_node_names(lambdaNode->subregion());
 	// The same name is used for the circuit and main module
 	auto moduleName = builder.getStringAttr(lambdaNode->name() + "_lambda_mod");
 	// Create the top level FIRRTL circuit
@@ -2132,9 +2135,8 @@ jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node)
 	// We increment a counter for each node that is instantiated
 	// to assure the name is unique while still being relatively
 	// easy to ready (which helps when debugging).
-	std::string append = "_";
-	append.append(std::to_string(unique++));
-	return builder.create<circt::firrtl::InstanceOp>(location, modules[name], strfmt(name, append));
+    auto node_name = get_node_name(node);
+	return builder.create<circt::firrtl::InstanceOp>(location, modules[name], node_name);
 }
 
 circt::firrtl::ConstantOp
@@ -2293,18 +2295,32 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
 	std::string append = "";
 	auto inPorts = node->ninputs();
 	auto outPorts = node->noutputs();
-	if (inPorts) {
-		append.append("_IN");
-		append.append(std::to_string(inPorts));
-		append.append("_W");
-		append.append(std::to_string(JlmSize(&node->input(inPorts-1)->type())));
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+		append.append("_I");
+		append.append(std::to_string(JlmSize(&node->input(i)->type())));
+        append.append("W");
 	}
-	if (outPorts) {
-		append.append("_OUT");
-		append.append(std::to_string(outPorts));
-		append.append("_W");
-		append.append(std::to_string(JlmSize(&node->output(outPorts-1)->type())));
+    for (size_t i = 0; i < node->noutputs(); ++i) {
+		append.append("_O");
+        append.append(std::to_string(JlmSize(&node->output(i)->type())));
+		append.append("W");
 	}
+    if(auto op = dynamic_cast<const jlm::getelementptr_op *>(&node->operation())){
+        const jive::type *pointeeType = &op->pointee_type();
+        for (size_t i = 1; i < node->ninputs(); i++) {
+            int bits = JlmSize(pointeeType);
+            if (dynamic_cast<const jive::bittype *>(pointeeType)) {
+                ;
+            } else if (auto arrayType = dynamic_cast<const jlm::arraytype *>(pointeeType)) {
+                pointeeType = &arrayType->element_type();
+            } else {
+                throw std::logic_error(pointeeType->debug_string() + " pointer not implemented!");
+            }
+            int bytes = bits / 8;
+            append.append("_");
+            append.append(std::to_string(bytes));
+        }
+    }
 	auto name = jive::detail::strfmt("op_", node->operation().debug_string() + append);
 	// Remove characters that are not valid in firrtl module names
 	std::replace_if(name.begin(), name.end(), isForbiddenChar, '_');

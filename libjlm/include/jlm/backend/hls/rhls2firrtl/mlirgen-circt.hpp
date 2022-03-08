@@ -191,10 +191,6 @@ namespace jlm {
 		public:
 			void
 			run(jlm::RvsdgModule &rvsdgModule) {
-				assert(node_map.empty());
-				// Ensure consistent naming across runs
-				create_node_names(get_hls_lambda(rvsdgModule)->subregion());
-
 				// Load the FIRRTLDialect
 				mlir::MLIRContext context;
 				context.getOrLoadDialect<circt::firrtl::FIRRTLDialect>();
