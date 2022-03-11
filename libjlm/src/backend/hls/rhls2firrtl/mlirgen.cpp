@@ -1337,11 +1337,13 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 		Connect(body, memReqReady, GetConstant(body, 1, 0));
 		auto memReqValid = GetSubfield(body, nodeMemReq, 1);
 		auto notOp = AddNotOp(body, previousGranted);
-		previousGranted = AddAndOp(body, notOp, memReqValid);
-		auto whenOp = AddWhenOp(body, previousGranted, false);
-		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
-		// The direction is inverted compared to mem_res
-		Connect(thenBody, mainMemReq, nodeMemReq);
+        auto condition = AddAndOp(body, notOp, memReqValid);
+        auto whenOp = AddWhenOp(body, condition, false);
+        auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+        // The direction is inverted compared to mem_res
+        Connect(thenBody, mainMemReq, nodeMemReq);
+        // update for next iteration
+        previousGranted = AddOrOp(body, previousGranted, memReqValid);
 	}
 
 	// Connect the results of the region
