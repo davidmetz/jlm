@@ -96,7 +96,7 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 	} else if (jive::is<hls::branch_op>(node)) {
 		color = "green";
 	} else if (jive::is<hls::mux_op>(node)) {
-		color = "red";
+		color = "darkred";
 	} else if (jive::is<hls::merge_op>(node)) {
 		color = "pink";
 	} else if (
