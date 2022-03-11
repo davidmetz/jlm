@@ -13,7 +13,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	auto file_name = get_base_file_name(rm);
 	cpp <<
 		"#define TRACE_CHUNK_SIZE 100000\n"
+#ifndef HLS_USE_VCD
 		"#define FST 1\n"
+#endif
 //		"#define HLS_MEM_DEBUG 1\n"
 		"\n"
 		"#include <verilated.h>\n"
@@ -141,6 +143,8 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    top->eval();\n"
 		"    top->mem_res_valid = mem_resp_valid;\n"
 		"    top->mem_res_data = mem_resp_data;\n"
+		"    // dump before trying to access memory\n"
+        "    tfp->dump(main_time * 2);\n"
 		"    if (!top->reset && top->mem_req_valid) {\n"
 		"        mem_resp_valid = true;\n"
 		"        void *addr = (void *) top->mem_req_addr;\n"
@@ -189,12 +193,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    } else {\n"
 		"        mem_resp_valid = false;\n"
 		"    }\n"
-		"    tfp->dump(main_time * 2);\n"
 		"    assert(!Verilated::gotFinish());\n"
 		"    top->clk = 0;\n"
 		"    top->eval();\n"
 		"    tfp->dump(main_time * 2 + 1);\n"
-//		"    tfp->flush();\n"
 		"    main_time++;\n"
 		"}\n"
 		"extern \"C\"\n"// TODO: parameter for linkage type here

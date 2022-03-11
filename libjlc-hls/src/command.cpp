@@ -395,8 +395,11 @@ lllnkcmd::run() const {
 				, " --cc"
 				, " --build"
 				, " --exe"
+#ifndef HLS_USE_VCD
 				, " --trace-fst"
-//				, " --trace"
+#else
+				, " --trace"
+#endif
 				, " -Wno-WIDTH" //divisions otherwise cause errors
 				, " -j"
 				, " -Mdir /tmp/verilator", time(nullptr), "/"
