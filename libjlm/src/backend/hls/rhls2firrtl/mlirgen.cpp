@@ -72,9 +72,12 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
-		auto op = AddDivOp(body, input0, input1);
+        auto sIntOp0 = AddAsSIntOp(body, input0);
+        auto sIntOp1 = AddAsSIntOp(body, input1);
+		auto divOp = AddDivOp(body, sIntOp0, sIntOp1);
+        auto uIntOp = AddAsUIntOp(body, divOp);
 		// Connect the op to the output data
-		PartialConnect(body, outData, op);
+		PartialConnect(body, outData, uIntOp);
 	} else if (dynamic_cast<const jive::bitshr_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
@@ -121,7 +124,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (dynamic_cast<const jive::bitsgt_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
-		auto op = AddGtOp(body, input0, input1);
+        auto sIntOp0 = AddAsSIntOp(body, input0);
+        auto sIntOp1 = AddAsSIntOp(body, input1);
+		auto op = AddGtOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	}  else if (dynamic_cast<const jive::bitult_op *>(&(node->operation()))) {
@@ -133,13 +138,17 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
-		auto op = AddGeqOp(body, input0, input1);
+        auto sIntOp0 = AddAsSIntOp(body, input0);
+        auto sIntOp1 = AddAsSIntOp(body, input1);
+		auto op = AddGeqOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsle_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], 2);
 		auto input1 = GetSubfield(body, inBundles[1], 2);
-		auto op = AddLeqOp(body, input0, input1);
+        auto sIntOp0 = AddAsSIntOp(body, input0);
+        auto sIntOp1 = AddAsSIntOp(body, input1);
+		auto op = AddLeqOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jlm::zext_op *>(&(node->operation()))) {
