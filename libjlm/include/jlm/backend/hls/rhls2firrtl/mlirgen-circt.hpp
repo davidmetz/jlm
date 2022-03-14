@@ -88,6 +88,9 @@ namespace jlm {
 					mlir::Block *body,
 					mlir::Value value,
                     llvm::StringRef fieldName);
+            mlir::BlockArgument GetPort(circt::firrtl::FModuleOp &module, std::string portName);
+            mlir::BlockArgument GetInPort(circt::firrtl::FModuleOp &module, size_t portNr);
+            mlir::BlockArgument GetOutPort(circt::firrtl::FModuleOp &module, size_t portNr);
 			void Connect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			void PartialConnect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			// Primary operations
