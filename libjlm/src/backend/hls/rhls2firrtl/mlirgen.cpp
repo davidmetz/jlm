@@ -24,54 +24,54 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		// Get the input bundle
 		auto bundle = module.getArgument(2+i);
 		// Get the data signal from the bundle
-		GetSubfield(body, bundle, 2);
+		GetSubfield(body, bundle, "data");
 		inBundles.push_back(bundle);
 	}
 
 	// Get the output bundle
 	auto outBundle = module.getArgument(2 + node->ninputs());
 	// Get the data signal from the bundle
-	auto outData = GetSubfield(body, outBundle, 2);
+	auto outData = GetSubfield(body, outBundle, "data");
 
 	if (dynamic_cast<const jive::bitadd_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAddOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsub_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddSubOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitand_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAndOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddXorOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddOrOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddMulOp(body, input0, input1);
 		// Connect the op to the output data
 		PartialConnect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
         auto sIntOp0 = AddAsSIntOp(body, input0);
         auto sIntOp1 = AddAsSIntOp(body, input1);
 		auto divOp = AddDivOp(body, sIntOp0, sIntOp1);
@@ -79,22 +79,22 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		// Connect the op to the output data
 		PartialConnect(body, outData, uIntOp);
 	} else if (dynamic_cast<const jive::bitshr_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddDShrOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitashr_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
 		auto shrOp = AddDShrOp(body, sIntOp0, input1);
 		auto uIntOp = AddAsUIntOp(body, shrOp);
 		// Connect the op to the output data
 		Connect(body, outData, uIntOp);
 	} else if (dynamic_cast<const jive::bitshl_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto bitsOp = AddBitsOp(body, input1, 7, 0);
 		auto op = AddDShlOp(body, input0, bitsOp);
 		int outSize = JlmSize(&node->output(0)->type());
@@ -102,64 +102,64 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		// Connect the op to the output data
 		Connect(body, outData, slice);
 	} else if (dynamic_cast<const jive::bitsmod_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
 		auto sIntOp1 = AddAsSIntOp(body, input1);
 		auto remOp = AddRemOp(body, sIntOp0, sIntOp1);
 		auto uIntOp = AddAsUIntOp(body, remOp);
 		Connect(body, outData, uIntOp);
 	} else if (dynamic_cast<const jive::biteq_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddEqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	}  else if (dynamic_cast<const jive::bitne_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddNeqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsgt_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
         auto sIntOp0 = AddAsSIntOp(body, input0);
         auto sIntOp1 = AddAsSIntOp(body, input1);
 		auto op = AddGtOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	}  else if (dynamic_cast<const jive::bitult_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddLtOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
         auto sIntOp0 = AddAsSIntOp(body, input0);
         auto sIntOp1 = AddAsSIntOp(body, input1);
 		auto op = AddGeqOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsle_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
         auto sIntOp0 = AddAsSIntOp(body, input0);
         auto sIntOp1 = AddAsSIntOp(body, input1);
 		auto op = AddLeqOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
 	} else if (dynamic_cast<const jlm::zext_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
 		Connect(body, outData, input0);
 	} else if (dynamic_cast<const jlm::trunc_op *>(&(node->operation()))) {
-		auto inData = GetSubfield(body, inBundles[0], 2);
+		auto inData = GetSubfield(body, inBundles[0], "data");
 		int outSize = JlmSize(&node->output(0)->type());
 		Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto sintOp = AddAsSIntOp(body, input0);
 		auto padOp = AddPadOp(body, sintOp, op->ndstbits());
 		auto uintOp = AddAsUIntOp(body, padOp);
@@ -176,15 +176,15 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto constant = GetConstant(body, size, value);
 		Connect(body, outData, constant);
 	} else if (dynamic_cast<const jive::bitslt_op *>(&(node->operation()))) {
-		auto input0 = GetSubfield(body, inBundles[0], 2);
-		auto input1 = GetSubfield(body, inBundles[1], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sInt0 = AddAsSIntOp(body, input0);
 		auto sInt1 = AddAsSIntOp(body, input1);
 		auto op = AddLtOp(body, sInt0, sInt1);
 		Connect(body, outData, op);
 	} else if (auto op = dynamic_cast<const jive::match_op *>(&(node->operation()))) {
-		auto inData = GetSubfield(body, inBundles[0], 2);
-		auto outData = GetSubfield(body, outBundle, 2);
+		auto inData = GetSubfield(body, inBundles[0], "data");
+		auto outData = GetSubfield(body, outBundle, "data");
 		int inSize = JlmSize(&node->input(0)->type());
 		int outSize = JlmSize(&node->output(0)->type());
 		if (IsIdentityMapping(*op)) {
@@ -208,7 +208,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		}
 	} else if (auto op = dynamic_cast<const jlm::getelementptr_op *>(&(node->operation()))) {
 		// Start of with base pointer
-		auto input0 = GetSubfield(body, inBundles[0], 2);
+		auto input0 = GetSubfield(body, inBundles[0], "data");
 		mlir::Value result = AddCvtOp(body, input0);
 
 		//TODO: support structs
@@ -223,7 +223,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 				throw std::logic_error(pointeeType->debug_string() + " pointer not implemented!");
 			}
 			// GEP inputs are signed
-			auto input = GetSubfield(body, inBundles[i], 2);
+			auto input = GetSubfield(body, inBundles[i], "data");
 			auto asSInt = AddAsSIntOp(body, input);
 			int bytes = bits / 8;
 			auto constantOp = GetConstant(body, 64, bytes);
@@ -244,19 +244,19 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	mlir::Value prevAnd = oneBitValue;
 	for (size_t i=0; i<node->ninputs(); i++) {
 		auto bundle = inBundles[i];
-		prevAnd = AddAndOp(body, prevAnd, GetSubfield(body, bundle, 1));
+		prevAnd = AddAndOp(body, prevAnd, GetSubfield(body, bundle, "valid"));
 	}
 	// Connect the valide signal to the output bundle
-	auto outValid = GetSubfield(body, outBundle, 1);
+	auto outValid = GetSubfield(body, outBundle, "valid");
 	Connect(body, outValid, prevAnd);
 	
 	// Generate the ready signal
-	auto outReady = GetSubfield(body, outBundle, 0);
+	auto outReady = GetSubfield(body, outBundle, "ready");
 	auto andReady = AddAndOp(body, outReady, prevAnd);
 	// Connect it to the ready signal of the two input bundles
 	for (size_t i=0; i<node->ninputs(); i++) {
 		auto bundle = inBundles[i];
-		auto ready = GetSubfield(body, bundle, 0);
+		auto ready = GetSubfield(body, bundle, "ready");
 		Connect(body, ready, andReady);
 	}
 
@@ -280,7 +280,7 @@ jlm::hls::MLIRGenImpl::MlirGenSink(const jive::simple_node *node) {
 	// Get the input bundle
 	auto bundle = module.getArgument(2);
 	// Get the ready signal from the bundle (first signal in the bundle)
-	auto ready = GetSubfield(body, bundle, 0);
+	auto ready = GetSubfield(body, bundle, "ready");
 	// Connect the constant to the ready signal
 	Connect(body, ready, constant);
 
@@ -295,9 +295,9 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 
 	// Input signals
 	auto inBundle = module.getArgument(2);
-	auto inReady = GetSubfield(body, inBundle, 0);
-	auto inValid = GetSubfield(body, inBundle, 1);
-	auto inData  = GetSubfield(body, inBundle, 2);
+	auto inReady = GetSubfield(body, inBundle, "ready");
+	auto inValid = GetSubfield(body, inBundle, "valid");
+	auto inData  = GetSubfield(body, inBundle, "data");
 
 	//
 	// Output registers
@@ -328,9 +328,9 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 
 		// Get the bundle
 		auto port = module.getArgument(2 + numInputs + i);
-		auto portReady = GetSubfield(body, port, 0);
-		auto portValid = GetSubfield(body, port, 1);
-		auto portData = GetSubfield(body, port, 2);
+		auto portReady = GetSubfield(body, port, "ready");
+		auto portValid = GetSubfield(body, port, "valid");
+		auto portData = GetSubfield(body, port, "data");
 
 		auto notFiredReg = AddNotOp(body, firedReg);
 		auto andOp = AddAndOp(body, inValid, notFiredReg);
@@ -380,14 +380,14 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 	int argument = 2;
 	// Input signals
 	auto inBundle0 = module.getArgument(argument++);
-	auto inReady0 = GetSubfield(body, inBundle0, 0);
-	auto inValid0 = GetSubfield(body, inBundle0, 1);
-	auto inData0  = GetSubfield(body, inBundle0, 2);
+	auto inReady0 = GetSubfield(body, inBundle0, "ready");
+	auto inValid0 = GetSubfield(body, inBundle0, "valid");
+	auto inData0  = GetSubfield(body, inBundle0, "data");
 
 	auto inBundle1 = module.getArgument(argument++);
-	auto inReady1 = GetSubfield(body, inBundle1, 0);
-	auto inValid1 = GetSubfield(body, inBundle1, 1);
-	auto inData1  = GetSubfield(body, inBundle1, 2);
+	auto inReady1 = GetSubfield(body, inBundle1, "ready");
+	auto inValid1 = GetSubfield(body, inBundle1, "valid");
+	auto inData1  = GetSubfield(body, inBundle1, "data");
 
 	// Stores also have a data input that needs to be handled
 	// The input is not used by loads but code below reference
@@ -398,36 +398,36 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 	circt::firrtl::SubfieldOp inData2 = NULL;
 	if (store) {
 		inBundle2 = module.getArgument(argument++);
-		inReady2 = GetSubfield(body, inBundle2, 0);
-		inValid2 = GetSubfield(body, inBundle2, 1);
-		inData2  = GetSubfield(body, inBundle2, 2);
+		inReady2 = GetSubfield(body, inBundle2, "ready");
+		inValid2 = GetSubfield(body, inBundle2, "valid");
+		inData2  = GetSubfield(body, inBundle2, "data");
 	}
 
 	// Output signals
 	auto outBundle0 = module.getArgument(argument++);
-	auto outReady0 = GetSubfield(body, outBundle0, 0);
-	auto outValid0 = GetSubfield(body, outBundle0, 1);
-	auto outData0  = GetSubfield(body, outBundle0, 2);
+	auto outReady0 = GetSubfield(body, outBundle0, "ready");
+	auto outValid0 = GetSubfield(body, outBundle0, "valid");
+	auto outData0  = GetSubfield(body, outBundle0, "data");
 
 	auto outBundle1 = module.getArgument(argument++);
-	auto outReady1 = GetSubfield(body, outBundle1, 0);
-	auto outValid1 = GetSubfield(body, outBundle1, 1);
-	auto outData1  = GetSubfield(body, outBundle1, 2);
+	auto outReady1 = GetSubfield(body, outBundle1, "ready");
+	auto outValid1 = GetSubfield(body, outBundle1, "valid");
+	auto outData1  = GetSubfield(body, outBundle1, "data");
 
 	// Mem signals
 	auto args = module.getArguments().size();
 	mlir::BlockArgument memReq = module.getArgument(args - 2);
 	mlir::BlockArgument memRes = module.getArgument(args - 1);
 
-	auto memReqReady = GetSubfield(body, memReq, 0);
-	auto memReqValid = GetSubfield(body, memReq, 1);
-	auto memReqAddr  = GetSubfield(body, memReq, 2);
-	auto memReqData  = GetSubfield(body, memReq, 3);
-	auto memReqWrite = GetSubfield(body, memReq, 4);
-	auto memReqWidth = GetSubfield(body, memReq, 5);
+	auto memReqReady = GetSubfield(body, memReq, "ready");
+	auto memReqValid = GetSubfield(body, memReq, "valid");
+	auto memReqAddr  = GetSubfield(body, memReq, "addr");
+	auto memReqData  = GetSubfield(body, memReq, "data");
+	auto memReqWrite = GetSubfield(body, memReq, "write");
+	auto memReqWidth = GetSubfield(body, memReq, "width");
 
-	auto memResValid = GetSubfield(body, memRes, 0);
-	auto memResData  = GetSubfield(body, memRes, 1);
+	auto memResValid = GetSubfield(body, memRes, "valid");
+	auto memResData  = GetSubfield(body, memRes, "data");
 
 	auto clock = GetClockSignal(module);
 	auto reset = GetResetSignal(module);
@@ -572,18 +572,18 @@ jlm::hls::MLIRGenImpl::MlirGenTrigger(const jive::simple_node *node) {
 
 	// Input signals
 	auto inBundle0 = module.getArgument(2);
-	auto inReady0 = GetSubfield(body, inBundle0, 0);
-	auto inValid0 = GetSubfield(body, inBundle0, 1);
-	// auto inData0  = GetSubfield(body, inBundle0, 2);
+	auto inReady0 = GetSubfield(body, inBundle0, "ready");
+	auto inValid0 = GetSubfield(body, inBundle0, "valid");
+	// auto inData0  = GetSubfield(body, inBundle0, "data");
 	auto inBundle1 = module.getArgument(3);
-	auto inReady1 = GetSubfield(body, inBundle1, 0);
-	auto inValid1 = GetSubfield(body, inBundle1, 1);
-	auto inData1  = GetSubfield(body, inBundle1, 2);
+	auto inReady1 = GetSubfield(body, inBundle1, "ready");
+	auto inValid1 = GetSubfield(body, inBundle1, "valid");
+	auto inData1  = GetSubfield(body, inBundle1, "data");
         // Output signals
 	auto outBundle = module.getArgument(4);
-	auto outReady = GetSubfield(body, outBundle, 0);
-	auto outValid = GetSubfield(body, outBundle, 1);
-	auto outData  = GetSubfield(body, outBundle, 2);
+	auto outReady = GetSubfield(body, outBundle, "ready");
+	auto outValid = GetSubfield(body, outBundle, "valid");
+	auto outData  = GetSubfield(body, outBundle, "data");
 
 	auto andOp0 = AddAndOp(body, outReady, inValid1);
 	auto andOp1 = AddAndOp(body, outReady, inValid0);
@@ -608,9 +608,9 @@ jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
 
 	// Input signals
 	auto inBundle = module.getArgument(2);
-	auto inReady = GetSubfield(body, inBundle, 0);
-	auto inValid = GetSubfield(body, inBundle, 1);
-	auto inData = GetSubfield(body, inBundle, 2);
+	auto inReady = GetSubfield(body, inBundle, "ready");
+	auto inValid = GetSubfield(body, inBundle, "valid");
+	auto inData = GetSubfield(body, inBundle, "data");
         // Output signals
 	auto outBundle = module.getArgument(3);
 	Connect(body, outBundle, inBundle);
@@ -659,14 +659,14 @@ jlm::hls::MLIRGenImpl::MlirGenPredicationBuffer(const jive::simple_node *node) {
 	body->push_back(dataReg);
 
 	auto inBundle = module.getArgument(2);
-	auto inReady = GetSubfield(body, inBundle, 0);
-	auto inValid = GetSubfield(body, inBundle, 1);
-	auto inData = GetSubfield(body, inBundle, 2);
+	auto inReady = GetSubfield(body, inBundle, "ready");
+	auto inValid = GetSubfield(body, inBundle, "valid");
+	auto inData = GetSubfield(body, inBundle, "data");
 
 	auto outBundle = module.getArgument(3);
-	auto outReady = GetSubfield(body, outBundle, 0);
-	auto outValid = GetSubfield(body, outBundle, 1);
-	auto outData = GetSubfield(body, outBundle, 2);
+	auto outReady = GetSubfield(body, outBundle, "ready");
+	auto outValid = GetSubfield(body, outBundle, "valid");
+	auto outData = GetSubfield(body, outBundle, "data");
 
 	auto orOp = AddOrOp(body, validReg, inValid);
 	Connect(body, outValid, orOp);
@@ -756,14 +756,14 @@ jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
 	}
 
 	auto inBundle = module.getArgument(2);
-	auto inReady = GetSubfield(body, inBundle, 0);
-	auto inValid = GetSubfield(body, inBundle, 1);
-	auto inData = GetSubfield(body, inBundle, 2);
+	auto inReady = GetSubfield(body, inBundle, "ready");
+	auto inValid = GetSubfield(body, inBundle, "valid");
+	auto inData = GetSubfield(body, inBundle, "data");
 
 	auto outBundle = module.getArgument(3);
-	auto outReady = GetSubfield(body, outBundle, 0);
-	auto outValid = GetSubfield(body, outBundle, 1);
-	auto outData = GetSubfield(body, outBundle, 2);
+	auto outReady = GetSubfield(body, outBundle, "ready");
+	auto outValid = GetSubfield(body, outBundle, "valid");
+	auto outData = GetSubfield(body, outBundle, "data");
 
 	// Connect out to buf0
 	Connect(body, outValid, validRegs[0]);
@@ -834,19 +834,19 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 
 	auto inputs = node->ninputs();
 	auto outBundle = module.getArgument(2+inputs);
-	auto outReady = GetSubfield(body, outBundle, 0);
+	auto outReady = GetSubfield(body, outBundle, "ready");
 	// Out valid
-	auto outValid = GetSubfield(body, outBundle, 1);
+	auto outValid = GetSubfield(body, outBundle, "valid");
 	Connect(body, outValid, zeroBitValue);
 	// Out data
 	auto invalid = GetInvalid(body, JlmSize(&node->output(0)->type()));
-	auto outData = GetSubfield(body, outBundle, 2);
+	auto outData = GetSubfield(body, outBundle, "data");
 	Connect(body, outData, invalid);
 	// Input ready 0
 	auto inBundle0 = module.getArgument(2);
-	auto inReady0 = GetSubfield(body, inBundle0, 0);
-	auto inValid0 = GetSubfield(body, inBundle0, 1);
-	auto inData0  = GetSubfield(body, inBundle0, 2);
+	auto inReady0 = GetSubfield(body, inBundle0, "ready");
+	auto inValid0 = GetSubfield(body, inBundle0, "valid");
+	auto inData0  = GetSubfield(body, inBundle0, "data");
 	Connect(body, inReady0, zeroBitValue);
 
 	// Add discard registers
@@ -892,9 +892,9 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 
 	for (size_t i=1; i<inputs; i++) {
 		auto inBundle = module.getArgument(2+i);
-		auto inReady = GetSubfield(body, inBundle, 0);
-		auto inValid = GetSubfield(body, inBundle, 1);
-		auto inData  = GetSubfield(body, inBundle, 2);
+		auto inReady = GetSubfield(body, inBundle, "ready");
+		auto inValid = GetSubfield(body, inBundle, "valid");
+		auto inData  = GetSubfield(body, inBundle, "data");
 
 		Connect(body, inReady, discardWires[i-1]);
 
@@ -944,28 +944,28 @@ jlm::hls::MLIRGenImpl::MlirGenNDMux(const jive::simple_node *node) {
 
 	auto inputs = node->ninputs();
 	auto outBundle = module.getArgument(2+inputs);
-	auto outReady = GetSubfield(body, outBundle, 0);
+	auto outReady = GetSubfield(body, outBundle, "ready");
 	// Out valid
-	auto outValid = GetSubfield(body, outBundle, 1);
+	auto outValid = GetSubfield(body, outBundle, "valid");
 	auto zeroBitValue = GetConstant(body, 1, 0);
 	Connect(body, outValid, zeroBitValue);
 	// Out data
 	auto invalid = GetInvalid(body, JlmSize(&node->output(0)->type()));
-	auto outData = GetSubfield(body, outBundle, 2);
+	auto outData = GetSubfield(body, outBundle, "data");
 	Connect(body, outData, invalid);
 
 	auto inBundle0 = module.getArgument(2);
-	auto inReady0 = GetSubfield(body, inBundle0, 0);
-	auto inValid0 = GetSubfield(body, inBundle0, 1);
+	auto inReady0 = GetSubfield(body, inBundle0, "ready");
+	auto inValid0 = GetSubfield(body, inBundle0, "valid");
 	Connect(body, inReady0, zeroBitValue);
-	auto inData0 = GetSubfield(body, inBundle0, 2);
+	auto inData0 = GetSubfield(body, inBundle0, "data");
 
 	// We have already handled the first input (i.e., i == 0)
 	for (size_t i = 1; i < inputs; i++) {
 		auto inBundle = module.getArgument(2+i);
-		auto inReady = GetSubfield(body, inBundle, 0);
-		auto inValid = GetSubfield(body, inBundle, 1);
-		auto inData = GetSubfield(body, inBundle, 2);
+		auto inReady = GetSubfield(body, inBundle, "ready");
+		auto inValid = GetSubfield(body, inBundle, "valid");
+		auto inData = GetSubfield(body, inBundle, "data");
 		Connect(body, inReady, zeroBitValue);
 		auto constant = GetConstant(body, JlmSize(&node->input(0)->type()), i-1);
 		auto eqOp = AddEqOp(body, inData0, constant);
@@ -990,14 +990,14 @@ jlm::hls::MLIRGenImpl::MlirGenBranch(const jive::simple_node *node) {
 	auto zeroBitValue = GetConstant(body, 1, 0);
 
 	auto inBundle0 = module.getArgument(2);
-	auto inReady0 = GetSubfield(body, inBundle0, 0);
-	auto inValid0 = GetSubfield(body, inBundle0, 1);
-	auto inData0 = GetSubfield(body, inBundle0, 2);
+	auto inReady0 = GetSubfield(body, inBundle0, "ready");
+	auto inValid0 = GetSubfield(body, inBundle0, "valid");
+	auto inData0 = GetSubfield(body, inBundle0, "data");
 
 	auto inBundle1 = module.getArgument(3);
-	auto inReady1 = GetSubfield(body, inBundle1, 0);
-	auto inValid1 = GetSubfield(body, inBundle1, 1);
-	auto inData1 = GetSubfield(body, inBundle1, 2);
+	auto inReady1 = GetSubfield(body, inBundle1, "ready");
+	auto inValid1 = GetSubfield(body, inBundle1, "valid");
+	auto inData1 = GetSubfield(body, inBundle1, "data");
 
 	Connect(body, inReady0, zeroBitValue);
 	Connect(body, inReady1, zeroBitValue);
@@ -1005,9 +1005,9 @@ jlm::hls::MLIRGenImpl::MlirGenBranch(const jive::simple_node *node) {
 	auto invalid = GetInvalid(body, 1);
 	for (size_t i = 0; i < node->noutputs(); i++) {
 		auto outBundle = module.getArgument(4+i);
-		auto outReady = GetSubfield(body, outBundle, 0);
-		auto outValid = GetSubfield(body, outBundle, 1);
-		auto outData = GetSubfield(body, outBundle, 2);
+		auto outReady = GetSubfield(body, outBundle, "ready");
+		auto outValid = GetSubfield(body, outBundle, "valid");
+		auto outData = GetSubfield(body, outBundle, "data");
 		Connect(body, outValid, zeroBitValue);
 		Connect(body, outData, invalid);
 
@@ -1333,9 +1333,9 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 		// (as given by memInstances) that makes a request will be granted.
 		auto mainMemReq = body->getArgument(mainIndex-2);
 		auto nodeMemReq = node->getResult(nodeIndex+1);
-		auto memReqReady = GetSubfield(body, nodeMemReq, 0);
+		auto memReqReady = GetSubfield(body, nodeMemReq, "ready");
 		Connect(body, memReqReady, GetConstant(body, 1, 0));
-		auto memReqValid = GetSubfield(body, nodeMemReq, 1);
+		auto memReqValid = GetSubfield(body, nodeMemReq, "valid");
 		auto notOp = AddNotOp(body, previousGranted);
         auto condition = AddAndOp(body, notOp, memReqValid);
         auto whenOp = AddWhenOp(body, condition, false);
@@ -1556,13 +1556,13 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		inputDataRegs.push_back(dataReg);
 
 		auto port = instance.getResult(i+2);
-		auto portValid = GetSubfield(body, port, 1);
+		auto portValid = GetSubfield(body, port, "valid");
 		Connect(body, portValid, validReg);
-		auto portData = GetSubfield(body, port, 2);
+		auto portData = GetSubfield(body, port, "data");
 		Connect(body, portData, dataReg);
 
 		// When statement
-		auto portReady = GetSubfield(body, port, 0);
+		auto portReady = GetSubfield(body, port, "ready");
 		auto whenCondition = AddAndOp(body, portReady, portValid);
 		auto whenOp = AddWhenOp(body, whenCondition, false);
 
@@ -1611,7 +1611,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		// Get the bundle
 		auto port = instance.getResult(2 + numInputs + i);
 
-		auto portReady = GetSubfield(body, port, 0);
+		auto portReady = GetSubfield(body, port, "ready");
 		auto notValidReg = builder.create<circt::firrtl::NotPrimOp>(
 				location,
 				circt::firrtl::IntType::get(builder.getContext(), false, 1),
@@ -1620,8 +1620,8 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		Connect(body, portReady, notValidReg);
 
 		// When statement
-		auto portValid = GetSubfield(body, port, 1);
-		auto portData = GetSubfield(body, port, 2);
+		auto portValid = GetSubfield(body, port, "valid");
+		auto portData = GetSubfield(body, port, "data");
 		auto whenCondition = AddAndOp(body, portReady, portValid);
 		auto whenOp = AddWhenOp(body, whenCondition, false);
 
@@ -1645,7 +1645,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		
 	}
 	auto inBundle = body->getArgument(2);
-	auto inReady = GetSubfield(body, inBundle, 0);
+	auto inReady = GetSubfield(body, inBundle, "ready");
 	Connect(body, inReady, prevAnd);
 
 	// Create the valid signal for the output bundle
@@ -1656,7 +1656,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		
 	}
 	auto outBundle = body->getArgument(3);
-	auto outValid = GetSubfield(body, outBundle, 1);
+	auto outValid = GetSubfield(body, outBundle, "valid");
 	Connect(body, outValid, prevAnd);
 
 	// Connect output data signals
@@ -1666,7 +1666,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 	}
 
 	// Input when statement
-	auto inValid = GetSubfield(body, inBundle, 1);
+	auto inValid = GetSubfield(body, inBundle, "valid");
 	auto whenCondition = AddAndOp(body, inReady, inValid);
 	auto whenOp = AddWhenOp(body, whenCondition, false);
 
@@ -1680,7 +1680,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 	}
 
 	// Output when statement
-	auto outReady = GetSubfield(body, outBundle, 0);
+	auto outReady = GetSubfield(body, outBundle, "ready");
 	whenCondition = AddAndOp(body, outReady, outValid);
 	whenOp = AddWhenOp(body, whenCondition, false);
 	// getThenBlock() cause an error during commpilation
@@ -1693,28 +1693,28 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 	// Connect the memory ports
 	auto args = body->getArguments().size();
 	auto memResBundle = body->getArgument(args-1);
-	auto memResValid = GetSubfield(body, memResBundle, 0);
-	auto memResData  = GetSubfield(body, memResBundle, 1);
+	auto memResValid = GetSubfield(body, memResBundle, "valid");
+	auto memResData  = GetSubfield(body, memResBundle, "data");
 
 	auto memReqBundle = body->getArgument(args-2);
-	auto memReqValid = GetSubfield(body, memReqBundle, 1);
-	auto memReqAddr  = GetSubfield(body, memReqBundle, 2);
-	auto memReqData  = GetSubfield(body, memReqBundle, 3);
-	auto memReqWrite = GetSubfield(body, memReqBundle, 4);
-	auto memReqWidth = GetSubfield(body, memReqBundle, 5);
+	auto memReqValid = GetSubfield(body, memReqBundle, "valid");
+	auto memReqAddr  = GetSubfield(body, memReqBundle, "addr");
+	auto memReqData  = GetSubfield(body, memReqBundle, "data");
+	auto memReqWrite = GetSubfield(body, memReqBundle, "write");
+	auto memReqWidth = GetSubfield(body, memReqBundle, "width");
 	
 	auto srArgs = instance.getResults().size();
 	auto srMemResBundle = instance->getResult(srArgs-1);
-	auto srMemResValid = GetSubfield(body, srMemResBundle, 0);
-	auto srMemResData  = GetSubfield(body, srMemResBundle, 1);
+	auto srMemResValid = GetSubfield(body, srMemResBundle, "valid");
+	auto srMemResData  = GetSubfield(body, srMemResBundle, "data");
 
 	auto srMemReqBundle = instance->getResult(srArgs-2);
-	auto srMemReqReady = GetSubfield(body, srMemReqBundle, 0);
-	auto srMemReqValid = GetSubfield(body, srMemReqBundle, 1);
-	auto srMemReqAddr  = GetSubfield(body, srMemReqBundle, 2);
-	auto srMemReqData  = GetSubfield(body, srMemReqBundle, 3);
-	auto srMemReqWrite = GetSubfield(body, srMemReqBundle, 4);
-	auto srMemReqWidth = GetSubfield(body, srMemReqBundle, 5);
+	auto srMemReqReady = GetSubfield(body, srMemReqBundle, "ready");
+	auto srMemReqValid = GetSubfield(body, srMemReqBundle, "valid");
+	auto srMemReqAddr  = GetSubfield(body, srMemReqBundle, "addr");
+	auto srMemReqData  = GetSubfield(body, srMemReqBundle, "data");
+	auto srMemReqWrite = GetSubfield(body, srMemReqBundle, "write");
+	auto srMemReqWidth = GetSubfield(body, srMemReqBundle, "width");
 
 	Connect(body, srMemResValid, memResValid);
 	Connect(body, srMemResData,  memResData);
@@ -1865,6 +1865,13 @@ jlm::hls::MLIRGenImpl::AddBundlePort(
 circt::firrtl::SubfieldOp
 jlm::hls::MLIRGenImpl::GetSubfield(mlir::Block *body, mlir::Value value, int index) {
 	auto subfield = builder.create<circt::firrtl::SubfieldOp>(location, value, index);
+	body->push_back(subfield);
+	return subfield;
+}
+
+circt::firrtl::SubfieldOp
+jlm::hls::MLIRGenImpl::GetSubfield(mlir::Block *body, mlir::Value value, llvm::StringRef fieldName) {
+	auto subfield = builder.create<circt::firrtl::SubfieldOp>(location, value, fieldName);
 	body->push_back(subfield);
 	return subfield;
 }
@@ -2225,11 +2232,11 @@ jlm::hls::MLIRGenImpl::InitializeMemReq(circt::firrtl::FModuleOp module) {
 	auto invalid3 = GetInvalid(body, 3);
 	auto invalid64 = GetInvalid(body, 64);
 	
-	auto memValid = GetSubfield(body, mem, 1);
-	auto memAddr  = GetSubfield(body, mem, 2);
-	auto memData  = GetSubfield(body, mem, 3);
-	auto memWrite = GetSubfield(body, mem, 4);
-	auto memWidth = GetSubfield(body, mem, 5);
+	auto memValid = GetSubfield(body, mem, "valid");
+	auto memAddr  = GetSubfield(body, mem, "addr");
+	auto memData  = GetSubfield(body, mem, "data");
+	auto memWrite = GetSubfield(body, mem, "write");
+	auto memWidth = GetSubfield(body, mem, "width");
 
 	Connect(body, memValid, zeroBitValue);
 	Connect(body, memAddr,  invalid64);

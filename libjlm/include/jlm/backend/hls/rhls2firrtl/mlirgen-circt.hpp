@@ -84,6 +84,10 @@ namespace jlm {
 					mlir::Block *body,
 					mlir::Value value,
 					int index);
+			circt::firrtl::SubfieldOp GetSubfield(
+					mlir::Block *body,
+					mlir::Value value,
+                    llvm::StringRef fieldName);
 			void Connect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			void PartialConnect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			// Primary operations
