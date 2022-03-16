@@ -233,7 +233,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		}
 		auto asUInt = AddAsUIntOp(body, result);
 		Connect(body, outData, AddBitsOp(body, asUInt, 63, 0));
-	} else if (dynamic_cast<const jlm::undef_constant_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::UndefValueOperation *>(&(node->operation()))) {
 		Connect(body, outData, GetConstant(body, 1, 0));
 	} else {
 		throw std::logic_error("Simple node " + node->operation().debug_string() + " not implemented!");
@@ -373,7 +373,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 	auto body = module.getBody();
 
 	// Check if it's a load or store operation
-	bool store = dynamic_cast<const jlm::store_op *>(&(node->operation()));
+	bool store = dynamic_cast<const jlm::StoreOperation *>(&(node->operation()));
 
 	InitializeMemReq(module);
 	// Input signals
@@ -492,7 +492,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 		Connect(body, memReqData, invalid);
 		if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
 			bitWidth = bitType->nbits();
-		} else if (dynamic_cast<const jlm::ptrtype *>(&node->output(0)->type())) {
+		} else if (dynamic_cast<const jlm::PointerType *>(&node->output(0)->type())) {
 			bitWidth = 64;
 		} else {
 			throw jlm::error("unknown width for mem request");
@@ -1030,9 +1030,9 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenSink(node);
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
 		return MlirGenFork(node);
-	} else if (dynamic_cast<const jlm::load_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::LoadOperation *>(&(node->operation()))) {
 		return MlirGenMem(node);
-	} else if (dynamic_cast<const jlm::store_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::StoreOperation *>(&(node->operation()))) {
 		return MlirGenMem(node);
 	} else if (dynamic_cast<const hls::predicate_buffer_op *>(&(node->operation()))) {
 		return MlirGenPredicationBuffer(node);
@@ -1215,9 +1215,9 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 
 		// Memory instances will need to be connected to the main memory ports
 		// So we keep track of them to handle them later
-		if (dynamic_cast<const jlm::load_op *>(&(rvsdgNode->operation()))) {
+		if (dynamic_cast<const jlm::LoadOperation *>(&(rvsdgNode->operation()))) {
 		  memInstances.insert(instance);
-		} else if (dynamic_cast<const jlm::store_op *>(&(rvsdgNode->operation()))) {
+		} else if (dynamic_cast<const jlm::StoreOperation *>(&(rvsdgNode->operation()))) {
 		  memInstances.insert(instance);
 		}
 
@@ -1249,7 +1249,7 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 				// If the source is a load operation then its output will be
 				// 64 bits wide. The default width of operations is 32 bits so
 				// the port widths will differ and cause errors.
-				if (dynamic_cast<const jlm::load_op *>(&(source->operation())))
+				if (dynamic_cast<const jlm::LoadOperation *>(&(source->operation())))
 					PartialConnect(body, sinkPort, sourcePort);
 				else
 					Connect(body, sinkPort, sourcePort);
@@ -1281,7 +1281,7 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 					// If the source is a load operation then its output will be
 					// 64 bits wide. The default width of operations is 32 bits so
 					// the port widths will differ and cause errors.
-					if (dynamic_cast<const jlm::load_op *>(&(source->operation())))
+					if (dynamic_cast<const jlm::LoadOperation *>(&(source->operation())))
 						PartialConnect(body, sinkPort, sourcePort);
 					else
 						Connect(body, sinkPort, sourcePort);

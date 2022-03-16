@@ -14,7 +14,7 @@ namespace jlm{
 	namespace hls{
 		static inline bool is_constant(const jive::node *node) {
 			return jive::is<jive::bitconstant_op>(node) ||
-				   jive::is<jlm::undef_constant_op>(node) ||
+				   jive::is<jlm::UndefValueOperation>(node) ||
 				   jive::is<jive::ctlconstant_op>(node);
 		}
 

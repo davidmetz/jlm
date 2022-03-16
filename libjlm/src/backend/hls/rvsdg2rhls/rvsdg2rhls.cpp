@@ -64,10 +64,10 @@ namespace jlm {
 
 	inline bool
 	is_fct_ptr(jive::input *input) {
-		auto pt = dynamic_cast<const jlm::ptrtype *>(&input->type());
+		auto pt = dynamic_cast<const jlm::PointerType *>(&input->type());
 		if (!pt)
 			return false;
-		return dynamic_cast<const FunctionType *>(&pt->pointee_type());
+		return dynamic_cast<const FunctionType *>(&pt->GetElementType());
 	}
 
 	const jive::output *
@@ -131,7 +131,7 @@ namespace jlm {
 			} else if (auto po = dynamic_cast<const jlm::alloca_op *>(&(node->operation()))) {
 				auto rr = region->graph()->root();
 				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
-				auto delta_type = jlm::ptrtype(po->value_type());
+				auto delta_type = jlm::PointerType(po->value_type());
 				auto db = delta::node::Create(rr, delta_type, delta_name, linkage::external_linkage, "", false);
 				// create zero constant of allocated type
 				jive::output *cout;

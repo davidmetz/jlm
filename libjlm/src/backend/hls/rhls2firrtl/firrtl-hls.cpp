@@ -98,7 +98,7 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 	std::ostringstream module;
 	module << module_header(n, true);
 
-	bool store = dynamic_cast<const jlm::store_op *>(&(n->operation()));
+	bool store = dynamic_cast<const jlm::StoreOperation *>(&(n->operation()));
 	// registers
 	module << indent(2) << "; registers\n";
 	for (size_t i = 0; i < n->noutputs(); ++i) {
@@ -132,7 +132,7 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 		module << indent(2) << "mem_req.data is invalid\n";
 		if (auto bt = dynamic_cast<const jive::bittype *>(&n->output(0)->type())) {
 			bit_width = bt->nbits();
-		} else if (dynamic_cast<const jlm::ptrtype *>(&n->output(0)->type())) {
+		} else if (dynamic_cast<const jlm::PointerType *>(&n->output(0)->type())) {
 			bit_width = 64;
 		} else {
 			throw jlm::error("unknown width for mem request");
@@ -491,7 +491,7 @@ jlm::hls::jlm_sizeof(const jive::type *t) {
 		return bt->nbits();
 	} else if (auto at = dynamic_cast<const jlm::arraytype *>(t)) {
 		return jlm_sizeof(&at->element_type()) * at->nelements();
-	} else if ( dynamic_cast<const jlm::ptrtype *>(t)) {
+	} else if ( dynamic_cast<const jlm::PointerType *>(t)) {
 		return 64;
 	} else if (auto ct = dynamic_cast<const jive::ctltype *>(t)) {
 		return ceil(log2(ct->nalternatives()));
@@ -601,7 +601,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 	} else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
 		auto value = o->value();
 		return jive::detail::strfmt("UInt<", value.nbits(), ">(", value.to_uint(), ")");
-	} else if (dynamic_cast<const jlm::undef_constant_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::UndefValueOperation *>(&(n->operation()))) {
 		return UInt(1, 0);  // TODO: Fix?
 	} else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
 		return UInt(ceil(log2(o->value().nalternatives())), o->value().alternative());
@@ -656,9 +656,9 @@ jlm::hls::FirrtlHLS::node_to_firrtl(const jive::node *node, const int depth) {
 		}
 	}
 	if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
-		if (dynamic_cast<const jlm::load_op *>(&(n->operation()))) {
+		if (dynamic_cast<const jlm::LoadOperation *>(&(n->operation()))) {
 			return mem_node_to_firrtl(n);
-		} else if (dynamic_cast<const jlm::store_op *>(&(n->operation()))) {
+		} else if (dynamic_cast<const jlm::StoreOperation *>(&(n->operation()))) {
 			return mem_node_to_firrtl(n);
 		} else if (dynamic_cast<const hls::predicate_buffer_op *>(&(n->operation()))) {
 			return pred_buffer_to_firrtl(n);

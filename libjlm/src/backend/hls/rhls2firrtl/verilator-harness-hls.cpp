@@ -205,8 +205,8 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	auto root = rm.Rvsdg().root();
 	for (size_t i = 0; i < root->narguments(); ++i) {
 		if(auto ip = dynamic_cast<const impport*>(&root->argument(i)->port())){
-			if (auto t = dynamic_cast<const jlm::ptrtype *>(&ip->type())) {
-				cpp << "extern " << convert_to_c_type(&t->pointee_type()) << " " << ip->name() << ";\n";
+			if (auto t = dynamic_cast<const jlm::PointerType *>(&ip->type())) {
+				cpp << "extern " << convert_to_c_type(&t->GetElementType()) << " " << ip->name() << ";\n";
 			} else{
 				throw error("unexpected impport type");
 			}
@@ -299,8 +299,8 @@ std::string
 jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jive::type *type) {
 	if (auto t = dynamic_cast<const jive::bittype *>(type)) {
 		return "int" + jive::detail::strfmt(t->nbits()) + "_t";
-	} else if (auto t = dynamic_cast<const jlm::ptrtype *>(type)) {
-		return convert_to_c_type(&t->pointee_type()) + "*";
+	} else if (auto t = dynamic_cast<const jlm::PointerType *>(type)) {
+		return convert_to_c_type(&t->GetElementType()) + "*";
 	} else if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
 		return convert_to_c_type(&t->element_type());
 	} else {

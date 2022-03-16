@@ -29,7 +29,7 @@ jlm::hls::add_prints(jive::region *region) {
 		if( dynamic_cast<jive::simple_node *>(node)
 				&& node->noutputs()==1
 				&& is<jive::bittype>(node->output(0)->type())
-				&& !is<jlm::undef_constant_op>(node)){
+				&& !is<jlm::UndefValueOperation>(node)){
 			auto out = node->output(0);
 			std::vector<jive::input *> old_users(out->begin(), out->end());
 			auto new_out = hls::print_op::create(*out)[0];
@@ -53,7 +53,7 @@ jlm::hls::convert_prints(jlm::RvsdgModule &rm) {
 	auto root = graph.root();
 	//TODO: make this less hacky by using the correct state types
 	FunctionType fct({&jive::bit64, &jive::bit64}, {loopstatetype::create().get()});
-	jlm::ptrtype ptr(fct);
+	jlm::PointerType ptr(fct);
 	impport imp(ptr, "printnode", linkage::external_linkage);
 	auto printf = graph.add_import(imp);
 	convert_prints(root, printf);
