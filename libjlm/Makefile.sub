@@ -1,13 +1,12 @@
 # Copyright 2019 Nico Reißmann <nico.reissmann@gmail.com>
 # See COPYING for terms of redistribution.
 
-ifdef CIRCT_LLVM
+ifdef CIRCT
   $(info Support for LLVM 14 and CIRCT enabled)
   $(shell echo "#include \"mlirgen-circt.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
   LLVM_VER_SRC = \
     libjlm/src/frontend/llvm/LlvmModuleConversion-llvm14.cpp \
     libjlm/src/backend/hls/rhls2firrtl/mlirgen.cpp
-
 else
   $(info Support for LLVM 13 enabled)
   $(shell echo "#include \"mlirgen-llvm.hpp\"" > $(JLM_ROOT)/libjlm/include/jlm/backend/hls/rhls2firrtl/mlirgen.hpp)
