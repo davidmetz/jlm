@@ -28,6 +28,7 @@ public:
 
 	prscmd(
 		const jlm::filepath & ifile,
+		const jlm::filepath & tmpfolder,
 		const std::vector<std::string> & Ipaths,
 		const std::vector<std::string> & Dmacros,
 		const std::vector<std::string> & Wwarnings,
@@ -35,6 +36,7 @@ public:
 		const standard & std)
 	: std_(std)
 	, ifile_(ifile)
+	, tmpfolder_(tmpfolder)
 	, Ipaths_(Ipaths)
 	, Dmacros_(Dmacros)
 	, Wwarnings_(Wwarnings)
@@ -54,19 +56,21 @@ public:
 	create(
 		passgraph * pgraph,
 		const jlm::filepath & ifile,
+		const jlm::filepath & tmpfolder,
 		const std::vector<std::string> & Ipaths,
 		const std::vector<std::string> & Dmacros,
 		const std::vector<std::string> & Wwarnings,
 		const std::vector<std::string> & flags,
 		const standard & std)
 	{
-		std::unique_ptr<prscmd> cmd(new prscmd(ifile, Ipaths, Dmacros, Wwarnings, flags, std));
+		std::unique_ptr<prscmd> cmd(new prscmd(ifile, tmpfolder, Ipaths, Dmacros, Wwarnings, flags, std));
 		return passgraph_node::create(pgraph, std::move(cmd));
 	}
 
 private:
 	standard std_;
 	jlm::filepath ifile_;
+    jlm::filepath tmpfolder_;
 	std::vector<std::string> Ipaths_;
 	std::vector<std::string> Dmacros_;
 	std::vector<std::string> Wwarnings_;
@@ -79,8 +83,10 @@ public:
 	~m2rcmd(){}
 
 	m2rcmd(
-		const jlm::filepath & ifile)
-	: ifile_(ifile)
+		const jlm::filepath & ifile,
+		const jlm::filepath & ofile)
+	: ifile_(ifile),
+	  ofile_(ofile)
 	{}
 
 	virtual std::string
@@ -95,14 +101,45 @@ public:
 	static passgraph_node *
 	create(
 		passgraph * pgraph,
-		const jlm::filepath & ifile)
+		const jlm::filepath & ifile,
+		const jlm::filepath & ofile)
 	{
-		std::unique_ptr<m2rcmd> cmd(new m2rcmd(ifile));
+		std::unique_ptr<m2rcmd> cmd(new m2rcmd(ifile, ofile));
 		return passgraph_node::create(pgraph, std::move(cmd));
 	}
 
 private:
 	jlm::filepath ifile_;
+	jlm::filepath ofile_;
+};
+
+class mkdircmd final : public command {
+public:
+	virtual
+	~mkdircmd(){}
+
+    mkdircmd(
+		const jlm::filepath & path)
+	: path_(path)
+	{}
+
+	virtual std::string
+	to_str() const override;
+
+	virtual void
+	run() const override;
+
+	static passgraph_node *
+	create(
+		passgraph * pgraph,
+		const jlm::filepath & path)
+	{
+		std::unique_ptr<mkdircmd> cmd(new mkdircmd(path));
+		return passgraph_node::create(pgraph, std::move(cmd));
+	}
+
+private:
+	jlm::filepath path_;
 };
 
 /* optimization command */
@@ -252,11 +289,13 @@ public:
 			const std::vector<jlm::filepath> & lfiles,
 			const jlm::filepath & hfile,
 			const jlm::filepath & ofile,
+            const jlm::filepath & tmpfolder,
 			const std::vector<std::string> & Lpaths,
 			const std::vector<std::string> & libs)
 	: ofile_(ofile)
 	, vfile_(vfile)
 	, hfile_(hfile)
+	, tmpfolder_(tmpfolder)
 	, libs_(libs)
 	, lfiles_(lfiles)
 	, Lpaths_(Lpaths)
@@ -299,18 +338,20 @@ public:
 		const std::vector<jlm::filepath> & lfiles,
 		const jlm::filepath & hfile,
 		const jlm::filepath & ofile,
+		const jlm::filepath & tmpfolder,
 		const std::vector<std::string> & Lpaths,
 		const std::vector<std::string> & libs)
 	{
-		std::unique_ptr<verilatorcmd> cmd(new verilatorcmd(vfile, lfiles, hfile, ofile, Lpaths, libs));
+		std::unique_ptr<verilatorcmd> cmd(new verilatorcmd(vfile, lfiles, hfile, ofile, tmpfolder, Lpaths, libs));
 		return passgraph_node::create(pgraph, std::move(cmd));
 	}
 
 private:
 	jlm::filepath ofile_;
 	jlm::filepath vfile_;
-	jlm::filepath hfile_;
-	std::vector<std::string> libs_;
+    jlm::filepath hfile_;
+    jlm::filepath tmpfolder_;
+    std::vector<std::string> libs_;
 	std::vector<jlm::filepath> lfiles_;
 	std::vector<std::string> Lpaths_;
 };
@@ -415,10 +456,10 @@ public:
 
 	hlscmd(
 		const jlm::filepath & ifile,
-		const std::string & function,
+		const std::string & outfolder,
 	        const bool &circt)
 	: ifile_(ifile)
-	, function_(function)
+	, outfolder_(outfolder)
 	, circt_(circt)
 	{}
 
@@ -431,20 +472,74 @@ public:
 	inline const jlm::filepath
 	firfile() const noexcept
 	{
-		return jlm::filepath("jlm_hls.fir");
+		return jlm::filepath(outfolder_+"jlm_hls.fir");
 	}
 
 	inline const jlm::filepath
 	llfile() const noexcept
 	{
-		return jlm::filepath("jlm_hls.rest.ll");
+		return jlm::filepath(outfolder_+"jlm_hls.rest.ll");
 	}
 
 	inline const jlm::filepath
 	harnessfile() const noexcept
 	{
-		std::basic_string<char> cd = gcd();
-		return jlm::filepath(cd+"/jlm_hls_harness.cpp");
+		return jlm::filepath(outfolder_+"jlm_hls_harness.cpp");
+	}
+
+	inline const jlm::filepath &
+	ifile() const noexcept
+	{
+		return ifile_;
+	}
+
+	static passgraph_node *
+	create(
+		passgraph * pgraph,
+		const jlm::filepath & ifile,
+		const std::string & outfolder,
+	        const bool &circt)
+	{
+		std::unique_ptr<hlscmd> cmd(new hlscmd(ifile, outfolder, circt));
+		return passgraph_node::create(pgraph, std::move(cmd));
+	}
+
+private:
+	jlm::filepath ifile_;
+	std::string outfolder_;
+	bool circt_;
+};
+
+class extractcmd final : public command {
+public:
+	virtual
+	~extractcmd(){}
+
+    extractcmd(
+		const jlm::filepath & ifile,
+		const std::string & function,
+		const std::string & outfolder)
+	: ifile_(ifile)
+	, function_(function)
+	, outfolder_(outfolder)
+	{}
+
+	virtual std::string
+	to_str() const override;
+
+	virtual void
+	run() const override;
+
+	inline const jlm::filepath
+	functionfile() const noexcept
+	{
+		return jlm::filepath(outfolder_+"jlm_hls.function.ll");
+	}
+
+	inline const jlm::filepath
+	llfile() const noexcept
+	{
+		return jlm::filepath(outfolder_+"jlm_hls.rest.ll");
 	}
 
 	inline const jlm::filepath &
@@ -463,16 +558,16 @@ public:
 		passgraph * pgraph,
 		const jlm::filepath & ifile,
 		const std::string & function,
-	        const bool &circt)
+		const std::string & outfolder)
 	{
-		std::unique_ptr<hlscmd> cmd(new hlscmd(ifile, function, circt));
+		std::unique_ptr<extractcmd> cmd(new extractcmd(ifile, function, outfolder));
 		return passgraph_node::create(pgraph, std::move(cmd));
 	}
 
 private:
 	jlm::filepath ifile_;
 	std::string function_;
-	bool circt_;
+	std::string outfolder_;
 };
 
 /* print command */

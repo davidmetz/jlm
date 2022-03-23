@@ -132,6 +132,7 @@ namespace jlm {
 				auto rr = region->graph()->root();
 				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
 				auto delta_type = jlm::PointerType(po->value_type());
+                std::cout << "alloca " << delta_name << ": " << po->value_type().debug_string() << "\n";
 				auto db = delta::node::Create(rr, delta_type, delta_name, linkage::external_linkage, "", false);
 				// create zero constant of allocated type
 				jive::output *cout;
@@ -184,96 +185,124 @@ namespace jlm {
 		return static_cast<delta::node *>(jive::node_output::node(data));
 	}
 
-	std::unique_ptr<jlm::RvsdgModule>
-	split_hls_function(jlm::RvsdgModule &rm, std::string &function_name) {
-		// TODO: use a different datastructure for rhls?
-		// create a copy of rm
-		auto rhls = jlm::RvsdgModule::Create(rm.SourceFileName(), rm.TargetTriple(), rm.DataLayout());
-		std::cout << "processing " << rm.SourceFileName().name() << "\n";
-		auto root = rm.Rvsdg().root();
-		for (auto node : jive::topdown_traverser(root)) {
-			if (auto ln = dynamic_cast<lambda::node *>(node)) {
-				if (!function_match(ln, function_name)) {
-					continue;
-				}
-				// TODO: do inlining  here
-				inline_calls(ln->subregion());
-				// TODO: do deduplication? other passes here?
-				pre_opt(rm);
-				convert_alloca(ln->subregion());
-				jive::substitution_map smap;
-				for (size_t i = 0; i < ln->ninputs(); ++i) {
-					//TODO: check for imports
-					auto orig_node = dynamic_cast<jive::node_output *>(ln->input(i)->origin())->node();
-					if (auto oln = dynamic_cast<lambda::node *>(orig_node)) {
-						throw jlm::error("Inlining of function " + oln->name() + " not supported");
-					} else if (auto odn = dynamic_cast<delta::node *>(orig_node)) {
-						// modify name to not contain .
-						if (odn->name().find('.') != std::string::npos) {
-							odn = rename_delta(odn);
-						}
-						std::cout << "delta node " << odn->name() << ": " << odn->type().debug_string() << "\n";
-						// add import for delta to rhls
-						impport im(odn->type(), odn->name(), linkage::external_linkage);
-//						JLM_ASSERT(im.name()==odn->name());
-						auto arg = rhls->Rvsdg().add_import(im);
-						auto tmp = dynamic_cast<const impport *>(&arg->port());
-						assert(tmp && tmp->name() == odn->name());
-						smap.insert(ln->input(i)->origin(), arg);
-						// add export for delta to rm
-						// TODO: check if not already exported and maybe adjust linkage?
-						rm.Rvsdg().add_export(odn->output(), {odn->type(), odn->name()});
-					} else {
-						throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
-					}
-				}
-				// copy function into rhls
-				auto new_ln = ln->copy(rhls->Rvsdg().root(), smap);
-				jive::result::create(rhls->Rvsdg().root(), new_ln->output(), nullptr, new_ln->output()->type());
-				// add function as input to rm and remove it
-				impport im(ln->output()->type(), ln->name(), linkage::external_linkage); //TODO: change linkage?
-				auto arg = rm.Rvsdg().add_import(im);
-				ln->output()->divert_users(arg);
-				remove(ln);
-				std::cout << "function " << new_ln->name() << " extracted for HLS\n";
-				return rhls;
-			}
-		}
-		throw jlm::error("HLS function " + function_name + " not found");
-	}
+    lambda::node * change_linkage(lambda::node * ln, linkage link){
+        auto lambda = lambda::node::create(ln->region(), ln->type(), ln->name(), link, ln->attributes());
+
+        /* add context variables */
+        jive::substitution_map subregionmap;
+        for (auto & cv : ln->ctxvars()) {
+            auto origin = cv.origin();
+            auto newcv = lambda->add_ctxvar(origin);
+            subregionmap.insert(cv.argument(), newcv);
+        }
+
+        /* collect function arguments */
+        for (size_t n = 0; n < ln->nfctarguments(); n++)
+            subregionmap.insert(ln->fctargument(n), lambda->fctargument(n));
+
+        /* copy subregion */
+        ln->subregion()->copy(lambda->subregion(), subregionmap, false, false);
+
+        /* collect function results */
+        std::vector<jive::output*> results;
+        for (auto & result : ln->fctresults())
+            results.push_back(subregionmap.lookup(result.origin()));
+
+        /* finalize lambda */
+        auto o = lambda->finalize(results);
+
+        divert_users(ln,outputs(lambda));
+        jive::remove(ln);
+
+        return lambda;
+    }
 }
 
 std::unique_ptr<jlm::RvsdgModule>
-jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rm, std::string &function_name) {
-	auto rhls = jlm::split_hls_function(rm, function_name); //TODO: pass through function name
-
-	pre_opt(*rhls);
-
-//	jlm::hls::add_prints(*rhls);
-	dump_ref(rhls);
-
-	// run conversion on copy
-	jlm::hls::remove_unused_state(*rhls);
-	// main conversion steps
-	jlm::hls::add_triggers(*rhls); // TODO: make compatible with loop nodes?
-	jlm::hls::gamma_conv(*rhls, true);
-	jlm::hls::theta_conv(*rhls);
-	// rhls optimization
-	jlm::hls::dne(*rhls);
-	// enforce 1:1 input output relationship
-	jlm::hls::add_sinks(*rhls);
-	jlm::hls::add_forks(*rhls);
-//	jlm::hls::add_buffers(*rhls, true);
-	// ensure that all rhls rules are met
-	jlm::hls::check_rhls(*rhls);
-	return rhls;
+jlm::hls::split_hls_function(jlm::RvsdgModule &rm, std::string &function_name) {
+    // TODO: use a different datastructure for rhls?
+    // create a copy of rm
+    auto rhls = jlm::RvsdgModule::Create(rm.SourceFileName(), rm.TargetTriple(), rm.DataLayout());
+    std::cout << "processing " << rm.SourceFileName().name() << "\n";
+    auto root = rm.Rvsdg().root();
+    for (auto node : jive::topdown_traverser(root)) {
+        if (auto ln = dynamic_cast<lambda::node *>(node)) {
+            if (!function_match(ln, function_name)) {
+                continue;
+            }
+            inline_calls(ln->subregion());
+            // TODO: have a seperate set of optimizations here
+            pre_opt(rm);
+            convert_alloca(ln->subregion());
+            jive::substitution_map smap;
+            for (size_t i = 0; i < ln->ninputs(); ++i) {
+                auto orig_node = dynamic_cast<jive::node_output *>(ln->input(i)->origin())->node();
+                if (auto oln = dynamic_cast<lambda::node *>(orig_node)) {
+                    throw jlm::error("Inlining of function " + oln->name() + " not supported");
+                } else if (auto odn = dynamic_cast<delta::node *>(orig_node)) {
+                    // modify name to not contain .
+                    if (odn->name().find('.') != std::string::npos) {
+                        odn = rename_delta(odn);
+                    }
+                    std::cout << "delta node " << odn->name() << ": " << odn->type().debug_string() << "\n";
+                    // add import for delta to rhls
+                    impport im(odn->type(), odn->name(), linkage::external_linkage);
+//						JLM_ASSERT(im.name()==odn->name());
+                    auto arg = rhls->Rvsdg().add_import(im);
+                    auto tmp = dynamic_cast<const impport *>(&arg->port());
+                    assert(tmp && tmp->name() == odn->name());
+                    smap.insert(ln->input(i)->origin(), arg);
+                    // add export for delta to rm
+                    // TODO: check if not already exported and maybe adjust linkage?
+                    rm.Rvsdg().add_export(odn->output(), {odn->type(), odn->name()});
+                } else {
+                    throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
+                }
+            }
+            // copy function into rhls
+            auto new_ln = ln->copy(rhls->Rvsdg().root(), smap);
+            new_ln = change_linkage(new_ln, linkage::external_linkage);
+            jive::result::create(rhls->Rvsdg().root(), new_ln->output(), nullptr, new_ln->output()->type());
+            // add function as input to rm and remove it
+            impport im(ln->output()->type(), ln->name(), linkage::external_linkage); //TODO: change linkage?
+            auto arg = rm.Rvsdg().add_import(im);
+            ln->output()->divert_users(arg);
+            remove(ln);
+            std::cout << "function " << new_ln->name() << " extracted for HLS\n";
+            return rhls;
+        }
+    }
+    throw jlm::error("HLS function " + function_name + " not found");
 }
 
 void
-jlm::hls::dump_ref(std::unique_ptr<jlm::RvsdgModule> &rhls) {
-	auto reference = RvsdgModule::Create(rhls->SourceFileName(), rhls->TargetTriple(), rhls->DataLayout());
+jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
+	pre_opt(rhls);
+
+//	jlm::hls::add_prints(rhls);
+//	dump_ref(rhls);
+
+	// run conversion on copy
+	jlm::hls::remove_unused_state(rhls);
+	// main conversion steps
+	jlm::hls::add_triggers(rhls); // TODO: make compatible with loop nodes?
+	jlm::hls::gamma_conv(rhls, true);
+	jlm::hls::theta_conv(rhls);
+	// rhls optimization
+	jlm::hls::dne(rhls);
+	// enforce 1:1 input output relationship
+	jlm::hls::add_sinks(rhls);
+	jlm::hls::add_forks(rhls);
+//	jlm::hls::add_buffers(*rhls, true);
+	// ensure that all rhls rules are met
+	jlm::hls::check_rhls(rhls);
+}
+
+void
+jlm::hls::dump_ref(jlm::RvsdgModule &rhls) {
+	auto reference = RvsdgModule::Create(rhls.SourceFileName(), rhls.TargetTriple(), rhls.DataLayout());
 	jive::substitution_map smap;
-	rhls->Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
+	rhls.Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
 	convert_prints(*reference);
 	for (size_t i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
 		auto arg = reference->Rvsdg().root()->argument(i);

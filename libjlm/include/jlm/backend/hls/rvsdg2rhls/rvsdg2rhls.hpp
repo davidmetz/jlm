@@ -18,11 +18,14 @@ namespace jlm{
 				   jive::is<jive::ctlconstant_op>(node);
 		}
 
-		std::unique_ptr<RvsdgModule>
-		rvsdg2rhls(jlm::RvsdgModule &rm, std::string &function_name);
+		void
+		rvsdg2rhls(jlm::RvsdgModule &rm);
 
 		void
-		dump_ref(std::unique_ptr<jlm::RvsdgModule> &rhls);
-	}
+		dump_ref(jlm::RvsdgModule &rhls);
+
+        std::unique_ptr<RvsdgModule>
+        split_hls_function(RvsdgModule &rm, std::string &function_name);
+    }
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_RVSDG2RHLS_HPP

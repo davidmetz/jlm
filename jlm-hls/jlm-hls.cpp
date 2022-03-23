@@ -29,6 +29,7 @@
 #include <jlm/backend/hls/rhls2firrtl/verilator-harness-hls.hpp>
 #include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
 #include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
+#include <unistd.h>
 
 class cmdflags {
 public:
@@ -37,7 +38,7 @@ public:
 
     std::string file;
     jlm::StatisticsDescriptor sd;
-    std::string hls_function;
+    std::string outfolder;
     bool circt = false;
 };
 
@@ -52,13 +53,13 @@ print_usage(const std::string &app) {
 static void
 parse_cmdflags(int argc, char **argv, cmdflags &flags) {
     static constexpr size_t file = 1;
-    static constexpr size_t hls_function = 2;
     static constexpr size_t circt = 3;
+    static constexpr size_t outfolder = 4;
 
     static struct option options[] = {
             {"file", required_argument, NULL, file},
-            {"hls-function", required_argument, NULL, hls_function},
             {"circt", optional_argument, NULL, circt},
+            {"outfolder", required_argument, NULL, outfolder},
             {NULL, 0, NULL, 0}
     };
 
@@ -69,12 +70,12 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
                 flags.file = optarg;
                 break;
             }
-            case hls_function: {
-                flags.hls_function = optarg;
-                break;
-            }
             case circt: {
                 flags.circt = circt;
+                break;
+            }
+            case outfolder: {
+                flags.outfolder = optarg;
                 break;
             }
 
@@ -84,7 +85,7 @@ parse_cmdflags(int argc, char **argv, cmdflags &flags) {
         }
     }
 
-    if (flags.file.empty() || flags.hls_function.empty()) {
+    if (flags.file.empty()) {
         print_usage(argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -107,8 +108,11 @@ main(int argc, char **argv) {
     llvm::LLVMContext ctx;
     llvm::SMDiagnostic err;
     auto llvmModule = llvm::parseIRFile(flags.file, err, ctx);
+    // change folder to redirect output
+    if(!flags.outfolder.empty()){
+        assert(chdir(flags.outfolder.c_str())==0);
+    }
     // TODO: fix this hack
-    jlm::filepath ff(flags.file);
     llvmModule->setSourceFileName(/*ff.path()+*/"jlm_hls");
     if (!llvmModule) {
         err.print(argv[0], llvm::errs());
@@ -118,33 +122,26 @@ main(int argc, char **argv) {
     /* LLVM to JLM pass */
     auto jlmModule = jlm::ConvertLlvmModule(*llvmModule);
 //    jlm::print(*jm, stdout);
-    auto rvsdgModule = jlm::ConvertInterProceduralGraphModule(*jlmModule, flags.sd);
+    auto rhls = jlm::ConvertInterProceduralGraphModule(*jlmModule, flags.sd);
 
-//    dump_xml(rvsdgModule);
+    dump_xml(rhls);
 //    jive::view(rvsdgModule->graph()->root(), stdout);
-    auto rhls = jlm::hls::rvsdg2rhls(*rvsdgModule, flags.hls_function);
+    jlm::hls::rvsdg2rhls(*rhls);
 //    jive::view(rhls->graph()->root(), stdout);
 //    dump_xml(rhls, "_hls");	// run conversion on copy
 
     if (flags.circt) {
-	jlm::hls::MLIRGen hls;
-	hls.run(*rhls);
+        jlm::hls::MLIRGen hls;
+        hls.run(*rhls);
     } else {
-	jlm::hls::FirrtlHLS hls;
-	hls.run(*rhls);
+        jlm::hls::FirrtlHLS hls;
+        hls.run(*rhls);
     }
 
     jlm::hls::DotHLS dhls;
     dhls.run(*rhls);
     jlm::hls::VerilatorHarnessHLS vhls;
     vhls.run(*rhls);
-
-    // non-hls part
-	auto jm2 = jlm::rvsdg2jlm::rvsdg2jlm(*rvsdgModule, flags.sd);
-	auto lm2 = jlm::jlm2llvm::convert(*jm2, ctx);
-	std::error_code EC;
-	llvm::raw_fd_ostream os(rvsdgModule->SourceFileName().base()+".rest.ll", EC);
-	lm2->print(os, nullptr);
 
     return 0;
 }

@@ -12,6 +12,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sys/stat.h>
 
 namespace jlm {
 
@@ -25,38 +26,54 @@ generate_commands(const jlm::cmdline_options & opts)
 	std::vector<passgraph_node*> leaves;
 	std::vector<passgraph_node*> llir;
 	std::vector<jlm::filepath> llir_files;
-	// c to llvmir
+
+    std::string tmp_identifier;
 	for (const auto & c : opts.compilations) {
-		passgraph_node * last = pgraph->entry();
+        tmp_identifier += c.ifile().name() + "_";
+    }
+    tmp_identifier += std::to_string(random());
+    jlm::filepath tmp_folder("/tmp/"+tmp_identifier+"/");
+    auto mkdir = mkdircmd::create(pgraph.get(), tmp_folder);
+    pgraph->entry()->add_edge(mkdir);
+
+    // c to llvmir
+    for (const auto & c : opts.compilations) {
+		passgraph_node * last = mkdir;
 
 		if (c.parse()) {
-			auto prsnode = prscmd::create(pgraph.get(), c.ifile(), opts.includepaths, opts.macros,
+			auto prsnode = prscmd::create(pgraph.get(), c.ifile(), tmp_folder, opts.includepaths, opts.macros,
 				opts.warnings, opts.flags, opts.std);
 			last->add_edge(prsnode);
 			last = prsnode;
 			llir.push_back(last);
 			llir_files.push_back(dynamic_cast<prscmd*>(&last->cmd())->ofile());
 		}
-
 	}
 	// link all llir into one so inlining can be done across files for HLS
 	// llvm-link
-	jlm::filepath ll_merged("/tmp/merged.ll");
+	jlm::filepath ll_merged(tmp_folder.to_str()+"merged.ll");
 	auto ll_link = lllnkcmd::create(pgraph.get(), llir_files, ll_merged);
 	for (const auto & ll : llir) {
 		ll->add_edge(ll_link);
 	}
-	auto m2r = m2rcmd::create(pgraph.get(), ll_merged);
-	ll_link->add_edge(m2r);
+    // need to already run m2r here
+    jlm::filepath  ll_m2r1(tmp_folder.to_str()+"merged.m2r.ll");
+    auto m2r1 = m2rcmd::create(pgraph.get(), ll_merged, ll_m2r1);
+    ll_link->add_edge(m2r1);
+    auto extract = extractcmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r1->cmd())->ofile(), opts.hls_function_regex, tmp_folder.to_str());
+    m2r1->add_edge(extract);
+    jlm::filepath  ll_m2r2(tmp_folder.to_str()+"function.m2r.ll");
+	auto m2r2 = m2rcmd::create(pgraph.get(), dynamic_cast<extractcmd*>(&extract->cmd())->functionfile(), ll_m2r2);
+	extract->add_edge(m2r2);
 	// hls
-	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r->cmd())->ofile(), opts.hls_function_regex, opts.circt);
-	m2r->add_edge(hls);
+	auto hls = hlscmd::create(pgraph.get(), dynamic_cast<m2rcmd*>(&m2r2->cmd())->ofile(), tmp_folder.to_str(), opts.circt);
+	m2r2->add_edge(hls);
 	// firrtl
 	if (!opts.generate_firrtl) {
-		jlm::filepath verilogfile("/tmp/jlm_hls.v");
+		jlm::filepath verilogfile(tmp_folder.to_str()+"jlm_hls.v");
 		auto firrtl = firrtlcmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->firfile(), verilogfile);
 		hls->add_edge(firrtl);
-		jlm::filepath asmofile("/tmp/hls.o");
+		jlm::filepath asmofile(tmp_folder.to_str()+"hls.o");
 		auto asmnode = cgencmd::create(pgraph.get(), dynamic_cast<hlscmd*>(&hls->cmd())->llfile(), asmofile, opts.Olvl);
 		hls->add_edge(asmnode);
 
@@ -67,7 +84,7 @@ generate_commands(const jlm::cmdline_options & opts)
 		}
 		lnkifiles.push_back(asmofile);
 		// TODO: remove old verilator folder first
-		auto verinode = verilatorcmd::create(pgraph.get(), verilogfile, lnkifiles, dynamic_cast<hlscmd*>(&hls->cmd())->harnessfile(), opts.lnkofile, opts.libpaths, opts.libs);
+		auto verinode = verilatorcmd::create(pgraph.get(), verilogfile, lnkifiles, dynamic_cast<hlscmd*>(&hls->cmd())->harnessfile(), opts.lnkofile, tmp_folder, opts.libpaths, opts.libs);
 		firrtl->add_edge(verinode);
 		verinode->add_edge(pgraph->exit());
 	}
@@ -110,7 +127,7 @@ jlm::filepath
 prscmd::ofile() const
 {
 	auto f = ifile_.base();
-	return "/tmp/"+create_prscmd_ofile(f);
+	return tmpfolder_.to_str()+create_prscmd_ofile(f);
 }
 
 std::string
@@ -317,15 +334,31 @@ lllnkcmd::run() const {
 			return strfmt(
 				"jlm-hls"
 				, " --file ", ifile().to_str()
-				, " --hls-function ", function()
+                , " --outfolder ", outfolder_
 				, " --circt "
 			 );
 		else
 			return strfmt(
 				"jlm-hls"
 				, " --file ", ifile().to_str()
-				, " --hls-function ", function()
+                , " --outfolder ", outfolder_
 			 );
+	}
+
+	void
+	extractcmd::run() const {
+		if (system(to_str().c_str()))
+			exit(EXIT_FAILURE);
+	}
+
+	std::string
+    extractcmd::to_str() const {
+        return strfmt(
+            "jlm-hls-extract"
+            , " --file ", ifile().to_str()
+            , " --hls-function ", function()
+            , " --outfolder ", outfolder_
+         );
 	}
 
 	void
@@ -402,8 +435,10 @@ lllnkcmd::run() const {
 #endif
 				, " -Wno-WIDTH" //divisions otherwise cause errors
 				, " -j"
-				, " -Mdir /tmp/verilator", time(nullptr), "/"
-				, " -MAKEFLAGS CXX=g++ "
+				, " -Mdir ", tmpfolder_.to_str(), "verilator/"
+				, " -MAKEFLAGS CXX=g++"
+				, " -CFLAGS -g" // TODO: switch for this
+                , " --assert"
 				, cflags
 				, " -o ", ofile
 				, " ", vfile().to_str()
@@ -415,8 +450,7 @@ lllnkcmd::run() const {
 	jlm::filepath
 	m2rcmd::ofile() const
 	{
-		auto f = ifile_.base();
-		return "/tmp/"+f+".m2r.ll";
+		return ofile_;
 	}
 
 	std::string
@@ -436,6 +470,22 @@ lllnkcmd::run() const {
 	m2rcmd::run() const
 	{
 		if (system(to_str().c_str()))
+			exit(EXIT_FAILURE);
+	}
+
+	std::string
+    mkdircmd::to_str() const
+    {
+		return strfmt(
+				"mkdir "
+				, path_.to_str()
+		);
+	}
+
+	void
+	mkdircmd::run() const
+	{
+		if (mkdir(path_.to_str().c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)!=0)
 			exit(EXIT_FAILURE);
 	}
 }
