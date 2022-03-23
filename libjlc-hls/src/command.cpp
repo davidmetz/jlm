@@ -31,6 +31,7 @@ generate_commands(const jlm::cmdline_options & opts)
 	for (const auto & c : opts.compilations) {
         tmp_identifier += c.ifile().name() + "_";
     }
+    srandom(time(nullptr));
     tmp_identifier += std::to_string(random());
     jlm::filepath tmp_folder("/tmp/"+tmp_identifier+"/");
     auto mkdir = mkdircmd::create(pgraph.get(), tmp_folder);
@@ -486,6 +487,6 @@ lllnkcmd::run() const {
 	mkdircmd::run() const
 	{
 		if (mkdir(path_.to_str().c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)!=0)
-			exit(EXIT_FAILURE);
+            throw jlm::error("mkdir failed: "+path_.to_str());
 	}
 }
