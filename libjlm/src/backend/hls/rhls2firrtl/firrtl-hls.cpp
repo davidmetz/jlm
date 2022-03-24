@@ -710,20 +710,16 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node *ln) {
 			throw jlm::error("Unimplemented op (unexpected structural node) : " + node->operation().debug_string());
 		}
 	}
-	int res_i = 0;
 	for (size_t i = 0; i < sr->narguments(); ++i) {
 		auto arg = sr->argument(i);
-		if (arg->input() != nullptr) {
+        auto ba = dynamic_cast<jlm::hls::backedge_argument*>(arg);
+        if (!ba) {
+            assert(arg->input() != nullptr);
 			// map to input of loop
 			output_map[arg] = output_map[arg->input()->origin()];
 		} else {
-			// not all loop vars have outputs due to remove_unused_loop_io
-			while (sr->result(res_i)->output() != nullptr) {
-				res_i++;
-			}
-			auto result = sr->result(res_i);
+			auto result = ba->result();
 			assert(result->type() == arg->type());
-			res_i++;
 			// map to end of loop (origin of associated result)
 			output_map[arg] = output_map[result->origin()];
 		}

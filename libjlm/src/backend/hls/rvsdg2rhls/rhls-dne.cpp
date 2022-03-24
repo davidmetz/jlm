@@ -41,24 +41,18 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node *ln) {
 	}
 	// clean up unused arguments - only ones without an input should be left
 	// go through in reverse because we remove some
-	int res_i = sr->nresults() - 1;
 	for (int i = sr->narguments() - 1; i >= 0; --i) {
 		auto arg = sr->argument(i);
-		if (arg->input() != nullptr) {
-			assert(arg->nusers() != 0);
-		} else {
-			// not all loop vars have outputs due to remove_unused_loop_io
-			while (sr->result(res_i)->output() != nullptr) {
-				res_i--;
-			}
-			auto result = sr->result(res_i);
+		if (auto ba = dynamic_cast<jlm::hls::backedge_argument*>(arg)){
+			auto result = ba->result();
 			assert(result->type() == arg->type());
-			res_i--;
-			if (arg->nusers() == 0) {
-				sr->remove_argument(arg->index());
-				sr->remove_result(result->index());
+			if (arg->nusers() == 0 || (arg->nusers()==1 && result->origin() == arg)) {
+                sr->remove_result(result->index());
+                sr->remove_argument(arg->index());
 			}
-		}
+		} else{
+            assert(arg->nusers() != 0);
+        }
 	}
 	return any_changed;
 }

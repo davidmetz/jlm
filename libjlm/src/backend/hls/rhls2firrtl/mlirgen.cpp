@@ -1097,9 +1097,12 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 	auto region = arg->region();
 	auto node = region->node();
 	if (dynamic_cast<hls::loop_node *>(node)) {
-		// Check if the argument is connected to an input,
-		// i.e., if the argument exits the region
-		if (arg->input() != nullptr) {
+		if (auto ba = dynamic_cast<jlm::hls::backedge_argument*>(arg)) {
+            return ba->result()->origin();
+        } else {
+            // Check if the argument is connected to an input,
+            // i.e., if the argument exits the region
+            assert(arg->input() != nullptr);
 			// Check if we are in a nested region and directly
 			// connected to the outer regions argument
 			auto origin = arg->input()->origin();
@@ -1114,28 +1117,6 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 			// Else we have reached the source
 			return origin;
 		}
-
-		// Need to go through the arguments and their
-		// potentially associated results to find the correct
-		// result associated with the sought argument
-		int resultIndex = 0;
-		for (size_t i = 0; i <= arg->index(); i++) {
-			auto tmp = region->argument(i);
-			if (tmp->input() == nullptr) {
-				// If the argument is not connected to an input
-				// then it is connected to the first result that
-				// is not connected to an output
-				while (region->result(resultIndex)->output() != nullptr) {
-					resultIndex++;
-				}
-				resultIndex++;
-			}
-		}
-		// Should have found a back edge so the type of the
-		// argument should be equal to the result
-		assert(region->result(resultIndex-1)->type() == arg->type());
-
-		return region->result(resultIndex-1)->origin();
 	}
 	// Reached the argument of a structural node that is not a hls::loop_node
 	return arg;

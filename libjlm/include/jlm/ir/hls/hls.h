@@ -452,6 +452,64 @@ namespace jlm {
 			}
 		};
 
+        class backedge_argument;
+        class backedge_result;
+        class loop_node;
+
+        class backedge_argument : public jive::argument {
+            friend loop_node;
+            friend backedge_result;
+        public:
+            ~backedge_argument() override= default;
+
+            backedge_result * result(){
+                return result_;
+            }
+
+        private:
+            backedge_argument(
+                    jive::region * region,
+                    const jive::type & type)
+                    : jive::argument(region, nullptr, type), result_(nullptr)
+            {}
+
+            static backedge_argument *
+            create(
+                    jive::region * region,
+                    const jive::type & type)
+            {
+                auto argument = new backedge_argument(region, type);
+                region->append_argument(argument);
+                return argument;
+            }
+            backedge_result * result_;
+        };
+
+        class backedge_result : public jive::result {
+            friend loop_node;
+            friend backedge_argument;
+        public:
+            ~backedge_result() override= default;
+
+            backedge_argument * argument(){
+                return argument_;
+            }
+
+        private:
+            backedge_result(jive::output * origin)
+                    : jive::result(origin->region(), origin, nullptr, origin->port()), argument_(nullptr)
+            {}
+
+            static backedge_result *
+            create(jive::output * origin)
+            {
+                auto result = new backedge_result(origin);
+                origin->region()->append_result(result);
+                return result;
+            }
+            backedge_argument * argument_;
+        };
+
 		class loop_node final : public jive::structural_node {
 		public:
 
@@ -468,16 +526,7 @@ namespace jlm {
 
 		public:
 			static loop_node *
-			create(jive::region *parent, bool init = true) {
-				auto ln = new loop_node(parent);
-				if (init) {
-					auto predicate = jive_control_false(ln->subregion());
-					jive::result::create(ln->subregion(), predicate, nullptr, jive::ctltype(2));
-					auto pred_arg = jive::argument::create(ln->subregion(), nullptr, jive::ctltype(2));
-					ln->_predicate_buffer = hls::predicate_buffer_op::create(*pred_arg)[0];
-				}
-				return ln;
-			}
+			create(jive::region *parent, bool init = true);
 
 			inline jive::region *
 			subregion() const noexcept {
@@ -496,85 +545,15 @@ namespace jlm {
 				return _predicate_buffer;
 			}
 
-			inline void
-			set_predicate(jive::output *p) {
-				auto node = jive::node_output::node(predicate()->origin());
-				predicate()->origin()->divert_users(p);
-				if (node && !node->has_users())
-					remove(node);
-			}
+			void set_predicate(jive::output *p);
 
-			// TODO: implement loop_node begin() and end()
-//        inline loop_node::loopvar_iterator
-//        begin() const
-//        {
-//            if (ninputs() == 0)
-//                return loopvar_iterator(nullptr);
-//
-//            return loopvar_iterator(output(0));
-//        }
-//
-//        inline loop_node::loopvar_iterator
-//        end() const
-//        {
-//            return loopvar_iterator(nullptr);
-//        }
-
-			// TODO: implement if using custom inputs/outputs
-//        jive::node_input *
-//        input(size_t index) const noexcept;
-//
-//        jive::node_output *
-//        output(size_t index) const noexcept;
+            backedge_argument * add_backedge(const jive::type & type);
 
 			jive::structural_output *
-			add_loopvar(jive::output *origin, jive::output **buffer = nullptr) {
-				jive::structural_input::create(this, origin, origin->type());
-				jive::structural_output::create(this, origin->type());
-
-				auto input = loop_node::input(ninputs() - 1);
-				auto output = loop_node::output(noutputs() - 1);
-
-				auto argument_in = jive::argument::create(subregion(), input, origin->type());
-				auto argument_loop = jive::argument::create(subregion(), nullptr, origin->type());
-
-				auto mux = hls::mux_op::create(*predicate_buffer(), {argument_in, argument_loop}, false, true)[0];
-				auto buf = hls::buffer_op::create(*mux, 2)[0];
-				auto branch = hls::branch_op::create(*predicate()->origin(), *buf, true);
-				if (buffer != nullptr) {
-					*buffer = buf;
-				}
-				//TODO: proper connection between argument_loop and result_loop
-				jive::result::create(subregion(), branch[0], output, origin->type());
-				jive::result::create(subregion(), branch[1], nullptr, origin->type());
-				return output;
-			}
+			add_loopvar(jive::output *origin, jive::output **buffer = nullptr);
 
 			virtual loop_node *
-			copy(jive::region *region, jive::substitution_map &smap) const override {
-				// TODO: fix this - broken - triggered if order is swapped in theta conversion pass
-				auto nf = graph()->node_normal_form(typeid(jive::operation));
-				nf->set_mutable(false);
-
-				jive::substitution_map rmap;
-				auto loop = create(region, false);
-
-				for (size_t i = 0; i < ninputs(); ++i) {
-					auto in_origin = smap.lookup(input(i)->origin());
-					jive::structural_input::create(loop, in_origin, in_origin->type());
-					rmap.insert(input(i), loop->input(i));
-				}
-				for (size_t i = 0; i < noutputs(); ++i) {
-					auto out = jive::structural_output::create(loop, output(i)->type());
-					rmap.insert(output(i), out);
-					smap.insert(output(i), out);
-				}
-
-				subregion()->copy(loop->subregion(), rmap, true, true);
-				loop->_predicate_buffer = rmap.lookup(_predicate_buffer);
-				nf->set_mutable(true);
-				return loop;
-			}
+			copy(jive::region *region, jive::substitution_map &smap) const override;
 		};
 	}
 }
