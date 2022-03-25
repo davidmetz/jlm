@@ -1375,26 +1375,17 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
 	if (!dynamic_cast<hls::loop_node *>(node)) {
 		throw std::logic_error("Expected a hls::loop_node but found: " + node->operation().debug_string());
 	}
-	// loop nodes has a single region
-	auto region = node->subregion(0);
-
-	for (size_t i=0; i < region->nresults(); i++) {
-		if (output == region->result(i)->output()) {
-			// Check if connected to a nested regions output
-			auto origin = region->result(i)->origin();
-			if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
-				// Need to trace the output of the nested structural node
-				return TraceStructuralOutput(o);
-			} else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
-				// Found the source node
-				return o;
-			} else {
-				throw std::logic_error("Encountered an unexpected output type");
-			}
-		}
-	}
-
-	throw std::logic_error("Did not find the associated result of the output");
+    assert(output->results.size()==1);
+    auto origin = output->results.begin().ptr()->origin();
+    if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+        // Need to trace the output of the nested structural node
+        return TraceStructuralOutput(o);
+    } else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+        // Found the source node
+        return o;
+    } else {
+        throw std::logic_error("Encountered an unexpected output type");
+    }
 }
 
 
