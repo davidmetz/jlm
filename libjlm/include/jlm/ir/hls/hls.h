@@ -9,6 +9,7 @@
 #include <jive/rvsdg/control.hpp>
 #include <jive/rvsdg/structural-node.hpp>
 #include <jlm/common.hpp>
+#include <jlm/ir/types.hpp>
 #include <jive/rvsdg/substitution.hpp>
 
 namespace jlm {
@@ -523,6 +524,7 @@ namespace jlm {
 			}
 
 			jive::output *_predicate_buffer;
+            backedge_argument * add_backedge(const jive::type & type);
 
 		public:
 			static loop_node *
@@ -547,7 +549,6 @@ namespace jlm {
 
 			void set_predicate(jive::output *p);
 
-            backedge_argument * add_backedge(const jive::type & type);
 
 			jive::structural_output *
 			add_loopvar(jive::output *origin, jive::output **buffer = nullptr);
