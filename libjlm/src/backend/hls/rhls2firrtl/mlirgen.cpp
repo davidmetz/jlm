@@ -1661,44 +1661,13 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 	// Connect the memory ports
 	auto args = body->getArguments().size();
 	auto memResBundle = body->getArgument(args-1);
-	auto memResValid = GetSubfield(body, memResBundle, "valid");
-	auto memResData  = GetSubfield(body, memResBundle, "data");
-
 	auto memReqBundle = body->getArgument(args-2);
-	auto memReqValid = GetSubfield(body, memReqBundle, "valid");
-	auto memReqAddr  = GetSubfield(body, memReqBundle, "addr");
-	auto memReqData  = GetSubfield(body, memReqBundle, "data");
-	auto memReqWrite = GetSubfield(body, memReqBundle, "write");
-	auto memReqWidth = GetSubfield(body, memReqBundle, "width");
 
 	auto srArgs = instance.getResults().size();
 	auto srMemResBundle = instance->getResult(srArgs-1);
-	auto srMemResValid = GetSubfield(body, srMemResBundle, "valid");
-	auto srMemResData  = GetSubfield(body, srMemResBundle, "data");
-
 	auto srMemReqBundle = instance->getResult(srArgs-2);
-	auto srMemReqReady = GetSubfield(body, srMemReqBundle, "ready");
-	auto srMemReqValid = GetSubfield(body, srMemReqBundle, "valid");
-	auto srMemReqAddr  = GetSubfield(body, srMemReqBundle, "addr");
-	auto srMemReqData  = GetSubfield(body, srMemReqBundle, "data");
-	auto srMemReqWrite = GetSubfield(body, srMemReqBundle, "write");
-	auto srMemReqWidth = GetSubfield(body, srMemReqBundle, "width");
-
-	Connect(body, srMemResValid, memResValid);
-	Connect(body, srMemResData,  memResData);
-	Connect(body, srMemReqReady, zeroBitValue);
-
-	// When statement
-	whenOp = AddWhenOp(body, srMemReqValid, false);
-	// getThenBlock() cause an error during commpilation
-	// So we first get the builder and then its associated body
-	thenBody = whenOp.getThenBodyBuilder().getBlock();
-	Connect(thenBody, srMemReqReady, oneBitValue);
-	Connect(thenBody, memReqValid, oneBitValue);
-	Connect(thenBody, memReqAddr, srMemReqAddr);
-	Connect(thenBody, memReqData, srMemReqData);
-	Connect(thenBody, memReqWrite, srMemReqWrite);
-	Connect(thenBody, memReqWidth, srMemReqWidth);
+    Connect(body, memReqBundle, srMemReqBundle);
+    Connect(body, srMemResBundle, memResBundle);
 
 	// Add the module to the body of the circuit
 	circuitBody->push_back(module);
