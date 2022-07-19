@@ -35,6 +35,29 @@
 #include <jlm/ir/operators/theta.hpp>
 #include <jlm/util/Statistics.hpp>
 #include "jlm/opt/DeadNodeElimination.hpp"
+#include "jlm/opt/reduction.hpp"
+#include "jive/view.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/mem-conv.hpp"
+#include <jlm/opt/alias-analyses/Optimization.hpp>
+
+void
+split_opt(jlm::RvsdgModule &rm) {
+	// TODO: figure out which optimizations to use here
+	jlm::DeadNodeElimination dne;
+	jlm::cne cne;
+	jlm::InvariantValueRedirection ivr;
+	jlm::tginversion tgi;
+    jlm::aa::SteensgaardBasic aa;
+    jlm::nodereduction red;
+    jlm::StatisticsDescriptor sd;
+	tgi.run(rm, sd);
+	dne.run(rm, sd);
+	cne.run(rm, sd);
+	ivr.run(rm, sd);
+    aa.run(rm, sd);
+    red.run(rm, sd);
+    dne.run(rm, sd);
+}
 
 void
 pre_opt(jlm::RvsdgModule &rm) {
@@ -48,6 +71,13 @@ pre_opt(jlm::RvsdgModule &rm) {
 	dne.run(rm, statisticsCollector);
 	cne.run(rm, statisticsCollector);
 	ivr.run(rm, statisticsCollector);
+}
+
+void
+dump_xml(jlm::RvsdgModule &rvsdgModule, const std::string &file_name) {
+    auto xml_file = fopen(file_name.c_str(), "w");
+    jive::view_xml(rvsdgModule.Rvsdg().root(), xml_file);
+    fclose(xml_file);
 }
 
 namespace jlm {
@@ -145,6 +175,7 @@ namespace jlm {
 				region->graph()->add_export(delta, {delta_type, delta_name});
 				auto delta_local = jlm::hls::route_to_region(delta, region);
 				node->output(0)->divert_users(delta_local);
+                // TODO: handle general case of other nodes getting state edge without a merge
 				// TODO: check that the input to alloca is a bitconst 1
 				JLM_ASSERT(node->output(1)->nusers() == 1);
 				auto mux_in = *node->output(1)->begin();
@@ -230,8 +261,9 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
                 continue;
             }
             inline_calls(ln->subregion());
-            // TODO: have a seperate set of optimizations here
-            pre_opt(rm);
+            dump_xml(rm, "post_inline.rvsdg");
+            split_opt(rm);
+            dump_xml(rm, "post_opt.rvsdg");
             convert_alloca(ln->subregion());
             jive::substitution_map smap;
             for (size_t i = 0; i < ln->ninputs(); ++i) {
@@ -289,6 +321,7 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	jlm::hls::theta_conv(rhls);
 	// rhls optimization
 	jlm::hls::dne(rhls);
+    jlm::hls::mem_conv(rhls);
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(rhls);
 	jlm::hls::add_forks(rhls);
