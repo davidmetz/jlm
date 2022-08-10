@@ -151,6 +151,7 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 std::string
 jlm::hls::DotHLS::edge(std::string src, std::string snk, const jive::type &type, bool back) {
 	auto color = "black";
+    JLM_ASSERT(src != "" && snk != "");
 	if (dynamic_cast<const jive::ctltype *>(&type)) {
 		color = "green";
 	}
@@ -193,6 +194,8 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 				dot << node_dot;
 			}
 		} else if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
+            // need to prepare output here again, because inputs might not have been resolved yet, because nodes in outer loop were not yet processed.
+            prepare_loop_out_port(ln);
 			dot << loop_to_dot(ln);
 		} else {
 			throw jlm::error("Unimplemented op (unexpected structural node) : " + node->operation().debug_string());
@@ -291,9 +294,11 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 	dot << "color=\"#80b3ff\"\n";
 	dot << "penwidth=6\n";
 
+    // process arguments
 	for (size_t i = 0; i < sr->narguments(); ++i) {
 		output_map[sr->argument(i)] = get_port_name(sr->argument(i));
 	}
+    // process nodes
 	for (auto node: jive::topdown_traverser(sr)) {
 		if (dynamic_cast<jive::simple_node *>(node)) {
 			auto node_dot = node_to_dot(node);
@@ -309,6 +314,7 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 				output_map[node->output(i)] = node_name + ":" + get_port_name(node->output(i));
 			}
 		} else if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
+            // the only structural nodes left are loop nodes
 			prepare_loop_out_port(ln);
 			dot << loop_to_dot(ln);
 		} else {
@@ -316,6 +322,7 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 					"Unimplemented op (unexpected structural node) : " + node->operation().debug_string());
 		}
 	}
+    // process results
 	for (size_t i = 0; i < sr->nresults(); ++i) {
 		auto origin = output_map[sr->result(i)->origin()];
 		auto result = get_port_name(sr->result(i));
