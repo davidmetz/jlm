@@ -5,6 +5,7 @@
  */
 
 #include "jlm/backend/hls/rhls2firrtl/mlirgen.hpp"
+#include <jlm/opt/alias-analyses/Operators.hpp>
 
 #ifdef CIRCT
 
@@ -162,6 +163,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto inData = GetSubfield(body, inBundles[0], "data");
 		int outSize = JlmSize(&node->output(0)->type());
 		Connect(body, outData, AddBitsOp(body, inData, outSize-1, 0));
+	} else if (dynamic_cast<const jlm::aa::LambdaExitMemStateOperator *>(&(node->operation()))) {
+		auto inData = GetSubfield(body, inBundles[0], "data");
+		Connect(body, outData, inData);
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto sintOp = AddAsSIntOp(body, input0);
@@ -1480,14 +1484,8 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenBranch(node);
 	} else if (dynamic_cast<const hls::trigger_op *>(&(node->operation()))) {
 		return MlirGenTrigger(node);
-	} else if (dynamic_cast<const hls::sink_op *>(&(node->operation()))) {
-		//return sink_to_firrtl(n);
-		throw std::logic_error(node->operation().debug_string() + " not implemented!");
 	} else if (dynamic_cast<const hls::print_op *>(&(node->operation()))) {
         return MlirGenPrint(node);
-	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
-		//return fork_to_firrtl(n);
-		throw std::logic_error(node->operation().debug_string() + " not implemented!");
 	} else if (dynamic_cast<const hls::merge_op *>(&(node->operation()))) {
 		// return merge_to_firrtl(n);
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");
