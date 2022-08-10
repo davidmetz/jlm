@@ -4,6 +4,7 @@
  */
 
 #include "jlm/backend/hls/rvsdg2rhls/remove-unused-state.hpp"
+#include "jlm/opt/alias-analyses/Operators.hpp"
 #include <jive/rvsdg/traverser.hpp>
 #include <jive/view.hpp>
 
@@ -27,6 +28,42 @@ jlm::hls::remove_unused_state(jive::region *region, bool can_remove_arguments) {
 			}
 		}
 	}
+    // exit will come before entry
+    for (auto &node : jive::bottomup_traverser(region)) {
+        if (auto simplenode = dynamic_cast<jive::simple_node *>(node)) {
+            if (auto lex = dynamic_cast<const jlm::aa::LambdaExitMemStateOperator *>(&node->operation())){
+                std::vector<jive::output *> nv;
+                for (size_t i = 0; i < simplenode->ninputs(); ++i) {
+                    if(auto so = dynamic_cast<jive::simple_output *>(simplenode->input(i)->origin())){
+                        if(dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator *>(&so->node()->operation())){
+                            // skip things coming from entry
+                            continue;
+                        }
+                    }
+                    nv.push_back(simplenode->input(i)->origin());
+                }
+                if(nv.size()!=simplenode->ninputs()){
+                    auto new_state = jlm::aa::LambdaExitMemStateOperator::Create(region, nv);
+                    simplenode->output(0)->divert_users(new_state);
+                    remove(simplenode);
+                }
+            } else if (auto len = dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator *>(&node->operation())){
+                std::vector<jive::output *> nv;
+                for (size_t i = 0; i < simplenode->noutputs(); ++i) {
+                    if(simplenode->output(i)->nusers()){
+                        nv.push_back(simplenode->output(i));
+                    }
+                }
+                if(nv.size()!=simplenode->noutputs()){
+                    auto new_states = jlm::aa::LambdaEntryMemStateOperator::Create(simplenode->input(0)->origin(), nv.size());
+                    for (size_t i = 0; i < nv.size(); ++i) {
+                        nv[i]->divert_users(new_states[i]);
+                    }
+                    remove(simplenode);
+                }
+            }
+        }
+    }
 	if (can_remove_arguments) {
 		// check if an input is passed through unnecessarily
 		for (int i = region->narguments() - 1; i >= 0; --i) {
