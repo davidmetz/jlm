@@ -525,7 +525,6 @@ namespace jlm {
 			}
 
 			jive::output *_predicate_buffer;
-            backedge_argument * add_backedge(const jive::type & type);
 
 		public:
 			static loop_node *
@@ -553,6 +552,8 @@ namespace jlm {
 
 			jive::structural_output *
 			add_loopvar(jive::output *origin, jive::output **buffer = nullptr);
+
+            backedge_argument * add_backedge(const jive::type & type);
 
 			virtual loop_node *
 			copy(jive::region *region, jive::substitution_map &smap) const override;
@@ -621,6 +622,118 @@ namespace jlm {
                 std::vector<jive::output*> inputs;
                 inputs.push_back(&addr);
                 inputs.insert(inputs.end(), states.begin(), states.end());
+                inputs.push_back(&load_result);
+                return jive::simple_node::create_normalized(region, op, inputs);
+            }
+        };
+
+        class state_gate_op final : public jive::simple_op {
+        public:
+            virtual
+            ~state_gate_op() {}
+
+            state_gate_op(
+                    const jive::type & type,
+                    size_t numStates)
+                    : simple_op(CreateInOutPorts(type, numStates), CreateInOutPorts(type, numStates)) {}
+
+            bool
+            operator==(const jive::operation &other) const noexcept override {
+                auto ot = dynamic_cast<const state_gate_op *>(&other);
+                // check predicate and value
+                return ot
+                       && ot->argument(1).type() == argument(1).type()
+                       && ot->narguments() == narguments();
+            }
+
+            static std::vector<jive::port>
+            CreateInOutPorts(const jive::type & type, size_t numStates)
+            {
+                std::vector<jive::port> ports(1, {type});
+                std::vector<jive::port> states(numStates, {MemoryStateType::Create()});
+                ports.insert(ports.end(), states.begin(), states.end());
+                return ports;
+            }
+
+            std::string
+            debug_string() const override {
+                return "HLS_STATE_GATE_"+ argument(narguments()-1).type().debug_string();
+            }
+
+            std::unique_ptr<jive::operation>
+            copy() const override {
+                return std::unique_ptr<jive::operation>(new state_gate_op(*this));
+            }
+
+            static std::vector<jive::output *>
+            create(
+                    jive::output &addr,
+                    const std::vector<jive::output *> &states
+            ) {
+                auto region = addr.region();
+                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
+                state_gate_op op(*pointerType, states.size());
+                std::vector<jive::output*> inputs;
+                inputs.push_back(&addr);
+                inputs.insert(inputs.end(), states.begin(), states.end());
+                return jive::simple_node::create_normalized(region, op, inputs);
+            }
+        };
+
+        class decoupled_load_op final : public jive::simple_op {
+        public:
+            virtual
+            ~decoupled_load_op() {}
+
+            decoupled_load_op(
+                    const PointerType & pointerType)
+                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)) {}
+
+            bool
+            operator==(const jive::operation &other) const noexcept override {
+                auto ot = dynamic_cast<const decoupled_load_op *>(&other);
+                // check predicate and value
+                return ot
+                       && ot->argument(1).type() == argument(1).type()
+                       && ot->narguments() == narguments();
+            }
+
+            static std::vector<jive::port>
+            CreateInPorts(const PointerType & pointerType)
+            {
+                std::vector<jive::port> ports(1, {pointerType});
+                ports.emplace_back(pointerType.GetElementType()); // result
+                return ports;
+            }
+
+            static std::vector<jive::port>
+            CreateOutPorts(const PointerType & pointerType)
+            {
+                std::vector<jive::port> ports(1, {pointerType.GetElementType()});
+                ports.emplace_back(pointerType); // addr
+                return ports;
+            }
+
+            std::string
+            debug_string() const override {
+                return "HLS_DEC_LOAD_"+ argument(narguments()-1).type().debug_string();
+            }
+
+            std::unique_ptr<jive::operation>
+            copy() const override {
+                return std::unique_ptr<jive::operation>(new decoupled_load_op(*this));
+            }
+
+            static std::vector<jive::output *>
+            create(
+                    jive::output &addr,
+                    jive::output &load_result
+            ) {
+                auto region = addr.region();
+                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
+                decoupled_load_op op(*pointerType);
+                std::vector<jive::output*> inputs;
+                inputs.push_back(&addr);
                 inputs.push_back(&load_result);
                 return jive::simple_node::create_normalized(region, op, inputs);
             }

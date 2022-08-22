@@ -62,10 +62,12 @@ namespace jlm {
 			// Operations
 			circt::firrtl::FModuleOp MlirGenSink(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenFork(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenStateGate(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenMem(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsMemResp(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsMemReq(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsLoad(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenHlsDLoad(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsStore(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPrint(const jive::simple_node *node);
@@ -107,6 +109,9 @@ namespace jlm {
 			circt::firrtl::AndPrimOp AddAndOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
+            circt::firrtl::NodeOp AddNodeOp(mlir::Block *body,
+                            mlir::Value value,
+                            std::string name);
 			circt::firrtl::XorPrimOp AddXorOp(mlir::Block *body,
 							mlir::Value first,
 							mlir::Value second);
