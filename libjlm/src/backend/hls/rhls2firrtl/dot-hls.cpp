@@ -154,6 +154,8 @@ jlm::hls::DotHLS::edge(std::string src, std::string snk, const jive::type &type,
     JLM_ASSERT(src != "" && snk != "");
 	if (dynamic_cast<const jive::ctltype *>(&type)) {
 		color = "green";
+	} else if (dynamic_cast<const jlm::MemoryStateType *>(&type)) {
+		color = "blue";
 	}
 	if (!back) {
 		return src + " -> " + snk + " [style=\"\", arrowhead=\"normal\", color=" + color +
