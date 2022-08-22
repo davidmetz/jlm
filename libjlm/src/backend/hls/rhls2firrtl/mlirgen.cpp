@@ -140,6 +140,12 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddLtOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
+	}   else if (dynamic_cast<const jive::bitule_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
+		auto op = AddLeqOp(body, input0, input1);
+		// Connect the op to the output data
+		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
