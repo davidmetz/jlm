@@ -58,6 +58,114 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node *ln) {
 	return any_changed;
 }
 
+bool dead_spec_gamma(jive::node *dmux_node){
+    auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&dmux_node->operation());
+    JLM_ASSERT(mux_op);
+    JLM_ASSERT(mux_op->discarding);
+    // check if all inputs have the same origin
+    bool all_inputs_same = true;
+    auto first_origin = dmux_node->input(1)->origin();
+    for (size_t i = 2; i < dmux_node->ninputs(); ++i) {
+        if(dmux_node->input(i)->origin() != first_origin){
+            all_inputs_same = false;
+            break;
+        }
+    }
+    if(all_inputs_same){
+        dmux_node->output(0)->divert_users(first_origin);
+        remove(dmux_node);
+        return true;
+    }
+    return false;
+}
+
+bool dead_nonspec_gamma(jive::node *ndmux_node){
+    auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&ndmux_node->operation());
+    JLM_ASSERT(mux_op);
+    JLM_ASSERT(!mux_op->discarding);
+    // check if all inputs go to outputs of same branch
+    bool all_inputs_same_branch = true;
+    jive::node * origin_branch;
+    for (size_t i = 1; i < ndmux_node->ninputs(); ++i) {
+        if(auto no = dynamic_cast<jive::node_output*>(ndmux_node->input(i)->origin())){
+            if(dynamic_cast<const jlm::hls::branch_op*>(&no->node()->operation())
+                && no->nusers() == 1){
+                if(i==1){
+                    origin_branch = no->node();
+                    continue;
+                } else if(origin_branch == no->node()){
+                    continue;
+                }
+            }
+        }
+        all_inputs_same_branch = false;
+        break;
+    }
+    if(all_inputs_same_branch
+        && origin_branch->input(0)->origin() == ndmux_node->input(0)->origin()){
+        // same control origin + all inputs to branch
+        ndmux_node->output(0)->divert_users(origin_branch->input(1)->origin());
+        remove(ndmux_node);
+        remove(origin_branch);
+        return true;
+    }
+    return false;
+}
+
+bool dead_loop(jive::node *ndmux_node){
+    auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&ndmux_node->operation());
+    JLM_ASSERT(mux_op);
+    JLM_ASSERT(!mux_op->discarding);
+    // origin is a backedege argument
+    auto backedge_arg = dynamic_cast<jlm::hls::backedge_argument*>(ndmux_node->input(2)->origin());
+    if(!backedge_arg){
+        return false;
+    }
+    // one buffer
+    if(ndmux_node->output(0)->nusers()!=1){
+        return false;
+    }
+    auto buf_in = dynamic_cast<jive::node_input*>(*ndmux_node->output(0)->begin());
+    if(!buf_in || !dynamic_cast<const jlm::hls::buffer_op*>(&buf_in->node()->operation())){
+        return false;
+    }
+    auto buf_out = buf_in->node()->output(0);
+    // one branch
+    if(buf_out->nusers()!=1){
+        return false;
+    }
+    auto branch_in = dynamic_cast<jive::node_input*>(*buf_out->begin());
+    if(!branch_in || !dynamic_cast<const jlm::hls::branch_op*>(&branch_in->node()->operation())){
+        return false;
+    }
+    if(branch_in->node()->output(1) != backedge_arg->result()->origin()){
+        // no connection back up
+        return false;
+    }
+    // depend on same control
+    auto branch_cond_origin = branch_in->node()->input(0)->origin();
+    auto pred_buf_out = dynamic_cast<jive::node_output*>(ndmux_node->input(0)->origin());
+    if(!pred_buf_out || !dynamic_cast<const jlm::hls::predicate_buffer_op*>(&pred_buf_out->node()->operation())){
+        return false;
+    }
+    auto pred_buf_cond_origin = pred_buf_out->node()->input(0)->origin();
+    if(auto pred_be = dynamic_cast<jlm::hls::backedge_argument*>(pred_buf_cond_origin)){
+        pred_buf_cond_origin = pred_be->result()->origin();
+    }
+    if(pred_buf_cond_origin!=branch_cond_origin){
+        return false;
+    }
+    // divert users
+    branch_in->node()->output(0)->divert_users(ndmux_node->input(1)->origin());
+    branch_in->node()->output(1)->divert_users(backedge_arg);
+    remove(branch_in->node());
+    remove(buf_in->node());
+    remove(ndmux_node);
+    ndmux_node->region()->remove_result(backedge_arg->result()->index());
+    ndmux_node->region()->remove_argument(backedge_arg->index());
+    return true;
+}
+
 bool
 jlm::hls::dne(jive::region *sr) {
 	bool any_changed = false;
@@ -66,17 +174,26 @@ jlm::hls::dne(jive::region *sr) {
 		changed = false;
 		for (auto &node : jive::bottomup_traverser(sr)) {
 			if (!node->has_users()) {
+                if(dynamic_cast<const jlm::hls::mem_req_op*>(&node->operation())){
+                    // TODO: fix this once memory connections are explicit
+                    continue;
+                }
 				remove(node);
 				changed = true;
 			} else if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
 				changed |= remove_unused_loop_outputs(ln);
 				changed |= remove_unused_loop_inputs(ln);
 				changed |= dne(ln->subregion());
-			}
+			} else if (auto mux = dynamic_cast<const jlm::hls::mux_op*>(&node->operation())){
+                if(mux->discarding){
+                    changed |= dead_spec_gamma(node);
+                } else{
+                    changed |= dead_nonspec_gamma(node) || dead_loop(node);
+                }
+            }
 		}
 		any_changed |= changed;
 	} while (changed);
-	assert(sr->bottom_nodes.empty());
 	return any_changed;
 }
 
