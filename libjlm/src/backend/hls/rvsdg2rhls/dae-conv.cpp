@@ -1,0 +1,355 @@
+//
+// Created by david on 7/2/21.
+//
+
+#include "jlm/backend/hls/rvsdg2rhls/dae-conv.hpp"
+#include "jlm/ir/operators/store.hpp"
+#include "jlm/ir/operators/load.hpp"
+#include "jlm/ir/operators/lambda.hpp"
+#include "jive/view.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/rhls-dne.hpp"
+#include <jive/rvsdg/substitution.hpp>
+#include <jlm/ir/hls/hls.hpp>
+#include <jive/rvsdg/theta.hpp>
+#include <jive/rvsdg/traverser.hpp>
+#include <queue>
+
+void
+jlm::hls::dae_conv(jlm::RvsdgModule &rm) {
+    auto &graph = rm.Rvsdg();
+    auto root = graph.root();
+    dae_conv(root);
+}
+
+void find_slice_node(jive::node* node, std::unordered_set<jive::node*> & slice);
+
+void find_slice_output(jive::output* output, std::unordered_set<jive::node*> & slice){
+    if(auto no = dynamic_cast<jive::node_output*>(output)){
+        if(slice.count(no->node())){
+            // only process each node once
+            return;
+        }
+        slice.insert(no->node());
+        JLM_ASSERT(slice.count(no->node()));
+        find_slice_node(no->node(), slice);
+    } else if (auto arg = dynamic_cast<jive::argument *>(output) ){
+        if(auto be = dynamic_cast<jlm::hls::backedge_argument*>(output)){
+            find_slice_output(be->result()->origin(), slice);
+        }
+    } else {
+        JLM_UNREACHABLE("THIS SHOULDNT HAPPEN");
+    }
+}
+
+void find_slice_node(jive::node* node, std::unordered_set<jive::node*> & slice){
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+        find_slice_output(node->input(i)->origin(), slice);
+    }
+}
+
+void find_data_slice_node(jive::node* node, std::unordered_set<jive::node*> & slice){
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+        if(jive::is<jlm::MemoryStateType>(node->input(i)->type())){
+            continue;
+        }
+        find_slice_output(node->input(i)->origin(), slice);
+    }
+}
+
+void find_state_slice_node(jive::node* node, std::unordered_set<jive::node*> & slice){
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+        if(!jive::is<jlm::MemoryStateType>(node->input(i)->type())){
+            continue;
+        }
+        find_slice_output(node->input(i)->origin(), slice);
+    }
+}
+
+bool
+is_slice_exclusive_(jive::node *source, jive::node *destination, std::unordered_set<jive::node*> & slice, std::unordered_set<jive::node*> & visited);
+
+bool
+is_slice_exclusive_input_(jive::input *source, jive::node *destination, std::unordered_set<jive::node*> & slice, std::unordered_set<jive::node*> & visited) {
+    if(auto ni = dynamic_cast<jive::node_input*>(source)){
+        if(!is_slice_exclusive_(ni->node(), destination, slice, visited)){
+            return false;
+        }
+    } else if (auto arg = dynamic_cast<jive::result *>(source) ){
+        if(auto be = dynamic_cast<jlm::hls::backedge_result*>(source)){
+            for(auto user:*be->argument()){
+                if(!is_slice_exclusive_input_(user, destination, slice, visited)){
+                    return false;
+                }
+            }
+        } else{
+            // descendant escapes loop
+            return false;
+        }
+    } else {
+        JLM_UNREACHABLE("THIS SHOULDNT HAPPEN");
+    }
+}
+
+void trace_to_loop_results(jive::output *out, std::vector<jive::result *> &results){
+    for(auto user: *out){
+        if(auto res = dynamic_cast<jive::result *>(user)){
+            results.push_back(res);
+        } else if(auto ni = dynamic_cast<jive::node_input*>(user)){
+            auto node = ni->node();
+            for (size_t i = 0; i < node->noutputs(); ++i) {
+                if(node->output(i)->type() == out->type()){
+                    trace_to_loop_results(node->output(i), results);
+                }
+            }
+        } else{
+            JLM_UNREACHABLE("NOPE");
+        }
+    }
+}
+
+bool
+is_slice_exclusive_(jive::node *source, jive::node *destination, std::unordered_set<jive::node*> & slice, std::unordered_set<jive::node*> & visited) {
+    // check if descendents of source can leave the slice without going through destination
+    if(source == destination){
+        return true;
+    } else if (!slice.count(source)){
+        return false;
+    } else if(visited.count(source)){
+        return true;
+    }
+    visited.insert(source);
+    for (size_t i = 0; i < source->noutputs(); ++i) {
+        for(auto user:*source->output(i)){
+            if(!is_slice_exclusive_input_(user, destination, slice, visited)){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool
+is_slice_exclusive_(jive::node *source, jive::node *destination, std::unordered_set<jive::node*> & slice){
+    std::unordered_set<jive::node*> visited;
+    return is_slice_exclusive_(source, destination, slice, visited);
+}
+
+void
+dump_xml(const jive::region * region, const std::string &file_name) {
+    auto xml_file = fopen(file_name.c_str(), "w");
+    jive::view_xml(region, xml_file);
+    fclose(xml_file);
+}
+
+void decouple_load(jlm::hls::loop_node * loopNode, jive::simple_node * loadNode, std::unordered_set<jive::node*> &loop_slice){
+    // loadNode is always a part of loop_slice due to state edges
+    auto new_loop = jlm::hls::loop_node::create(loopNode->region(), false);
+    jive::substitution_map smap;
+    std::vector<jlm::hls::backedge_argument*> backedge_args;
+    // create arguments
+    for (size_t i = 0; i < loopNode->subregion()->narguments(); ++i) {
+        auto arg = loopNode->subregion()->argument(i);
+        // only process arguments that are used by at least one node in the slice
+        for(auto user:*arg){
+            if(auto ni = dynamic_cast<jive::node_input*>(user)){
+                if(loop_slice.count(ni->node())){
+                    jive::argument * new_arg;
+                    if(auto be = dynamic_cast<jlm::hls::backedge_argument*>(arg)){
+                        new_arg = new_loop->add_backedge(arg->type());
+                        backedge_args.push_back(be);
+                    } else{
+                        auto new_in = jive::structural_input::create(new_loop, arg->input()->origin(), arg->type());
+                        smap.insert(arg->input(), new_in);
+                        new_arg = jive::argument::create(new_loop->subregion(), new_in, arg->type());
+                    }
+                    smap.insert(arg, new_arg);
+                    continue;
+                }
+            }
+        }
+    }
+    // copy nodes
+    std::vector<std::vector<jive::node*>> context(loopNode->subregion()->nnodes());
+    for (auto & node : *loopNode->subregion()) {
+        JIVE_DEBUG_ASSERT(node.depth() < context.size());
+        context[node.depth()].push_back(&node);
+    }
+    for (size_t n = 0; n < context.size(); n++) {
+        for (auto node : context[n]) {
+            if (loop_slice.count(node)) {
+                node->copy(new_loop->subregion(), smap);
+            }
+        }
+    }
+    // handle backedges
+    for (auto be:backedge_args) {
+        auto res = be->result();
+        auto new_res = dynamic_cast<jlm::hls::backedge_argument*>(smap.lookup(be))->result();
+        new_res->divert_to(smap.lookup(res->origin()));
+    }
+
+
+    // redirect state edges to new loop outputs
+    for (size_t i = 1; i < loadNode->noutputs()-1; ++i) {
+        std::vector<jive::result *> results;
+        trace_to_loop_results(loadNode->output(i), results);
+        JLM_ASSERT(results.size() <= 2);
+        for (auto res:results) {
+            if(dynamic_cast<jlm::hls::backedge_result*>(res)){
+                // backedges should already have been copied
+                continue;
+            }
+            auto new_res_origin = smap.lookup(res->origin());
+            auto new_state_output = jive::structural_output::create(new_loop, new_res_origin->port());
+            jive::result::create(new_loop->subregion(), new_res_origin, new_state_output, new_res_origin->type());
+            res->output()->divert_users(new_state_output);
+        }
+    }
+    dump_xml(new_loop->subregion(), "new_loop_just_slice.rvsdg");
+    //replace load with stategate
+    auto new_load = dynamic_cast<jive::node_output*>(smap.lookup(loadNode->output(0)))->node();
+    std::vector<jive::output *> in_states;
+    std::vector<std::vector<jive::input *>> state_users;
+    for (size_t i = 1; i < new_load->ninputs()-1; ++i) {
+        in_states.push_back(new_load->input(i)->origin());
+        state_users.emplace_back();
+        for(auto user :*new_load->output(i)){
+            state_users.back().push_back(user);
+        }
+    }
+
+    auto gate_out = jlm::hls::state_gate_op::create(*new_load->input(0)->origin(), in_states);
+    // divert state edges to state gate
+    for (size_t i = 0; i < in_states.size(); ++i) {
+        for (auto user:state_users[i]) {
+            user->divert_to(gate_out[i+1]);
+        }
+    }
+
+    // create output for address
+    auto load_addr = gate_out[0];
+    auto addr_output = jive::structural_output::create(new_loop, load_addr->port());
+    jive::result::create(new_loop->subregion(), load_addr, addr_output, load_addr->type());
+    // trace and remove loop input for mem data reponse
+    auto mem_data_loop_out = new_load->input(new_load->ninputs()-1)->origin();
+    auto mem_data_loop_arg = dynamic_cast<jive::argument*>(mem_data_loop_out);
+    auto mem_data_loop_in = mem_data_loop_arg->input();
+    auto mem_data_resp = mem_data_loop_in ->origin();
+    dump_xml(new_loop->subregion(), "new_loop_before_remove.rvsdg");
+    remove(new_load);
+    JLM_ASSERT(mem_data_loop_arg->nusers() == 0);
+    new_loop->subregion()->remove_argument(mem_data_loop_arg->index());
+    new_loop->remove_input(mem_data_loop_in->index());
+    // create new decoupled load
+    auto dload_out = jlm::hls::decoupled_load_op::create(*addr_output, *mem_data_resp);
+
+    // redirect mem_req_addr to dload_out[1]
+    auto old_mem_req_res = dynamic_cast<jive::result*>(*loadNode->output(loadNode->noutputs()-1)->begin());
+    auto old_mem_req_out = old_mem_req_res->output();
+    auto mem_req_in = *old_mem_req_out->begin();
+    mem_req_in->divert_to(dload_out[1]);
+    loopNode->subregion()->remove_result(old_mem_req_res->index());
+    loopNode->remove_output(old_mem_req_out->index());
+    // redirect state outputs of loadNode so they become pass through
+    for (size_t i = 1; i < loadNode->noutputs()-1; ++i) {
+        loadNode->output(i)->divert_users(loadNode->input(i)->origin());
+    }
+    // TODO: remove this once decoupled load is actually decoupled/has buffers
+    auto buf = dload_out[0];//jlm::hls::buffer_op::create(*dload_out[0], 10, true)[0];
+    // replace data output of loadNode
+    auto old_data_in = jive::structural_input::create(loopNode, buf, dload_out[0]->type());
+    auto old_data_arg = jive::argument::create(loopNode->subregion(), old_data_in, dload_out[0]->type());
+    loadNode->output(0)->divert_users(old_data_arg);
+    remove(loadNode);
+}
+
+bool process_loopnode(jlm::hls::loop_node * loopNode) {
+    for (auto &node: jive::topdown_traverser(loopNode->subregion())) {
+        if (auto ln = dynamic_cast<jlm::hls::loop_node *>(node)) {
+            if(process_loopnode(ln)){
+                return true;
+            }
+        } else if (auto simplenode = dynamic_cast<jive::simple_node * >(node)) {
+            if (dynamic_cast<const jlm::hls::load_op *>(&simplenode->operation())) {
+                // can currently only generate dae one loop deep
+                // find load slice within loop - three slices - complete, data and state-edge
+                std::unordered_set<jive::node*> loop_slice, data_slice, state_slice;
+                find_slice_node(simplenode, loop_slice);
+                find_data_slice_node(simplenode, data_slice);
+                find_state_slice_node(simplenode, state_slice);
+                // check if this load can be decoupled
+                bool can_decouple = true;
+                for (auto sn:data_slice) {
+                    if(dynamic_cast<jive::structural_node*>(sn)){
+                        // data slice may not contain loops
+                        can_decouple = false;
+                        break;
+                    } else if(dynamic_cast<const jlm::hls::load_op*>(&sn->operation()) ||
+                            dynamic_cast<const jlm::hls::store_op*>(&sn->operation())){
+                        // data slice may not contain loads or stores - this includes node
+                        can_decouple = false;
+                        break;
+                    } else if(dynamic_cast<const jlm::hls::decoupled_load_op*>(&sn->operation())){
+                        // decoupled load has to be exclusive to load slice - e.g. not needed once load slice is removed
+                        if(!is_slice_exclusive_(sn, simplenode, loop_slice)) {
+                            can_decouple = false;
+                            break;
+                        }
+                    }
+                }
+                JLM_ASSERT(!can_decouple || !data_slice.count(simplenode));
+                for (auto sn:state_slice) {
+                    if(dynamic_cast<jive::structural_node*>(sn)){
+                        // state slice may not contain loops
+                        can_decouple = false;
+                        break;
+                    } else if(dynamic_cast<const jlm::hls::load_op*>(&sn->operation()) ||
+                            dynamic_cast<const jlm::hls::store_op*>(&sn->operation())){
+                        // state slice may not contain loads or stores except for node
+                        if(sn!=dynamic_cast<jive::node*>(simplenode)){
+                            can_decouple = false;
+                            break;
+                        }
+                    } else if(dynamic_cast<const jlm::hls::decoupled_load_op*>(&sn->operation())){
+                        // decoupled load has to be exclusive to load slice - e.g. not needed once load slice is removed
+                        if(!is_slice_exclusive_(sn, simplenode, loop_slice)) {
+                            can_decouple = false;
+                            break;
+                        }
+                    }
+                }
+                if(can_decouple){
+                    decouple_load(loopNode, simplenode, loop_slice);
+//                    dump_xml(loopNode->subregion(), "decoupled_before_dne.rvsdg");
+//                    jlm::hls::dne(loopNode->subregion());
+//                    jlm::hls::remove_unused_loop_inputs(loopNode);
+//                    dump_xml(loopNode->subregion(), "decoupled_after_dne.rvsdg");
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void jlm::hls::dae_conv(jive::region *region) {
+    auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
+    bool changed;
+    do {
+        changed = false;
+        for (auto &node: jive::topdown_traverser(lambda->subregion())) {
+            if (auto loopnode = dynamic_cast<jlm::hls::loop_node *>(node)) {
+                if(process_loopnode(loopnode)){
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        if(changed){
+            // run dne after each change
+            dne(lambda->subregion());
+        }
+    } while (changed);
+}
+
+
