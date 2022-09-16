@@ -21,6 +21,7 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/SourceMgr.h>
+#include "jlm/backend/hls/rhls2firrtl/json-hls.hpp"
 
 
 static void
@@ -102,6 +103,11 @@ main(int argc, char ** argv)
 		stringToFile(
 			vhls.run(*rvsdgModule),
       commandLineOptions.OutputFolder_.path() + "/jlm_hls_harness.cpp");
+        // TODO: hide behind flag
+		jlm::hls::JsonHLS jhls;
+		stringToFile(
+                jhls.run(*rvsdgModule),
+      commandLineOptions.OutputFolder_.path() + "/jlm_hls.json");
 	} else if (commandLineOptions.OutputFormat_ == jlm::JlmHlsCommandLineOptions::OutputFormat::Dot) {
 		jlm::hls::rvsdg2rhls(*rvsdgModule);
 
