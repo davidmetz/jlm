@@ -254,8 +254,8 @@ void decouple_load(jlm::hls::loop_node * loopNode, jive::simple_node * loadNode,
     for (size_t i = 1; i < loadNode->noutputs()-1; ++i) {
         loadNode->output(i)->divert_users(loadNode->input(i)->origin());
     }
-    // TODO: remove this once decoupled load is actually decoupled/has buffers
-    auto buf = dload_out[0];//jlm::hls::buffer_op::create(*dload_out[0], 10, true)[0];
+    // use a buffer here to make ready logic for response easy and consistent
+    auto buf = jlm::hls::buffer_op::create(*dload_out[0], 2, true)[0];
     // replace data output of loadNode
     auto old_data_in = jive::structural_input::create(loopNode, buf, dload_out[0]->type());
     auto old_data_arg = jive::argument::create(loopNode->subregion(), old_data_in, dload_out[0]->type());

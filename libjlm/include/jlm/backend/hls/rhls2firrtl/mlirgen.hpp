@@ -96,6 +96,7 @@ namespace jlm {
 					mlir::Block *body,
 					mlir::Value value,
 					llvm::StringRef fieldName);
+            mlir::OpResult GetInstancePort(circt::firrtl::InstanceOp& instance, std::string portName);
 			mlir::BlockArgument GetPort(circt::firrtl::FModuleOp &module, std::string portName);
 			mlir::BlockArgument GetInPort(circt::firrtl::FModuleOp &module, size_t portNr);
 			mlir::BlockArgument GetOutPort(circt::firrtl::FModuleOp &module, size_t portNr);
@@ -182,6 +183,7 @@ namespace jlm {
 							jive::simple_node *node);
 			circt::firrtl::ConstantOp GetConstant(mlir::Block *body, int size, int value);
 			circt::firrtl::InvalidValueOp GetInvalid(mlir::Block *body, int size);
+            void ConnectInvalid(mlir::Block *body, mlir::Value value);
 
 			jive::output *TraceArgument(jive::argument *arg);
 			jive::simple_output *TraceStructuralOutput(jive::structural_output *out);
@@ -194,6 +196,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp nodeToModule(const jive::simple_node *node, bool mem=false);
 			circt::firrtl::IntType GetIntType(int size);
 			circt::firrtl::IntType GetIntType(const jive::type *type, int extend = 0);
+            circt::firrtl::FIRRTLType GetFirrtlType(const jive::type *type);
 			std::string GetModuleName(const jive::node *node);
 			bool IsIdentityMapping(const jive::match_op &op);
 

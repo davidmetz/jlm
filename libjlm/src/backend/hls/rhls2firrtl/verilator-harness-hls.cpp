@@ -12,6 +12,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	auto ln = get_hls_lambda(rm);
 	auto function_name = ln->name();
 	auto file_name = get_base_file_name(rm);
+
+    auto mem_reqs = get_mem_reqs(ln);
+    auto mem_resps = get_mem_resps(ln);
 	cpp <<
 		"#define TRACE_CHUNK_SIZE 100000\n"
 #ifndef HLS_USE_VCD
@@ -116,22 +119,27 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    top->i_valid = 0;\n";
 	// reset all data inputs to zero
 	for (size_t i = 0; i < ln->ninputs(); ++i) {
-		cpp << "    top->i_data" << i << " = 0;\n";
+		cpp << "    top->i_data_" << i << " = 0;\n";
 	}
 	cpp <<
 		"    top->reset = 1;\n"
-		"\n"
-		"    top->mem_req_ready = true;\n"
-		"    top->mem_res_valid = false;\n"
-		"    top->mem_res_data = 1111111;\n"
+		"\n";
+    for (size_t i = 0; i < mem_reqs.size(); ++i) {
+        cpp <<
+		"    top->mem_"<< i <<"_req_ready = false;\n"
+        "    top->mem_"<< i <<"_res_valid = false;\n"
+        "    top->mem_"<< i <<"_res_data_data = 0xDEADBEEF;\n";
+    }
+    cpp <<
 		"    clock_cycle();\n"
 		"    clock_cycle();\n"
 		"    top->reset = 0;\n"
 		"    clock_cycle();\n"
 		"}\n"
 		"\n"
-		"bool mem_resp_valid;\n"
-		"uint64_t mem_resp_data;\n"
+        "bool mem_resp_valid[" << mem_reqs.size() << "];\n"
+		"uint64_t mem_resp_data[" << mem_reqs.size() << "];\n"
+		"uint8_t mem_resp_id[" << mem_reqs.size() << "];\n"
 		"\n"
 		"void clock_cycle() {\n"
 		"    if (terminate) {\n"
@@ -141,59 +149,81 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    }\n"
 		"    assert(!Verilated::gotFinish());\n"
 		"    top->clk = 1;\n"
-		"    top->eval();\n"
-		"    top->mem_res_valid = mem_resp_valid;\n"
-		"    top->mem_res_data = mem_resp_data;\n"
+		"    top->eval();\n";
+    for (size_t i = 0; i < mem_reqs.size(); ++i) {
+        cpp <<
+        "    top->mem_" << i << "_res_data_data = mem_resp_data["<<i<<"];\n"
+        "    top->mem_" << i << "_res_data_id = mem_resp_id["<<i<<"];\n"
+        "    top->mem_" << i << "_res_valid = mem_resp_valid["<<i<<"];\n"
+        "    if (top->mem_" << i << "_res_valid && top->mem_" << i << "_res_ready) {\n"
+        "        mem_resp_valid["<<i<<"] = false;\n"
+        "    }\n"
+        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";
+    }
+    cpp <<
 		"    // dump before trying to access memory\n"
-        "    tfp->dump(main_time * 2);\n"
-		"    if (!top->reset && top->mem_req_valid) {\n"
-		"        mem_resp_valid = true;\n"
-		"        void *addr = (void *) top->mem_req_addr;\n"
-		"        uint64_t data = top->mem_req_data;\n"
-		"        if (top->mem_req_write) {\n"
+        "    tfp->dump(main_time * 2);\n";
+    for (size_t i = 0; i < mem_reqs.size(); ++i) {
+        cpp <<
+		"    // mem_" << i << "\n"
+		"    if (!top->reset && top->mem_" << i << "_req_valid && top->mem_" << i << "_req_ready) {\n"
+		"        mem_resp_valid["<<i<<"] = true;\n"
+		"        mem_resp_id["<<i<<"] = top->mem_" << i << "_req_data_id;\n"
+		"        void *addr = (void *) top->mem_" << i << "_req_data_addr;\n";
+        auto req_bt = dynamic_cast<const jlm::hls::bundletype*>(&mem_reqs[i]->type());
+        auto has_write = req_bt->get_element_type("write") != nullptr;
+        if(has_write) {
+            cpp <<
+        "        uint64_t data = top->mem_" << i << "_req_data_data;\n"
+        "        if (top->mem_" << i << "_req_data_write) {\n"
+        "#ifdef HLS_MEM_DEBUG\n"
+        "            std::cout << \"mem_"<<i<<" writing \" << data << \" to \" << addr << \"\\n\";\n"
+        "#endif\n"
+        "            switch (top->mem_" << i << "_req_data_size) {\n"
+        "                case 0:\n"
+        "                    *(uint8_t *) addr = data;\n"
+        "                    break;\n"
+        "                case 1:\n"
+        "                    *(uint16_t *) addr = data;\n"
+        "                    break;\n"
+        "                case 2:\n"
+        "                    *(uint32_t *) addr = data;\n"
+        "                    break;\n"
+        "                case 3:\n"
+        "                    *(uint64_t *) addr = data;\n"
+        "                    break;\n"
+        "                default:\n"
+        "                    assert(false);\n"
+        "            }\n"
+        "        } else {\n";
+        } else {
+            cpp <<
+        "        if (true) {\n";
+        }
+        cpp <<
 		"#ifdef HLS_MEM_DEBUG\n"
-		"            std::cout << \"writing \" << data << \" to \" << addr << \"\\n\";\n"
-		"#endif\n"
-		"            switch (top->mem_req_width) {\n"
-		"                case 0:\n"
-		"                    *(uint8_t *) addr = data;\n"
-		"                    break;\n"
-		"                case 1:\n"
-		"                    *(uint16_t *) addr = data;\n"
-		"                    break;\n"
-		"                case 2:\n"
-		"                    *(uint32_t *) addr = data;\n"
-		"                    break;\n"
-		"                case 3:\n"
-		"                    *(uint64_t *) addr = data;\n"
-		"                    break;\n"
-		"                default:\n"
-		"                    assert(false);\n"
-		"            }\n"
-		"        } else {\n"
-		"#ifdef HLS_MEM_DEBUG\n"
-		"            std::cout << \"reading from \" << addr << \"\\n\";\n"
+		"            std::cout << \"mem_"<<i<<" reading from \" << addr << \"\\n\";\n"
 		"#endif\n"
 		"        }\n"
-		"        switch (top->mem_req_width) {\n"
+		"        switch (top->mem_" << i << "_req_data_size) {\n"
 		"            case 0:\n"
-		"                mem_resp_data = *(uint8_t *) addr;\n"
+		"                mem_resp_data["<<i<<"] = *(uint8_t *) addr;\n"
 		"                break;\n"
 		"            case 1:\n"
-		"                mem_resp_data = *(uint16_t *) addr;\n"
+		"                mem_resp_data["<<i<<"] = *(uint16_t *) addr;\n"
 		"                break;\n"
 		"            case 2:\n"
-		"                mem_resp_data = *(uint32_t *) addr;\n"
+		"                mem_resp_data["<<i<<"] = *(uint32_t *) addr;\n"
 		"                break;\n"
 		"            case 3:\n"
-		"                mem_resp_data = *(uint64_t *) addr;\n"
+		"                mem_resp_data["<<i<<"] = *(uint64_t *) addr;\n"
 		"                break;\n"
 		"            default:\n"
 		"                assert(false);\n"
 		"        }\n"
-		"    } else {\n"
-		"        mem_resp_valid = false;\n"
-		"    }\n"
+		"    }\n";
+        }
+        cpp <<
 		"    assert(!Verilated::gotFinish());\n"
 		"    top->clk = 0;\n"
 		"    top->eval();\n"
@@ -245,7 +275,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
 			continue;
 		}
-		cpp << "    top->i_data" << i << " = (uint64_t) a" << i << ";\n";
+		cpp << "    top->i_data_" << i << " = (uint64_t) a" << i << ";\n";
 	}
 	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
 		size_t ix = ln->cvargument(i)->input()->argument()->index();
@@ -257,7 +287,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		} else{
 			throw jlm::error("Unsupported cvarg origin type type");
 		}
-		cpp << "    top->i_data" << ix << " = (uint64_t) &" << name << ";\n";
+		cpp << "    top->i_data_" << ix << " = (uint64_t) &" << name << ";\n";
 		cpp << "#ifdef HLS_MEM_DEBUG\n";
 		cpp << "    std::cout << \"" << name << ": \" << &" << name << " << \"\\n\";\n";
 		cpp << "#endif\n";
@@ -277,7 +307,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    clock_cycle();\n"
 		"    top->i_valid = 0;\n";
 	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
-		cpp << "    top->i_data" << i << " = 0;\n";
+		cpp << "    top->i_data_" << i << " = 0;\n";
 	}
 	cpp <<
 		"    for (int i = 0; i < TIMEOUT && !top->o_valid; i++) {\n"
@@ -285,12 +315,12 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    }\n"
 		"    if (!top->o_valid) {\n"
 		"        std::cout << \"o_valid not set\\n\";\n"
-		"        verilator_finish();\n"
+		"        //verilator_finish();\n"
 		"        exit(-1);\n"
 		"    }\n"
 		"    std::cout << \"finished - took \" << (main_time - start) << \"cycles\\n\";\n";
 	if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
-		cpp << "    return top->o_data0;\n";
+		cpp << "    return top->o_data_0;\n";
 	}
 	cpp << "}\n}\n";
 	return cpp.str();

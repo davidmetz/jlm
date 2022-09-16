@@ -211,6 +211,14 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 		if(mx && !mx->discarding && mx->loop){
 			dot << get_node_name(node) << " ";
 		}
+//        // also have the fork after the pred buf here
+//        auto fork = dynamic_cast<const hls::fork_op*>(&node->operation());
+//        if(fork){
+//            auto origin_out = dynamic_cast<jive::node_output*>(node->input(0)->origin());
+//            if(origin_out && dynamic_cast<const jlm::hls::predicate_buffer_op*>(&origin_out->node()->operation())){
+//                dot << get_node_name(node) << " ";
+//            }
+//        }
 	}
 	dot << "}\n";
 	// all loop branches at one level
@@ -234,7 +242,12 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 				assert(output_map.count(node->input(i)->origin()));
 				auto origin = output_map[node->input(i)->origin()];
 				// implement edge as back edge when it produces a cycle
-				bool back = mx && !mx->discarding && mx->loop && (i==0||i==2);//back_outputs.count(node->input(i)->origin());
+				bool back = mx && !mx->discarding && mx->loop && (/*i==0||*/i==2);//back_outputs.count(node->input(i)->origin());
+                auto origin_out = dynamic_cast<jive::node_output*>(node->input(i)->origin());
+                if(origin_out && dynamic_cast<const jlm::hls::predicate_buffer_op*>(&origin_out->node()->operation())){
+                    //
+                    back = true;
+                }
 				dot << edge(origin, in_name, node->input(i)->type(), back);
 			}
 		}
