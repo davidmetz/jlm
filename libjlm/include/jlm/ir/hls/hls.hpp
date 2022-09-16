@@ -12,6 +12,8 @@
 #include <jlm/common.hpp>
 #include <jlm/ir/types.hpp>
 #include <jive/rvsdg/substitution.hpp>
+#include <memory>
+#include <utility>
 
 namespace jlm {
 	namespace hls {
@@ -558,6 +560,72 @@ namespace jlm {
 			virtual loop_node *
 			copy(jive::region *region, jive::substitution_map &smap) const override;
 		};
+
+
+        class bundletype final : public jive::valuetype {
+        public:
+            ~bundletype(){}
+
+            bundletype(
+                    const std::vector<std::pair<std::string, std::unique_ptr<jive::type>>> * elements)
+                    : jive::valuetype()
+                    , elements_(std::move(elements))
+            {}
+
+            bundletype(const bundletype &) = default;
+
+            bundletype(bundletype &&) = delete;
+
+            bundletype &
+            operator=(const bundletype &) = delete;
+
+            bundletype &
+            operator=(bundletype &&) = delete;
+
+            virtual bool
+            operator==(const jive::type & other)  const noexcept override{
+                auto type = dynamic_cast<const bundletype*>(&other);
+                //TODO: better comparison?
+                if(!type || type->elements_->size() != elements_->size()){
+                    return false;
+                }
+                for (size_t i = 0; i < elements_->size(); ++i) {
+                    if(type->elements_->at(i).first != elements_->at(i).first ||
+                            *type->elements_->at(i).second != *elements_->at(i).second){
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            jive::type* get_element_type(std::string element) const{
+                for (size_t i = 0; i < elements_->size(); ++i) {
+                    if(elements_->at(i).first == element){
+                        return elements_->at(i).second.get();
+                    }
+                }
+                //TODO: do something different?
+                return nullptr;
+            }
+
+            virtual std::unique_ptr<jive::type>
+            copy() const override {
+                return std::unique_ptr<jive::type>(new bundletype(*this));
+            }
+
+            virtual std::string
+            debug_string()  const override {
+                return "bundle";
+            };
+
+//        private:
+            //TODO: fix memory leak
+            const std::vector<std::pair<std::string, std::unique_ptr<jive::type>>> * elements_;
+        };
+
+        std::unique_ptr<bundletype> get_mem_req_type(const PointerType & pointerType, bool write);
+
+        std::unique_ptr<bundletype> get_mem_res_type(const jive::valuetype & dataType);
 
         class load_op final : public jive::simple_op {
         public:

@@ -97,3 +97,22 @@ void jlm::hls::loop_node::set_predicate(jive::output *p) {
     if (node && !node->has_users())
         remove(node);
 }
+
+std::unique_ptr<jlm::hls::bundletype> jlm::hls::get_mem_req_type(const jlm::PointerType &pointerType, bool write) {
+    auto elements = new std::vector<std::pair<std::string, std::unique_ptr<jive::type>>>();
+    elements->emplace_back("addr", pointerType.copy());
+    elements->emplace_back("size", std::make_unique<jive::bittype>(4));
+    elements->emplace_back("id", std::make_unique<jive::bittype>(8));
+    if(write){
+        elements->emplace_back("data", pointerType.GetElementType().copy());
+        elements->emplace_back("write", std::make_unique<jive::bittype>(1));
+    }
+    return std::make_unique<bundletype>(elements);
+}
+
+std::unique_ptr<jlm::hls::bundletype> jlm::hls::get_mem_res_type(const jive::valuetype &dataType) {
+    auto elements = new std::vector<std::pair<std::string, std::unique_ptr<jive::type>>>();
+    elements->emplace_back("data", dataType.copy());
+    elements->emplace_back("id", std::make_unique<jive::bittype>(8));
+    return std::make_unique<bundletype>(elements);
+}
