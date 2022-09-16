@@ -42,7 +42,14 @@ jlm::hls::remove_unused_state(jive::region *region, bool can_remove_arguments) {
                     }
                     nv.push_back(simplenode->input(i)->origin());
                 }
-                if(nv.size()!=simplenode->ninputs()){
+                if(nv.size() == 0){
+                    // special case were no entry/exit operator is needed
+                    auto entry_node = dynamic_cast<jive::node_output*>(simplenode->input(0)->origin())->node();
+                    JLM_ASSERT(dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator *>(&entry_node->operation()));
+                    simplenode->output(0)->divert_users(entry_node->input(0)->origin());
+                    remove(simplenode);
+                    remove(entry_node);
+                } else if(nv.size()!=simplenode->ninputs()){
                     auto new_state = jlm::aa::LambdaExitMemStateOperator::Create(region, nv);
                     simplenode->output(0)->divert_users(new_state);
                     remove(simplenode);
