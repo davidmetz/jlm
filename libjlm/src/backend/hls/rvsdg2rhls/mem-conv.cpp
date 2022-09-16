@@ -90,18 +90,85 @@ void gather_mem_nodes(jive::region *region, std::vector<jive::simple_node *> &lo
     }
 }
 
+typedef std::vector<std::pair<std::vector<jive::simple_node *>, std::vector<jive::simple_node *>>> port_load_store;
+
+// trace each input pointer to loads and stores
+void trace_pointer_arguments(jive::output * op, std::vector<jive::simple_node *> &load_nodes,
+                             std::vector<jive::simple_node *> &store_nodes,
+                             std::unordered_set<jive::output*> & visited) {
+    if(!dynamic_cast<const jlm::PointerType*>(&op->type())){
+        // only process pointer outputs
+        return;
+    }
+    if(visited.count(op)){
+        // skip already processed outputs
+        return;
+    }
+    visited.insert(op);
+    for (auto user: *op) {
+        if(auto si = dynamic_cast<jive::simple_input*>(user)){
+            auto simplenode = si->node();
+            if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
+                store_nodes.push_back(simplenode);
+            } else if (dynamic_cast<const jlm::LoadOperation *>(&simplenode->operation())) {
+                load_nodes.push_back(simplenode);
+            } else {
+                for (size_t i = 0; i < simplenode->noutputs(); ++i) {
+                    trace_pointer_arguments(simplenode->output(i), load_nodes, store_nodes, visited);
+                }
+            }
+        } else if (auto sti = dynamic_cast<jive::structural_input*>(user)){
+            for(auto &arg: sti->arguments){
+                trace_pointer_arguments(&arg, load_nodes, store_nodes, visited);
+            }
+        } else if (auto r = dynamic_cast<jive::result*>(user)){
+            if(auto ber = dynamic_cast<jlm::hls::backedge_result*>(r)){
+                trace_pointer_arguments(ber->argument(), load_nodes, store_nodes, visited);
+            } else {
+                trace_pointer_arguments(r->output(), load_nodes, store_nodes, visited);
+            }
+        } else {
+            JLM_UNREACHABLE("THIS SHOULD BE COVERED");
+        }
+    }
+}
+
+void trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store &port_nodes){
+    for (size_t i = 0; i < ln->subregion()->narguments(); ++i) {
+        auto arg = ln->subregion()->argument(i);
+        if(dynamic_cast<const jlm::PointerType*>(&arg->type())){
+            port_nodes.emplace_back();
+            std::unordered_set<jive::output*> visited;
+            trace_pointer_arguments(arg, port_nodes.back().first, port_nodes.back().second, visited);
+        }
+    }
+}
+
 void jlm::hls::mem_conv(jive::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     std::vector<jive::simple_node *> load_nodes;
     std::vector<jive::simple_node *> store_nodes;
     gather_mem_nodes(region, load_nodes, store_nodes);
+    port_load_store port_nodes;
+    trace_pointer_arguments(lambda, port_nodes);
+    //TODO: extra port for loads/stores not associated to a port yet
+    for(auto & ls: port_nodes){
+        generate_mem_port(lambda_region, ls.first, ls.second);
+    }
+}
+
+void jlm::hls::generate_mem_port(jive::region *lambda_region, std::vector<jive::simple_node *> &load_nodes,
+                                 const std::vector<jive::simple_node *> &store_nodes) {
     std::vector<const jive::type *> load_types;
     for (auto l: load_nodes) {
         auto pointerType = dynamic_cast<const PointerType*>(&l->input(0)->type());
         load_types.push_back(&pointerType->GetElementType());
     }
-    auto load_responses = mem_resp_op::create(lambda_region, load_types);
+    // TODO: change type
+    auto mem_resp_type = get_mem_res_type(jive::bit64);
+    auto mem_resp_argument = jive::argument::create(lambda_region, nullptr, *mem_resp_type);
+    auto load_responses = mem_resp_op::create(*mem_resp_argument, load_types);
     std::vector<jive::output *> load_addrs;
     for (size_t i = 0; i < load_nodes.size(); ++i) {
         auto reponse = load_responses[i];
@@ -121,6 +188,7 @@ void jlm::hls::mem_conv(jive::region *region) {
         store_operands.push_back(data);
     }
     auto req = mem_req_op::create(load_addrs, store_operands, lambda_region);
+    jive::result::create(lambda_region, req[0], nullptr, req[0]->type());
 }
 
 

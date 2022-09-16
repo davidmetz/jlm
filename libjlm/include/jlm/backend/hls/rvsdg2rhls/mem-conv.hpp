@@ -15,6 +15,9 @@ namespace jlm{
 
 		void
 		mem_conv(jlm::RvsdgModule &rm);
-	}
+
+        void generate_mem_port(jive::region *lambda_region, std::vector<jive::simple_node *> &load_nodes,
+                               const std::vector<jive::simple_node *> &store_nodes);
+    }
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEM_CONV_HPP
