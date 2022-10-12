@@ -1048,7 +1048,7 @@ namespace jlm {
             bool
             operator==(const jive::operation &other) const noexcept override {
                 // TODO:
-                auto ot = dynamic_cast<const local_mem_op *>(&other);
+                //auto ot = dynamic_cast<const local_mem_op *>(&other);
                 // check predicate and value
                 return false;
             }
