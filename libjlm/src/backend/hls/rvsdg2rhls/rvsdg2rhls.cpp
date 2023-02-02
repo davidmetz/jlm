@@ -38,6 +38,9 @@
 #include "jlm/opt/reduction.hpp"
 #include "jive/view.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/mem-conv.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/mem-sep.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/memstate-conv.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/dae-conv.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
 
 void
@@ -47,16 +50,14 @@ split_opt(jlm::RvsdgModule &rm) {
 	jlm::cne cne;
 	jlm::InvariantValueRedirection ivr;
 	jlm::tginversion tgi;
-    jlm::aa::SteensgaardBasic aa;
-    jlm::nodereduction red;
-    jlm::StatisticsDescriptor sd;
-	tgi.run(rm, sd);
-	dne.run(rm, sd);
-	cne.run(rm, sd);
-	ivr.run(rm, sd);
-    aa.run(rm, sd);
-    red.run(rm, sd);
-    dne.run(rm, sd);
+        jlm::nodereduction red;
+	jlm::StatisticsCollector statisticsCollector;
+	tgi.run(rm, statisticsCollector);
+	dne.run(rm, statisticsCollector);
+	cne.run(rm, statisticsCollector);
+	ivr.run(rm, statisticsCollector);
+        red.run(rm, statisticsCollector);
+	dne.run(rm, statisticsCollector);
 }
 
 void
@@ -71,6 +72,7 @@ pre_opt(jlm::RvsdgModule &rm) {
 	dne.run(rm, statisticsCollector);
 	cne.run(rm, statisticsCollector);
 	ivr.run(rm, statisticsCollector);
+	dne.run(rm, statisticsCollector);
 }
 
 void
@@ -99,36 +101,25 @@ namespace jlm {
 		return dynamic_cast<const FunctionType *>(&pt->GetElementType());
 	}
 
-	const jive::output *
-	trace_call(jive::input *input) {
-		JLM_ASSERT(is_fct_ptr(input));
+    const jive::output *hls::trace_call(jive::input *input) {
+        JLM_ASSERT(is_fct_ptr(input));
 
 		auto graph = input->region()->graph();
 
-		auto argument = dynamic_cast<const jive::argument *>(input->origin());
-		const jive::output * result;
-		if (auto to = dynamic_cast<const jive::theta_output*>(input->origin())){
-			result = trace_call(to->input());
-		} else if (argument == nullptr) {
-			result = input->origin();
-		} else if (argument->region() == graph->root()){
-			result = argument;
-		} else{
-			JLM_ASSERT(argument->input() != nullptr);
-			result = trace_call(argument->input());
-		}
-		auto so = dynamic_cast<const jive::structural_output *>(result);
-		if(!so){
-			auto arg = dynamic_cast<const jive::argument *>(result);
-			auto ip = dynamic_cast<const impport *>(&arg->port());
-			if(ip){
-				throw jive::compiler_error("can not inline external function "+ip->name());
-			}
-		}
-		JLM_ASSERT(so);
-		JLM_ASSERT(is<lambda::operation>(so->node()));
-		return result;
-	}
+        auto argument = dynamic_cast<const jive::argument *>(input->origin());
+        const jive::output * result;
+        if (auto to = dynamic_cast<const jive::theta_output*>(input->origin())){
+            result = trace_call(to->input());
+        } else if (argument == nullptr) {
+            result = input->origin();
+        } else if (argument->region() == graph->root()){
+            result = argument;
+        } else{
+            JLM_ASSERT(argument->input() != nullptr);
+            result = trace_call(argument->input());
+        }
+        return result;
+    }
 
 	void
 	inline_calls(jive::region *region) {
@@ -138,8 +129,21 @@ namespace jlm {
 					inline_calls(structnode->subregion(n));
 				}
 			} else if (dynamic_cast<const jlm::CallOperation *>(&(node->operation()))) {
-				auto func = trace_call(node->input(0));
-				auto ln = dynamic_cast<const jive::structural_output *>(func)->node();
+				auto traced = jlm::hls::trace_call(node->input(0));
+                auto so = dynamic_cast<const jive::structural_output *>(traced);
+                if(!so){
+                    auto arg = dynamic_cast<const jive::argument *>(traced);
+                    auto ip = dynamic_cast<const impport *>(&arg->port());
+                    if(ip){
+                        if(ip->name().rfind("decouple_", 0)==0){
+                            // can't inline pseudo functions used for decoupling
+                            continue;
+                        }
+                        throw jive::compiler_error("can not inline external function "+ip->name());
+                    }
+                }
+                JLM_ASSERT(is<lambda::operation>(so->node()));
+				auto ln = dynamic_cast<const jive::structural_output *>(traced)->node();
 				jlm::inlineCall(dynamic_cast<jive::simple_node *>(node), dynamic_cast<const lambda::node *>(ln));
 				// restart for this region
 				inline_calls(region);
@@ -180,11 +184,16 @@ namespace jlm {
 				JLM_ASSERT(node->output(1)->nusers() == 1);
 				auto mux_in = *node->output(1)->begin();
 				auto mux_node = input_node(mux_in);
-				JLM_ASSERT(dynamic_cast<const jlm::MemStateMergeOperator *>(&mux_node->operation()));
-				JLM_ASSERT(mux_node->ninputs() == 2);
-				auto other_index = mux_in->index() ? 0 : 1;
-				mux_node->output(0)->divert_users(mux_node->input(other_index)->origin());
-				jive::remove(mux_node);
+				if(dynamic_cast<const jlm::MemStateMergeOperator *>(&mux_node->operation())){
+                    // merge after alloca -> remove merge
+                    JLM_ASSERT(mux_node->ninputs() == 2);
+                    auto other_index = mux_in->index() ? 0 : 1;
+                    mux_node->output(0)->divert_users(mux_node->input(other_index)->origin());
+                    jive::remove(mux_node);
+                } else {
+                    //TODO: fix this properly by adding a state edge to the LambdaEntryMemState and routing it to the region
+                    JLM_ASSERT(false);
+                }
 				jive::remove(node);
 			}
 		}
@@ -227,8 +236,10 @@ namespace jlm {
         }
 
         /* collect function arguments */
-        for (size_t n = 0; n < ln->nfctarguments(); n++)
+        for (size_t n = 0; n < ln->nfctarguments(); n++){
+            lambda->fctargument(n)->set_attributes(ln->fctargument(n)->attributes());
             subregionmap.insert(ln->fctargument(n), lambda->fctargument(n));
+        }
 
         /* copy subregion */
         ln->subregion()->copy(lambda->subregion(), subregionmap, false, false);
@@ -267,7 +278,16 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
             convert_alloca(ln->subregion());
             jive::substitution_map smap;
             for (size_t i = 0; i < ln->ninputs(); ++i) {
-                auto orig_node = dynamic_cast<jive::node_output *>(ln->input(i)->origin())->node();
+                auto orig_node_output = dynamic_cast<jive::node_output *>(ln->input(i)->origin());
+                if(!orig_node_output){
+                    // handle decouple stuff
+                    auto arg = dynamic_cast<const jive::argument *>(ln->input(i)->origin());
+                    auto ip = dynamic_cast<const impport *>(&arg->port());
+                    auto new_arg = rhls->Rvsdg().add_import(*ip);
+                    smap.insert(ln->input(i)->origin(), new_arg);
+                    continue;
+                }
+                auto orig_node = orig_node_output->node();
                 if (auto oln = dynamic_cast<lambda::node *>(orig_node)) {
                     throw jlm::error("Inlining of function " + oln->name() + " not supported");
                 } else if (auto odn = dynamic_cast<delta::node *>(orig_node)) {
@@ -321,6 +341,7 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	jlm::hls::theta_conv(rhls);
 	// rhls optimization
 	jlm::hls::dne(rhls);
+    jlm::hls::memstate_conv(rhls);
     jlm::hls::mem_conv(rhls);
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(rhls);
