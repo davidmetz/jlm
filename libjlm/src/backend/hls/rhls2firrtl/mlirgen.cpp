@@ -1397,6 +1397,7 @@ jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
 		auto whenOp = AddWhenOp(body, notOp, false);
 		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
 		Connect(thenBody, outData, inData);
+		Connect(thenBody, outValid, inValid);
 	} else {
 		Connect(body, consumedWires[0], zeroBitValue);
 	}
