@@ -25,6 +25,9 @@ namespace jlm{
 		void
 		dump_ref(jlm::RvsdgModule &rhls);
 
+        const jive::output *
+        trace_call(jive::input *input);
+
         std::unique_ptr<RvsdgModule>
         split_hls_function(RvsdgModule &rm, const std::string &function_name);
     }

@@ -13,14 +13,14 @@ jive::structural_output *jlm::hls::loop_node::add_loopvar(jive::output *origin, 
     auto argument_loop = add_backedge(origin->type());
 
     auto mux = hls::mux_op::create(*predicate_buffer(), {argument_in, argument_loop}, false, true)[0];
-    auto buf = hls::buffer_op::create(*mux, 2)[0];
-    auto branch = hls::branch_op::create(*predicate()->origin(), *buf, true);
+    auto branch = hls::branch_op::create(*predicate()->origin(), *mux, true);
     if (buffer != nullptr) {
-        *buffer = buf;
+        *buffer = mux;
     }
     jive::result::create(subregion(), branch[0], output, origin->type());
     auto result_loop = argument_loop->result();
-    result_loop->divert_to(branch[1]);
+    auto buf = hls::buffer_op::create(*branch[1], 2)[0];
+    result_loop->divert_to(buf);
     return output;
 }
 
@@ -86,7 +86,9 @@ jlm::hls::loop_node *jlm::hls::loop_node::create(jive::region *parent, bool init
         auto predicate = jive_control_false(ln->subregion());
         auto pred_arg = ln->add_backedge(jive::ctltype(2));
         pred_arg->result()->divert_to(predicate);
-        ln->_predicate_buffer = hls::predicate_buffer_op::create(*pred_arg)[0];
+        // we need a buffer without pass-through behavior to avoid a combinatorial cycle of ready signals
+        auto pre_buffer = hls::buffer_op::create(*pred_arg, 2)[0];
+        ln->_predicate_buffer = hls::predicate_buffer_op::create(*pre_buffer)[0];
     }
     return ln;
 }

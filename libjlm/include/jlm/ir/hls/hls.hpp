@@ -495,7 +495,7 @@ namespace jlm {
         public:
             ~backedge_result() override= default;
 
-            backedge_argument * argument(){
+            backedge_argument * argument() const {
                 return argument_;
             }
 

@@ -485,28 +485,37 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
     auto memResData = GetSubfield(body, memResBundle, "data");
 
     auto zeroBitValue = GetConstant(body, 1,0);
+    auto oneBitValue = GetConstant(body, 1,1);
     Connect(body, memResReady, zeroBitValue);
 
     for (size_t i = 0; i < node->noutputs(); ++i) {
         auto outBundle = GetOutPort(module, i);
         auto outValid = GetSubfield(body, outBundle, "valid");
-        auto outReady = GetSubfield(body, outBundle, "ready");
         auto outData = GetSubfield(body, outBundle, "data");
-        int nbits = JlmSize(&node->output(i)->type());
+        Connect(body, outValid, zeroBitValue);
 
-        auto condition = AddEqOp(body, GetConstant(body, 8, i), memResId);
+        int nbits = JlmSize(&node->output(i)->type());
         if(nbits == 64){
             Connect(body, outData, memResData);
         } else {
             Connect(body, outData, AddBitsOp(body, memResData, nbits-1, 0));
         }
-        auto whenOp = AddWhenOp(body, condition, true);
+    }
+    auto elseBody = body;
+    for (size_t i = 0; i < node->noutputs(); ++i) {
+        auto outBundle = GetOutPort(module, i);
+        auto outValid = GetSubfield(body, outBundle, "valid");
+        auto outReady = GetSubfield(body, outBundle, "ready");
+
+        auto condition = AddEqOp(body, GetConstant(body, 8, i), memResId);
+        auto whenOp = AddWhenOp(elseBody, condition, true);
         auto thenBody = whenOp.getThenBodyBuilder().getBlock();
         Connect(thenBody, outValid, memResValid);
         Connect(thenBody, memResReady, outReady);
-        auto elseBody = whenOp.getElseBodyBuilder().getBlock();
-        Connect(elseBody, outValid, zeroBitValue);
+        elseBody = whenOp.getElseBodyBuilder().getBlock();
     }
+    // connect to ready for other ids - for example stores
+    Connect(elseBody, memResReady, oneBitValue);
     return module;
 }
 
@@ -1957,6 +1966,8 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
     } else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
         // Found the source node
         return o;
+    } else if (auto a = dynamic_cast<jive::argument *>(origin)) {
+        throw std::logic_error("Encountered pass through argument - should be eliminated");
     } else {
         throw std::logic_error("Encountered an unexpected output type");
     }

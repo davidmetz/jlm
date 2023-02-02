@@ -15,6 +15,12 @@ namespace jlm {
 		remove_unused_loop_outputs(hls::loop_node *ln);
 
 		bool
+        remove_unused_loop_backedges(hls::loop_node *ln);
+
+		bool
+        remove_loop_passthrough(hls::loop_node *ln);
+
+		bool
 		remove_unused_loop_inputs(hls::loop_node *ln);
 
 

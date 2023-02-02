@@ -1,0 +1,2 @@
+TESTS += \
+	libjlm/backend/hls/rvsdg2rhls/test-loop-passthrough \
