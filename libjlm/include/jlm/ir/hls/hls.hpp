@@ -892,7 +892,8 @@ namespace jlm {
                 auto ot = dynamic_cast<const mem_req_op *>(&other);
                 // check predicate and value
                 return ot
-                       && ot->argument(1).type() == argument(1).type()
+                       && ot->narguments() == narguments()
+                       && (ot->narguments() == 0 || (ot->argument(1).type() == argument(1).type()))
                        && ot->narguments() == narguments();
             }
 
