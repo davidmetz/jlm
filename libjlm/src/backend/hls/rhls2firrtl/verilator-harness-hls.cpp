@@ -339,8 +339,6 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "}\n"
         "\n";
 
-
-
     cpp << "extern \"C\"\n"// TODO: parameter for linkage type here
            "{\n";
     // imports
@@ -348,7 +346,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
     for (size_t i = 0; i < root->narguments(); ++i) {
         if(auto ip = dynamic_cast<const impport*>(&root->argument(i)->port())){
             if (auto t = dynamic_cast<const jlm::PointerType *>(&ip->type())) {
-                cpp << "extern " << convert_to_c_type(&t->GetElementType()) << " " << ip->name() << ";\n";
+                cpp << "extern " << convert_to_c_type(&root->argument(i)->port().type()) << " " << ip->name() << ";\n";
             } else{
                 throw error("unexpected impport type");
             }

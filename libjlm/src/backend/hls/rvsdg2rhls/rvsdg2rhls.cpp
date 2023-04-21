@@ -112,10 +112,10 @@ namespace jlm {
 		return dynamic_cast<const FunctionType *>(&pt->GetElementType());
 	}
 
-    const jive::output *hls::trace_call(jive::input *input) {
-        JLM_ASSERT(is_fct_ptr(input));
-
-        auto graph = input->region()->graph();
+	const jive::output *
+	trace_call(jive::input *input) {
+		JLM_ASSERT(is_fct_ptr(input));
+		auto graph = input->region()->graph();
 
         auto argument = dynamic_cast<const jive::argument *>(input->origin());
         const jive::output * result;
@@ -175,9 +175,9 @@ namespace jlm {
 			} else if (auto po = dynamic_cast<const jlm::alloca_op *>(&(node->operation()))) {
 				auto rr = region->graph()->root();
 				auto delta_name = jive::detail::strfmt("hls_alloca_", alloca_cnt++);
-				auto delta_type = jlm::PointerType(po->value_type());
-                std::cout << "alloca " << delta_name << ": " << po->value_type().debug_string() << "\n";
-				auto db = delta::node::Create(rr, delta_type, delta_name, linkage::external_linkage, "", false);
+        PointerType delta_type;
+        std::cout << "alloca " << delta_name << ": " << po->value_type().debug_string() << "\n";
+				auto db = delta::node::Create(rr, po->value_type(), delta_name, linkage::external_linkage, "", false);
 				// create zero constant of allocated type
 				jive::output *cout;
 				if (auto bt = dynamic_cast<const jive::bittype *>(&po->value_type())) {
@@ -316,7 +316,7 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
                     smap.insert(ln->input(i)->origin(), arg);
                     // add export for delta to rm
                     // TODO: check if not already exported and maybe adjust linkage?
-                    rm.Rvsdg().add_export(odn->output(), {odn->type(), odn->name()});
+                    rm.Rvsdg().add_export(odn->output(), {odn->output()->type(), odn->name()});
                 } else {
                     throw jlm::error("Unsupported node type: " + orig_node->operation().debug_string());
                 }
@@ -326,7 +326,7 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
             new_ln = change_linkage(new_ln, linkage::external_linkage);
             jive::result::create(rhls->Rvsdg().root(), new_ln->output(), nullptr, new_ln->output()->type());
             // add function as input to rm and remove it
-            impport im(ln->output()->type(), ln->name(), linkage::external_linkage); //TODO: change linkage?
+            impport im(ln->type(), ln->name(), linkage::external_linkage); //TODO: change linkage?
             auto arg = rm.Rvsdg().add_import(im);
             ln->output()->divert_users(arg);
             remove(ln);
