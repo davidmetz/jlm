@@ -9,12 +9,13 @@
 #include <jive/rvsdg/operation.hpp>
 #include <jive/rvsdg/control.hpp>
 #include <jive/rvsdg/structural-node.hpp>
-#include <jlm/common.hpp>
 #include <jlm/ir/types.hpp>
 #include <jive/rvsdg/substitution.hpp>
 #include <jlm/ir/operators/store.hpp>
 #include <memory>
 #include <utility>
+
+#include <jlm/util/common.hpp>
 
 namespace jlm {
 	namespace hls {
