@@ -6,10 +6,10 @@
 #include "jlm/ir/operators/store.hpp"
 #include "jlm/ir/operators/load.hpp"
 #include "jlm/ir/operators/lambda.hpp"
-#include <jive/rvsdg/substitution.hpp>
+#include <jlm/rvsdg/substitution.hpp>
 #include <jlm/ir/hls/hls.hpp>
-#include <jive/rvsdg/theta.hpp>
-#include <jive/rvsdg/traverser.hpp>
+#include <jlm/rvsdg/theta.hpp>
+#include <jlm/rvsdg/traverser.hpp>
 #include <jlm/opt/alias-analyses/Operators.hpp>
 
 void

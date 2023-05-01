@@ -5,7 +5,7 @@
 
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP
-#include <jive/rvsdg/region.hpp>
+#include <jlm/rvsdg/region.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{

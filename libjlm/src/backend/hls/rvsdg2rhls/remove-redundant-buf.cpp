@@ -6,8 +6,8 @@
 #include "jlm/backend/hls/rvsdg2rhls/remove-redundant-buf.hpp"
 #include "jlm/opt/alias-analyses/Operators.hpp"
 #include "jlm/ir/hls/hls.hpp"
-#include <jive/rvsdg/traverser.hpp>
-#include <jive/view.hpp>
+#include <jlm/rvsdg/traverser.hpp>
+#include <jlm/rvsdg/view.hpp>
 
 bool eliminate_buf(jive::output * o){
     if(auto so = dynamic_cast<jive::simple_output*>(o)){

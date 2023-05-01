@@ -6,7 +6,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
 
-#include <jive/rvsdg/gamma.hpp>
+#include <jlm/rvsdg/gamma.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 
 namespace jlm{

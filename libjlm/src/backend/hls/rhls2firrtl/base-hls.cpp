@@ -3,14 +3,11 @@
  * See COPYING for terms of redistribution.
  */
 
+#include <jlm/backend/hls/rhls2firrtl/base-hls.hpp>
+#include <jlm/ir/hls/hls.hpp>
+
 #include <algorithm>
 #include <math.h>
-#include <jlm/ir/hls/hls.hpp>
-#include <jlm/ir/operators/lambda.hpp>
-#include "jlm/backend/hls/rhls2firrtl/base-hls.hpp"
-#include "jive/rvsdg/structural-node.hpp"
-#include "jive/rvsdg/simple-node.hpp"
-
 
 bool
 jlm::hls::isForbiddenChar(char c) {

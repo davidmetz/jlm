@@ -6,8 +6,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_REMOVE_REDUNDANT_BUF_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_REMOVE_REDUNDANT_BUF_HPP
 
-#include <jive/rvsdg/region.hpp>
-#include <jive/rvsdg/gamma.hpp>
+#include <jlm/rvsdg/gamma.hpp>
 #include <jlm/ir/operators/lambda.hpp>
 #include <jlm/ir/RvsdgModule.hpp>
 

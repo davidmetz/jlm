@@ -3,18 +3,18 @@
  * See COPYING for terms of redistribution.
  */
 
-#include <jive/rvsdg/substitution.hpp>
+#include <jlm/rvsdg/substitution.hpp>
 #include <jlm/ir/hls/hls.hpp>
-#include <jive/rvsdg/traverser.hpp>
-#include "jlm/backend/hls/rvsdg2rhls/alloca-conv.hpp"
-#include "jlm/ir/operators/alloca.hpp"
-#include "jive/types/bitstring/constant.hpp"
-#include "jlm/ir/operators/store.hpp"
-#include "jlm/ir/operators/load.hpp"
-#include "jlm/ir/operators/call.hpp"
-#include "jlm/ir/operators/GetElementPtr.hpp"
-#include "jlm/backend/hls/rvsdg2rhls/mem-conv.hpp"
-#include "jlm/ir/operators/operators.hpp"
+#include <jlm/rvsdg/traverser.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/alloca-conv.hpp>
+#include <jlm/ir/operators/alloca.hpp>
+#include <jlm/rvsdg/bitstring/constant.hpp>
+#include <jlm/ir/operators/store.hpp>
+#include <jlm/ir/operators/load.hpp>
+#include <jlm/ir/operators/call.hpp>
+#include <jlm/ir/operators/GetElementPtr.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/mem-conv.hpp>
+#include <jlm/ir/operators/operators.hpp>
 
 class TraceAllocaUses {
 public:

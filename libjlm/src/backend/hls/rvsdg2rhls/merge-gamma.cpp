@@ -3,12 +3,12 @@
  * See COPYING for terms of redistribution.
  */
 
-#include "jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp"
-#include <jive/rvsdg/substitution.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp>
+#include <jlm/rvsdg/substitution.hpp>
 #include <jlm/ir/hls/hls.hpp>
-#include <jive/rvsdg/theta.hpp>
-#include <jive/rvsdg/traverser.hpp>
-#include <jive/rvsdg/region.hpp>
+#include <jlm/rvsdg/theta.hpp>
+#include <jlm/rvsdg/traverser.hpp>
+#include <jlm/rvsdg/region.hpp>
 
 void
 jlm::hls::merge_gamma(jlm::RvsdgModule &rm) {

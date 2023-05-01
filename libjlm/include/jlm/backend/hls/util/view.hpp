@@ -8,7 +8,7 @@
 #define JLM_BACKEND_HLS_UTIL_VIEW_HPP
 
 #include <string>
-#include <jive/rvsdg/graph.hpp>
+#include <jlm/rvsdg/graph.hpp>
 #include "jlm/ir/RvsdgModule.hpp"
 
 namespace jlm::hls {

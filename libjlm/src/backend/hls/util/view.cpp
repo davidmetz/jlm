@@ -6,13 +6,13 @@
 
 #include <jlm/backend/hls/util/view.hpp>
 #include <jlm/ir/hls/hls.hpp>
-#include <jive/rvsdg/gamma.hpp>
-#include <jive/rvsdg/region.hpp>
-#include <jive/rvsdg/simple-node.hpp>
-#include <jive/rvsdg/structural-node.hpp>
-#include <jive/rvsdg/theta.hpp>
-#include <jive/view.hpp>
-#include "jive/rvsdg/traverser.hpp"
+#include <jlm/rvsdg/gamma.hpp>
+#include <jlm/rvsdg/region.hpp>
+#include <jlm/rvsdg/simple-node.hpp>
+#include <jlm/rvsdg/structural-node.hpp>
+#include <jlm/rvsdg/theta.hpp>
+#include <jlm/rvsdg/view.hpp>
+#include <jlm/rvsdg/traverser.hpp>
 
 namespace jlm::hls {
     static inline std::string
