@@ -6,8 +6,8 @@
 #ifndef JLM_IR_HLS_HLS_HPP
 #define JLM_IR_HLS_HLS_HPP
 
-#include <jlm/ir/types.hpp>
-#include <jlm/ir/operators/store.hpp>
+#include <jlm/llvm/ir/types.hpp>
+#include <jlm/llvm/ir/operators/store.hpp>
 #include <jlm/rvsdg/operation.hpp>
 #include <jlm/rvsdg/control.hpp>
 #include <jlm/rvsdg/structural-node.hpp>

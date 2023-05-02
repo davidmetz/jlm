@@ -7,7 +7,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
 
 #include <jlm/rvsdg/gamma.hpp>
-#include <jlm/ir/RvsdgModule.hpp>
+#include <jlm/llvm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{

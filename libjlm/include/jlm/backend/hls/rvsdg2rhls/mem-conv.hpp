@@ -5,8 +5,8 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_MEM_CONV_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MEM_CONV_HPP
 
-#include <jlm/ir/RvsdgModule.hpp>
-#include "jlm/ir/operators/lambda.hpp"
+#include <jlm/llvm/ir/RvsdgModule.hpp>
+#include "jlm/llvm/ir/operators/lambda.hpp"
 
 namespace jlm::hls{
     typedef std::vector<std::tuple<std::vector<jive::simple_node *>, std::vector<jive::simple_node *>, std::vector<jive::simple_node *>>> port_load_store_decouple;

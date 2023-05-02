@@ -7,8 +7,8 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_REMOVE_REDUNDANT_BUF_HPP
 
 #include <jlm/rvsdg/gamma.hpp>
-#include <jlm/ir/operators/lambda.hpp>
-#include <jlm/ir/RvsdgModule.hpp>
+#include <jlm/llvm/ir/operators/lambda.hpp>
+#include <jlm/llvm/ir/RvsdgModule.hpp>
 
 namespace jlm {
 	namespace hls {

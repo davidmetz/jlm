@@ -7,7 +7,7 @@
 #define JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP
 
 #include <jlm/rvsdg/theta.hpp>
-#include <jlm/ir/RvsdgModule.hpp>
+#include <jlm/llvm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{

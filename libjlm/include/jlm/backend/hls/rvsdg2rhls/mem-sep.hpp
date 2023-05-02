@@ -5,8 +5,8 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_MEM_SEP_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MEM_SEP_HPP
 
-#include <jlm/ir/RvsdgModule.hpp>
-#include "jlm/ir/operators/lambda.hpp"
+#include <jlm/llvm/ir/RvsdgModule.hpp>
+#include <jlm/llvm/ir/operators/lambda.hpp>
 
 namespace jlm{
 	namespace hls{

@@ -5,7 +5,7 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_MEM_QUEUE_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MEM_QUEUE_HPP
 
-#include <jlm/ir/RvsdgModule.hpp>
+#include <jlm/llvm/ir/RvsdgModule.hpp>
 
 namespace jlm{
 	namespace hls{

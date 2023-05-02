@@ -9,7 +9,7 @@
 
 #include <string>
 #include <jlm/rvsdg/graph.hpp>
-#include "jlm/ir/RvsdgModule.hpp"
+#include <jlm/llvm/ir/RvsdgModule.hpp>
 
 namespace jlm::hls {
     std::string
