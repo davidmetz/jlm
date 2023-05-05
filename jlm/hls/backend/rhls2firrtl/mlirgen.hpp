@@ -24,7 +24,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Verifier.h"
-//#include "mlir/Tools/mlir-translate/Translation.h"
 
 #include "circt/Dialect/FIRRTL/FIREmitter.h"
 #include "circt/Dialect/FIRRTL/FIRRTLDialect.h"
@@ -53,6 +52,7 @@ namespace jlm {
 			// We don't have any locations (i.e., the originating line in the
 			// source file) in RVSDG, so we set all operations to unkown
 			mlir::Location location = builder.getUnknownLoc();
+			circt::firrtl::ConventionAttr conventionAttr = circt::firrtl::ConventionAttr::get(builder.getContext(), Convention::Internal);
 			std::unordered_map<std::string, circt::firrtl::FModuleOp> modules;
 			// FIRRTL generating functions
 			std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
