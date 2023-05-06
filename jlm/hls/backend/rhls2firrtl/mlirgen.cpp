@@ -6,6 +6,7 @@
 
 #include <jlm/llvm/opt/alias-analyses/Operators.hpp>
 #include <jlm/hls/backend/rhls2firrtl/mlirgen.hpp>
+#include <jlm/util/strfmt.hpp>
 
 #include <llvm/ADT/SmallPtrSet.h>
 
@@ -3541,7 +3542,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
         size_t stores = (input_node(*node->output(1)->begin())->ninputs()-1-loads)/2;
         append.append(std::to_string(stores));
     }
-	auto name = jive::detail::strfmt("op_", node->operation().debug_string() + append);
+	auto name = strfmt("op_", node->operation().debug_string() + append);
 	// Remove characters that are not valid in firrtl module names
 	std::replace_if(name.begin(), name.end(), isForbiddenChar, '_');
 	return name;
