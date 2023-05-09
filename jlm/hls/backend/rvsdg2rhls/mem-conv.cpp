@@ -578,7 +578,7 @@ jlm::hls::ConnectRequestResponseMemPorts(
         JLM_ASSERT(smap.contains(*loadNode->output(0)));
         auto loadOutput = dynamic_cast<jive::simple_output *>(smap.lookup(loadNode->output(0)));
         loadNodes.push_back(loadOutput->node());
-        auto loadOp = AssertedCast<const jlm::LoadOperation>(&loadOutput->node()->operation());
+        auto loadOp = util::AssertedCast<const jlm::LoadOperation>(&loadOutput->node()->operation());
         loadTypes.push_back(&loadOp->GetLoadedType());
     }
     std::vector<jive::simple_node *> storeNodes;

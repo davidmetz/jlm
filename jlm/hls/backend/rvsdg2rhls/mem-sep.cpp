@@ -203,7 +203,7 @@ jive::result *trace_edge(
 //                    sn->output(1)->divert_users(common_edge);
 //                    new_next->divert_to(sn->output(1));
 //                }
-                throw jlm::error("not implemented yet");
+                throw jlm::util::error("not implemented yet");
 
             } else {
                 assert(sn->noutputs() == 1);

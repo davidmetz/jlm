@@ -672,7 +672,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
             bitWidth = 64;
         } else{
-            throw jlm::error("unknown width for mem request");
+            throw jlm::util::error("unknown width for mem request");
         }
         int log2Bytes = log2(bitWidth / 8);
         Connect(thenBody, memReqSize, GetConstant(thenBody, 3, log2Bytes));
@@ -706,7 +706,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         } else if (dynamic_cast<const jlm::PointerType *>(storeType)) {
             bitWidth = 64;
         } else{
-            throw jlm::error("unknown width for mem request");
+            throw jlm::util::error("unknown width for mem request");
         }
         int log2Bytes = log2(bitWidth / 8);
         Connect(thenBody, memReqSize, GetConstant(thenBody, 3, log2Bytes));
@@ -1363,7 +1363,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 		} else if (dynamic_cast<const jlm::PointerType *>(&node->output(0)->type())) {
 			bitWidth = 64;
 		} else {
-			throw jlm::error("unknown width for mem request");
+			throw jlm::util::error("unknown width for mem request");
 		}
 	}
 
@@ -2342,7 +2342,7 @@ jlm::hls::MLIRGenImpl::createInstances(jive::region *subRegion, mlir::Block *cir
             auto inst = MlirGen(oln, body, circuitBody);
             instances.merge(inst);
         } else {
-            throw error("Unimplemented op (unexpected structural node) : " +
+            throw util::error("Unimplemented op (unexpected structural node) : " +
                      node->operation().debug_string());
         }
     }
@@ -3135,7 +3135,7 @@ void check_may_not_depend_on(mlir::Value value, llvm::SmallPtrSet<mlir::Value, 1
     }
     visited.insert(value);
     if(forbiddenDependencies.contains(value)){
-        throw jlm::error("forbidden dependency detected");
+        throw jlm::util::error("forbidden dependency detected");
     }
     auto op = value.getDefiningOp();
     // don't check anything for registers - connects don't count since they don't form combinatorial circuits
@@ -3526,7 +3526,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
             } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
                 bitWidth = 64;
             } else{
-                throw jlm::error("unknown width for mem request");
+                throw jlm::util::error("unknown width for mem request");
             }
             append.append("_");
             append.append(std::to_string(bitWidth));
@@ -3542,7 +3542,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
         size_t stores = (input_node(*node->output(1)->begin())->ninputs()-1-loads)/2;
         append.append(std::to_string(stores));
     }
-	auto name = strfmt("op_", node->operation().debug_string() + append);
+	auto name = jlm::util::strfmt("op_", node->operation().debug_string() + append);
 	// Remove characters that are not valid in firrtl module names
 	std::replace_if(name.begin(), name.end(), isForbiddenChar, '_');
 	return name;
@@ -3599,7 +3599,7 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 
 	if (status.failed())
 	{
-		throw jlm::error("Exporting of FIRRTL failed");
+		throw jlm::util::error("Exporting of FIRRTL failed");
 	}
 
 	output.close();

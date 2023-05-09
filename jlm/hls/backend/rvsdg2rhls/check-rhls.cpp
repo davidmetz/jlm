@@ -16,14 +16,14 @@ jlm::hls::check_rhls(jive::region *sr) {
 			if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
 				check_rhls(ln->subregion());
 			} else {
-				throw jlm::error("There should be only simple nodes and loop nodes");
+				throw jlm::util::error("There should be only simple nodes and loop nodes");
 			}
 		}
 		for (size_t i = 0; i < node->noutputs(); i++) {
 			if (node->output(i)->nusers() == 0) {
-				throw jlm::error("Output has no users");
+				throw jlm::util::error("Output has no users");
 			} else if (node->output(i)->nusers() > 1) {
-				throw jlm::error("Output has more than one user");
+				throw jlm::util::error("Output has more than one user");
 			}
 		}
 		if (is_constant(node)) {
@@ -43,11 +43,11 @@ jlm::hls::check_rhls(jlm::RvsdgModule &rm) {
 	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	if (root->nodes.size() != 1) {
-		throw jlm::error("Root should have only one node now");
+		throw jlm::util::error("Root should have only one node now");
 	}
 	auto ln = dynamic_cast<const jlm::lambda::node *>(root->nodes.begin().ptr());
 	if (!ln) {
-		throw jlm::error("Node needs to be a lambda");
+		throw jlm::util::error("Node needs to be a lambda");
 	}
 	check_rhls(ln->subregion());
 }

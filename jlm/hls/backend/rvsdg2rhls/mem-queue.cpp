@@ -286,7 +286,7 @@ jive::output * separate_load_edge(
 //                    sn->output(1)->divert_users(common_edge);
 //                    new_next->divert_to(sn->output(1));
 //                }
-                throw jlm::error("not implemented yet");
+                throw jlm::util::error("not implemented yet");
 
             } else if (auto co = dynamic_cast<const jlm::MemStateMergeOperator *>(op)) {
                 auto si_load_user =dynamic_cast<jive::simple_input*>(addr_edge_user);
