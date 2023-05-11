@@ -10,9 +10,9 @@
 #include <jlm/rvsdg/traverser.hpp>
 
 void
-jlm::hls::check_rhls(jive::region *sr) {
-	for (auto &node : jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::structural_node *>(node)) {
+jlm::hls::check_rhls(jlm::rvsdg::region *sr) {
+	for (auto &node : jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::structural_node *>(node)) {
 			if (auto ln = dynamic_cast<hls::loop_node *>(node)) {
 				check_rhls(ln->subregion());
 			} else {

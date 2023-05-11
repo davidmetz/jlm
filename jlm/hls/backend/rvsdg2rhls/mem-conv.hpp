@@ -9,7 +9,7 @@
 #include "jlm/llvm/ir/operators/lambda.hpp"
 
 namespace jlm::hls{
-    typedef std::vector<std::tuple<std::vector<jive::simple_node *>, std::vector<jive::simple_node *>, std::vector<jive::simple_node *>>> port_load_store_decouple;
+    typedef std::vector<std::tuple<std::vector<jlm::rvsdg::simple_node *>, std::vector<jlm::rvsdg::simple_node *>, std::vector<jlm::rvsdg::simple_node *>>> port_load_store_decouple;
 
     void
     trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decouple &port_nodes);
@@ -26,29 +26,29 @@ namespace jlm::hls{
      * @param decouple_nodes The decouple nodes to be connected to the reponse port
      * @result The request output to which the memory operations are connected
      */
-    jive::output *
+    jlm::rvsdg::output *
     ConnectRequestResponseMemPorts(const jlm::lambda::node * lambda,
                         size_t argumentIndex,
-                        jive::substitution_map & smap,
-                        const std::vector<jive::simple_node *> & originalLoadNodes,
-                        const std::vector<jive::simple_node *> & originalStoreNodes,
-                        const std::vector<jive::simple_node *> & originalDecoupledNodes);
+                        jlm::rvsdg::substitution_map & smap,
+                        const std::vector<jlm::rvsdg::simple_node *> & originalLoadNodes,
+                        const std::vector<jlm::rvsdg::simple_node *> & originalStoreNodes,
+                        const std::vector<jlm::rvsdg::simple_node *> & originalDecoupledNodes);
 
-    jive::simple_node *
+    jlm::rvsdg::simple_node *
     ReplaceLoad(
-        jive::substitution_map & smap,
-        const jive::simple_node * originalLoad,
-        jive::output * response);
+        jlm::rvsdg::substitution_map & smap,
+        const jlm::rvsdg::simple_node * originalLoad,
+        jlm::rvsdg::output * response);
 
-    jive::simple_node *
+    jlm::rvsdg::simple_node *
     ReplaceStore(
-        jive::substitution_map & smap,
-        const jive::simple_node * originalStore);
+        jlm::rvsdg::substitution_map & smap,
+        const jlm::rvsdg::simple_node * originalStore);
 
-    jive::output *
-    route_response(jive::region *target, jive::output *response);
+    jlm::rvsdg::output *
+    route_response(jlm::rvsdg::region *target, jlm::rvsdg::output *response);
 
-    jive::output *
-    route_request(jive::region *target, jive::output *request);
+    jlm::rvsdg::output *
+    route_request(jlm::rvsdg::region *target, jlm::rvsdg::output *request);
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEM_CONV_HPP

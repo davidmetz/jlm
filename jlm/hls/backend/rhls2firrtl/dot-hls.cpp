@@ -21,7 +21,7 @@ jlm::hls::DotHLS::get_text(jlm::RvsdgModule &rm) {
 }
 
 std::string
-jlm::hls::DotHLS::argument_to_dot(jive::argument *port) {
+jlm::hls::DotHLS::argument_to_dot(jlm::rvsdg::argument *port) {
 	auto name = get_port_name(port);
 
 	auto dot = \
@@ -39,7 +39,7 @@ jlm::hls::DotHLS::argument_to_dot(jive::argument *port) {
 }
 
 std::string
-jlm::hls::DotHLS::result_to_dot(jive::result *port) {
+jlm::hls::DotHLS::result_to_dot(jlm::rvsdg::result *port) {
 	auto name = get_port_name(port);
 
 	auto dot = \
@@ -58,7 +58,7 @@ jlm::hls::DotHLS::result_to_dot(jive::result *port) {
 }
 
 std::string
-jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
+jlm::hls::DotHLS::node_to_dot(const jlm::rvsdg::node *node) {
 	auto SPACER = "                    <TD WIDTH=\"10\"></TD>\n";
 	auto name = get_node_name(node);
 	auto opname = node->operation().debug_string();
@@ -87,20 +87,20 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 	}
 
 	std::string color = "black";
-	if (jive::is<hls::buffer_op>(node)) {
+	if (jlm::rvsdg::is<hls::buffer_op>(node)) {
 		color = "blue";
-	} else if (jive::is<hls::fork_op>(node)) {
+	} else if (jlm::rvsdg::is<hls::fork_op>(node)) {
 		color = "grey";
-	} else if (jive::is<hls::sink_op>(node)) {
+	} else if (jlm::rvsdg::is<hls::sink_op>(node)) {
 		color = "grey";
-	} else if (jive::is<hls::branch_op>(node)) {
+	} else if (jlm::rvsdg::is<hls::branch_op>(node)) {
 		color = "green";
-	} else if (jive::is<hls::mux_op>(node)) {
+	} else if (jlm::rvsdg::is<hls::mux_op>(node)) {
 		color = "darkred";
-	} else if (jive::is<hls::merge_op>(node)) {
+	} else if (jlm::rvsdg::is<hls::merge_op>(node)) {
 		color = "pink";
 	} else if (
-			jive::is<hls::trigger_op>(node) ||
+			jlm::rvsdg::is<hls::trigger_op>(node) ||
 			hls::is_constant(node)
 			) {
 		color = "orange";
@@ -148,10 +148,10 @@ jlm::hls::DotHLS::node_to_dot(const jive::node *node) {
 }
 
 std::string
-jlm::hls::DotHLS::edge(std::string src, std::string snk, const jive::type &type, bool back) {
+jlm::hls::DotHLS::edge(std::string src, std::string snk, const jlm::rvsdg::type &type, bool back) {
 	auto color = "black";
-    JLM_ASSERT(src != "" && snk != "");
-	if (dynamic_cast<const jive::ctltype *>(&type)) {
+	JLM_ASSERT(src != "" && snk != "");
+	if (dynamic_cast<const jlm::rvsdg::ctltype *>(&type)) {
 		color = "green";
 	} else if (dynamic_cast<const jlm::MemoryStateType *>(&type)) {
 		color = "blue";
@@ -174,8 +174,8 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 	dot << "subgraph cluster_loop_" << loop_ctr++ << " {\n";
 	dot << "color=\"#ff8080\"\n";
 
-	std::set<jive::output *> back_outputs;
-	std::set<jive::node *> top_nodes; // no artificial top nodes for now
+	std::set<jlm::rvsdg::output *> back_outputs;
+	std::set<jlm::rvsdg::node *> top_nodes; // no artificial top nodes for now
 	for (size_t i = 0; i < sr->narguments(); ++i) {
 		auto arg = sr->argument(i);
 		// arguments without an input produce a cycle
@@ -184,8 +184,8 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 		}
 	}
 
-	for (auto node: jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto node_dot = node_to_dot(node);
 			if (top_nodes.count(node)) {
 				dot << "{rank=source; \n";
@@ -205,7 +205,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 
 	// all loop muxes at one level
 	dot << "{rank=same ";
-	for (auto node: jive::topdown_traverser(sr)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
 		auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
 		auto lc = dynamic_cast<const hls::loop_constant_buffer_op*>(&node->operation());
 		if((mx && !mx->discarding && mx->loop)||lc){
@@ -214,7 +214,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 //        // also have the fork after the pred buf here
 //        auto fork = dynamic_cast<const hls::fork_op*>(&node->operation());
 //        if(fork){
-//            auto origin_out = dynamic_cast<jive::node_output*>(node->input(0)->origin());
+//            auto origin_out = dynamic_cast<jlm::rvsdg::node_output*>(node->input(0)->origin());
 //            if(origin_out && dynamic_cast<const jlm::hls::predicate_buffer_op*>(&origin_out->node()->operation())){
 //                dot << get_node_name(node) << " ";
 //            }
@@ -223,7 +223,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 	dot << "}\n";
 	// all loop branches at one level
 	dot << "{rank=same ";
-	for (auto node: jive::topdown_traverser(sr)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
 		auto br = dynamic_cast<const hls::branch_op*>(&node->operation());
 		if(br && br->loop){
 			dot << get_node_name(node) << " ";
@@ -233,8 +233,8 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 
 	dot << "}\n";
 	// do edges outside in order not to pull other nodes into the cluster
-	for (auto node: jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
 			auto node_name = get_node_name(node);
 			for (size_t i = 0; i < node->ninputs(); ++i) {
@@ -243,7 +243,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 				auto origin = output_map[node->input(i)->origin()];
 				// implement edge as back edge when it produces a cycle
 				bool back = mx && !mx->discarding && mx->loop && (/*i==0||*/i==2);//back_outputs.count(node->input(i)->origin());
-                auto origin_out = dynamic_cast<jive::node_output*>(node->input(i)->origin());
+                auto origin_out = dynamic_cast<jlm::rvsdg::node_output*>(node->input(i)->origin());
                 if(origin_out && dynamic_cast<const jlm::hls::predicate_buffer_op*>(&origin_out->node()->operation())){
                     //
                     back = true;
@@ -261,8 +261,8 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node *ln) {
 
 	auto sr = ln->subregion();
 	// just translate outputs
-	for (auto node: jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto node_name = get_node_name(node);
 			for (size_t i = 0; i < node->noutputs(); ++i) {
 				output_map[node->output(i)] = node_name + ":" + get_port_name(node->output(i));
@@ -296,7 +296,7 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node *ln) {
 }
 
 std::string
-jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
+jlm::hls::DotHLS::subregion_to_dot(jlm::rvsdg::region *sr) {
 	std::ostringstream dot;
 	dot << "digraph G {\n";
 	for (size_t i = 0; i < sr->narguments(); ++i) {
@@ -324,8 +324,8 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 		output_map[sr->argument(i)] = get_port_name(sr->argument(i));
 	}
     // process nodes
-	for (auto node: jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (auto node: jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto node_dot = node_to_dot(node);
 			dot << node_dot;
 			auto node_name = get_node_name(node);

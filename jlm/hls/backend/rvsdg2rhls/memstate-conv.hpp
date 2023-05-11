@@ -11,7 +11,7 @@ namespace jlm{
 	namespace hls{
 
 		void
-		memstate_conv(jive::region *region);
+		memstate_conv(jlm::rvsdg::region *region);
 
 		void
 		memstate_conv(jlm::RvsdgModule &rm);

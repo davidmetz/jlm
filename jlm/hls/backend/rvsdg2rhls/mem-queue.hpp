@@ -11,7 +11,7 @@ namespace jlm{
 	namespace hls{
 
 		void
-		mem_queue(jive::region *region);
+		mem_queue(jlm::rvsdg::region *region);
 
 		void
 		mem_queue(jlm::RvsdgModule &rm);

@@ -16,7 +16,7 @@ namespace jlm {
 		remove_redundant_buf(jlm::RvsdgModule &rm);
 
 		void
-		remove_redundant_buf(jive::region *region);
+		remove_redundant_buf(jlm::rvsdg::region *region);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_REMOVE_REDUNDANT_BUF_HPP

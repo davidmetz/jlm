@@ -12,21 +12,21 @@ namespace jlm{
 	namespace hls{
 
 		void
-		mem_sep_independent(jive::region *region);
+		mem_sep_independent(jlm::rvsdg::region *region);
 
 		void
 		mem_sep_independent(jlm::RvsdgModule &rm);
 
 		void
-		mem_sep_argument(jive::region *region);
+		mem_sep_argument(jlm::rvsdg::region *region);
 
 		void
 		mem_sep_argument(jlm::RvsdgModule &rm);
 
-        jive::argument *
+        jlm::rvsdg::argument *
         GetMemoryStateArgument(const jlm::lambda::node & lambda);
 
-        jive::result *
+        jlm::rvsdg::result *
         GetMemoryStateResult(const jlm::lambda::node & lambda);
 	}
 }

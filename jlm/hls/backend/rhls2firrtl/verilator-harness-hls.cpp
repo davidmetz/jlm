@@ -407,7 +407,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		   "	}\n";
 	size_t register_ix = 0;
 	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
-		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
+		if (dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ArgumentType(i))) {
 			register_ix++;
 			continue;
 		}
@@ -420,7 +420,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	}
 	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
 		std::string name;
-		if(auto a = dynamic_cast<jive::argument *>(ln->input(i)->origin())){
+		if(auto a = dynamic_cast<jlm::rvsdg::argument *>(ln->input(i)->origin())){
 			if(auto ip = dynamic_cast<const impport*>(&a->port())){
 				name = ip->name();
 			}
@@ -478,7 +478,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "    hls_loads.erase(hls_loads.begin(), hls_loads.end());\n"
         "    hls_stores.erase(hls_stores.begin(), hls_stores.end());\n"
         "    mem_access_ctr = 0;\n";
-	if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
+	if (ln->type().NumResults() && !dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ResultType(0))) {
 		cpp << "    return top->o_data_0;\n";
 	}
     cpp << "}\n";
@@ -531,7 +531,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
            "        close(fd[0]);\n"
            "    }\n";
 
-    if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
+    if (ln->type().NumResults() && !dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ResultType(0))) {
         cpp << "    return 0;\n";
     }
     cpp << "}\n";
@@ -540,7 +540,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
            "    ";
     call_function(cpp, ln, "run_ref");
     cpp << "\n";
-    if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
+    if (ln->type().NumResults() && !dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ResultType(0))) {
         cpp << "    return ";
     } else {
         cpp << "    ";
@@ -556,7 +556,7 @@ void jlm::hls::VerilatorHarnessHLS::call_function(std::ostringstream &cpp, const
                                                   const std::string &function_name) {
     cpp << function_name << "(";
     for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
-        if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
+        if (dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ArgumentType(i))) {
             continue;
         }
         else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
@@ -580,7 +580,7 @@ void jlm::hls::VerilatorHarnessHLS::get_function_header(
         return_type = "void";
     } else {
         auto type = &ln->type().ResultType(0);
-        if (dynamic_cast<const jive::statetype *>(type))
+        if (dynamic_cast<const jlm::rvsdg::statetype *>(type))
         {
             return_type = "void";
         } else if (dynamic_cast<const jlm::hls::bundletype *>(type))
@@ -593,7 +593,7 @@ void jlm::hls::VerilatorHarnessHLS::get_function_header(
     }
     cpp << return_type << " " << function_name << "(\n";
     for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
-        if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
+        if (dynamic_cast<const jlm::rvsdg::statetype *>(&ln->type().ArgumentType(i))) {
             continue;
         }
         else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
@@ -611,8 +611,8 @@ void jlm::hls::VerilatorHarnessHLS::get_function_header(
 }
 
 std::string
-jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jive::type *type) {
-	if (auto t = dynamic_cast<const jive::bittype *>(type)) {
+jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type *type) {
+	if (auto t = dynamic_cast<const jlm::rvsdg::bittype *>(type)) {
 		return "int" + util::strfmt(t->nbits()) + "_t";
 	} else if (is<PointerType>(*type)) {
 		return "void*";
@@ -624,7 +624,7 @@ jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jive::type *type) {
 }
 
 std::string
-jlm::hls::VerilatorHarnessHLS::convert_to_c_type_postfix(const jive::type *type) {
+jlm::hls::VerilatorHarnessHLS::convert_to_c_type_postfix(const jlm::rvsdg::type *type) {
 	if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
 		return util::strfmt("[", t->nelements(), "]", convert_to_c_type(&t->element_type()));
 	} else {

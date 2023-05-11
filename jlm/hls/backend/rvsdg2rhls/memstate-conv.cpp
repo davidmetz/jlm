@@ -19,12 +19,12 @@ jlm::hls::memstate_conv(jlm::RvsdgModule &rm) {
     memstate_conv(root);
 }
 
-void jlm::hls::memstate_conv(jive::region *region) {
-    for (auto &node: jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+void jlm::hls::memstate_conv(jlm::rvsdg::region *region) {
+    for (auto &node: jlm::rvsdg::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jlm::rvsdg::structural_node *>(node)) {
             for (size_t n = 0; n < structnode->nsubregions(); n++)
                 memstate_conv(structnode->subregion(n));
-        } else if (auto simplenode = dynamic_cast<jive::simple_node * >(node)) {
+        } else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node * >(node)) {
             if (dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator *>(&simplenode->operation())||
                     dynamic_cast<const jlm::MemStateSplitOperator *>(&simplenode->operation())) {
                 auto new_outs = hls::fork_op::create(simplenode->noutputs(), *simplenode->input(0)->origin());

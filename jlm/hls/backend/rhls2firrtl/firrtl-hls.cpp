@@ -10,7 +10,7 @@
 #include <math.h>
 
 bool
-jlm::hls::is_identity_mapping(const jive::match_op &op) {
+jlm::hls::is_identity_mapping(const jlm::rvsdg::match_op &op) {
 	for (const auto &pair : op) {
 		if (pair.first != pair.second)
 			return false;
@@ -31,7 +31,7 @@ jlm::hls::FirrtlHLS::get_text(jlm::RvsdgModule &rm) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::to_firrtl_type(const jive::type *type) {
+jlm::hls::FirrtlHLS::to_firrtl_type(const jlm::rvsdg::type *type) {
 	return util::strfmt("UInt<", jlm_sizeof(type), ">");
 }
 
@@ -73,7 +73,7 @@ jlm::hls::FirrtlHLS::mux_mem(const std::vector<std::string> &mem_nodes) const {
 }
 
 std::string
-jlm::hls::FirrtlHLS::module_header(const jive::node *node, bool has_mem_io) {
+jlm::hls::FirrtlHLS::module_header(const jlm::rvsdg::node *node, bool has_mem_io) {
 	std::ostringstream module;
 
 	module << indent(1) << "module " << get_module_name(node) << ":\n";
@@ -98,7 +98,7 @@ jlm::hls::FirrtlHLS::module_header(const jive::node *node, bool has_mem_io) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n, true);
@@ -131,11 +131,11 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 	if (store) {
 		module << indent(2) << "mem_req.write <= " << UInt(1, 1) << "\n";
 		module << indent(2) << "mem_req.data <= " << data(n->input(1)) << "\n";
-		bit_width = dynamic_cast<const jive::bittype *>(&n->input(1)->type())->nbits();
+		bit_width = dynamic_cast<const jlm::rvsdg::bittype *>(&n->input(1)->type())->nbits();
 	} else {
 		module << indent(2) << "mem_req.write <= " << UInt(1, 0) << "\n";
 		module << indent(2) << "mem_req.data is invalid\n";
-		if (auto bt = dynamic_cast<const jive::bittype *>(&n->output(0)->type())) {
+		if (auto bt = dynamic_cast<const jlm::rvsdg::bittype *>(&n->output(0)->type())) {
 			bit_width = bt->nbits();
 		} else if (dynamic_cast<const jlm::PointerType *>(&n->output(0)->type())) {
 			bit_width = 64;
@@ -181,7 +181,7 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -206,7 +206,7 @@ jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::buffer_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::buffer_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -268,7 +268,7 @@ jlm::hls::FirrtlHLS::buffer_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -296,7 +296,7 @@ jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::dmux_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::dmux_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -351,7 +351,7 @@ jlm::hls::FirrtlHLS::dmux_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::merge_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::merge_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -373,7 +373,7 @@ jlm::hls::FirrtlHLS::merge_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::fork_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::fork_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -409,7 +409,7 @@ jlm::hls::FirrtlHLS::fork_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::sink_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::sink_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -422,7 +422,7 @@ jlm::hls::FirrtlHLS::sink_to_firrtl(const jive::simple_node *n) {
 
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::print_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	auto pn = dynamic_cast<const jlm::hls::print_op *>(&n->operation());
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
@@ -446,7 +446,7 @@ jlm::hls::FirrtlHLS::print_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::branch_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::branch_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -472,7 +472,7 @@ jlm::hls::FirrtlHLS::branch_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::trigger_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 	module << module_header(n);
@@ -491,16 +491,16 @@ jlm::hls::FirrtlHLS::trigger_to_firrtl(const jive::simple_node *n) {
 
 
 int
-jlm::hls::jlm_sizeof(const jive::type *t) {
-	if (auto bt = dynamic_cast<const jive::bittype *>(t)) {
+jlm::hls::jlm_sizeof(const jlm::rvsdg::type *t) {
+	if (auto bt = dynamic_cast<const jlm::rvsdg::bittype *>(t)) {
 		return bt->nbits();
 	} else if (auto at = dynamic_cast<const jlm::arraytype *>(t)) {
 		return jlm_sizeof(&at->element_type()) * at->nelements();
 	} else if ( dynamic_cast<const jlm::PointerType *>(t)) {
 		return 64;
-	} else if (auto ct = dynamic_cast<const jive::ctltype *>(t)) {
+	} else if (auto ct = dynamic_cast<const jlm::rvsdg::ctltype *>(t)) {
 		return ceil(log2(ct->nalternatives()));
-	} else if (dynamic_cast<const jive::statetype *>(t)) {
+	} else if (dynamic_cast<const jlm::rvsdg::statetype *>(t)) {
 		return 1;
 	} else {
 		throw std::logic_error(t->debug_string() + " size of not implemented!");
@@ -508,14 +508,14 @@ jlm::hls::jlm_sizeof(const jive::type *t) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	auto o = dynamic_cast<const jlm::GetElementPtrOperation *>(&(n->operation()));
 	std::string result = "cvt("+data(n->input(0))+")"; // start of with base pointer
 	//TODO: support structs
-	const jive::type *pt = &o->GetPointeeType();
+	const jlm::rvsdg::type *pt = &o->GetPointeeType();
 	for (size_t i = 1; i < n->ninputs(); ++i) {
 		int bits = jlm_sizeof(pt);
-		if (dynamic_cast<const jive::bittype *>(pt)) { ;
+		if (dynamic_cast<const jlm::rvsdg::bittype *>(pt)) { ;
 		} else if (auto at = dynamic_cast<const jlm::arraytype *>(pt)) {
 			pt = &at->element_type();
 		} else {
@@ -531,9 +531,9 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jive::simple_node *n) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::match_op_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::match_op_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string result;
-	auto o = dynamic_cast<const jive::match_op *>(&(n->operation()));
+	auto o = dynamic_cast<const jlm::rvsdg::match_op *>(&(n->operation()));
 	JLM_ASSERT(o);
 	if (is_identity_mapping(*o)) {
 		return data(n->input(0));
@@ -549,14 +549,14 @@ jlm::hls::FirrtlHLS::match_op_to_firrtl(const jive::simple_node *n) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
-	if (dynamic_cast<const jive::match_op *>(&(n->operation()))) {
+jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jlm::rvsdg::simple_node *n) {
+	if (dynamic_cast<const jlm::rvsdg::match_op *>(&(n->operation()))) {
 		return match_op_to_firrtl(n);
-	} else if (dynamic_cast<const jive::bitsgt_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsgt_op *>(&(n->operation()))) {
 		return "gt(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
-	} else if (dynamic_cast<const jive::bitsge_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsge_op *>(&(n->operation()))) {
 		return "geq(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
-	} else if (dynamic_cast<const jive::bitsle_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsle_op *>(&(n->operation()))) {
 		return "leq(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
 	} else if (auto o = dynamic_cast<const jlm::sext_op *>(&(n->operation()))) {
 		return "asUInt(pad(asSInt(" + data(n->input(0)) + "), " + util::strfmt(o->ndstbits()) +
@@ -567,48 +567,48 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 		return data(n->input(0));
 	} else if (dynamic_cast<const jlm::zext_op *>(&(n->operation()))) {
 		return data(n->input(0));
-	} else if (dynamic_cast<const jive::bitugt_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitugt_op *>(&(n->operation()))) {
 		return "gt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitult_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitult_op *>(&(n->operation()))) {
 		return "lt(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitslt_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitslt_op *>(&(n->operation()))) {
 		return "lt(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + "))";
-	} else if (dynamic_cast<const jive::biteq_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::biteq_op *>(&(n->operation()))) {
 		return "eq(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitadd_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitadd_op *>(&(n->operation()))) {
 		return "add(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitmul_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitmul_op *>(&(n->operation()))) {
 		return "mul(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitsub_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsub_op *>(&(n->operation()))) {
 		return "sub(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitand_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitand_op *>(&(n->operation()))) {
 		return "and(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitxor_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitxor_op *>(&(n->operation()))) {
 		return "xor(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitor_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitor_op *>(&(n->operation()))) {
 		return "or(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitshr_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitshr_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		return "dshr(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (dynamic_cast<const jive::bitashr_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitashr_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		return "asUInt(dshr(asSInt(" + data(n->input(0)) + "), " + data(n->input(1)) + "))";
-	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsdiv_op *>(&(n->operation()))) {
 		return "asUInt(div(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + ")))";
-	}  else if (dynamic_cast<const jive::bitsmod_op *>(&(n->operation()))) {
+	}  else if (dynamic_cast<const jlm::rvsdg::bitsmod_op *>(&(n->operation()))) {
 		return "asUInt(rem(asSInt(" + data(n->input(0)) + "), asSInt(" + data(n->input(1)) + ")))";
-	} else if (dynamic_cast<const jive::bitshl_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitshl_op *>(&(n->operation()))) {
 		//TODO: automatic conversion to static shift?
 		// TODO: adjust shift limit (bits)
 		return "dshl(" + data(n->input(0)) + ", bits(" + data(n->input(1)) + ", 7, 0))";
-	} else if (dynamic_cast<const jive::bitne_op *>(&(n->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitne_op *>(&(n->operation()))) {
 		return "neq(" + data(n->input(0)) + ", " + data(n->input(1)) + ")";
-	} else if (auto o = dynamic_cast<const jive::bitconstant_op *>(&(n->operation()))) {
+	} else if (auto o = dynamic_cast<const jlm::rvsdg::bitconstant_op *>(&(n->operation()))) {
 		auto value = o->value();
 		return util::strfmt("UInt<", value.nbits(), ">(", value.to_uint(), ")");
 	} else if (dynamic_cast<const jlm::UndefValueOperation *>(&(n->operation()))) {
 		return UInt(1, 0);  // TODO: Fix?
-	} else if (auto o = dynamic_cast<const jive::ctlconstant_op *>(&(n->operation()))) {
+	} else if (auto o = dynamic_cast<const jlm::rvsdg::ctlconstant_op *>(&(n->operation()))) {
 		return UInt(ceil(log2(o->value().nalternatives())), o->value().alternative());
 	} else if (dynamic_cast<const jlm::GetElementPtrOperation *>(&(n->operation()))) {
 		return gep_op_to_firrtl(n);
@@ -618,7 +618,7 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jive::simple_node *n) {
 }
 
 jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jive::simple_node *n) {
+jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jlm::rvsdg::simple_node *n) {
 	std::string module_name = get_module_name(n);
 	std::ostringstream module;
 
@@ -653,14 +653,14 @@ jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jive::simple_node *n
 }
 
 jlm::hls::FirrtlModule
-jlm::hls::FirrtlHLS::node_to_firrtl(const jive::node *node, const int depth) {
+jlm::hls::FirrtlHLS::node_to_firrtl(const jlm::rvsdg::node *node, const int depth) {
 	// check if module for operation was already generated
 	for (auto pair: modules) {
 		if(pair.first != nullptr && *pair.first == node->operation()) {
 			return pair.second;
 		}
 	}
-	if (auto n = dynamic_cast<const jive::simple_node *>(node)) {
+	if (auto n = dynamic_cast<const jlm::rvsdg::simple_node *>(node)) {
 		if (dynamic_cast<const jlm::LoadOperation *>(&(n->operation()))) {
 			return mem_node_to_firrtl(n);
 		} else if (dynamic_cast<const jlm::StoreOperation *>(&(n->operation()))) {
@@ -698,8 +698,8 @@ std::string
 jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node *ln) {
 	std::ostringstream firrtl;
 	auto sr = ln->subregion();
-	for (const auto node : jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (const auto node : jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
 			std::string inst_name = get_node_name(node);
 			if (node_module.has_mem) {
@@ -738,10 +738,10 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node *ln) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::connect(jive::region *sr) {
+jlm::hls::FirrtlHLS::connect(jlm::rvsdg::region *sr) {
 	std::ostringstream firrtl;
-	for (const auto &node : jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (const auto &node : jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto inst_name = get_node_name(node);
 			firrtl << indent(2) << inst_name << ".clk <= clk\n";
 			firrtl << indent(2) << inst_name << ".reset <= reset\n";
@@ -763,7 +763,7 @@ jlm::hls::FirrtlHLS::connect(jive::region *sr) {
 }
 
 jlm::hls::FirrtlModule
-jlm::hls::FirrtlHLS::subregion_to_firrtl(jive::region *sr) {
+jlm::hls::FirrtlHLS::subregion_to_firrtl(jlm::rvsdg::region *sr) {
 	auto module_name = "subregion_mod" + util::strfmt(modules.size());
 	std::ostringstream module;
 	module << indent(1) << "module " << module_name << ":\n";
@@ -787,8 +787,8 @@ jlm::hls::FirrtlHLS::subregion_to_firrtl(jive::region *sr) {
 		output_map[sr->argument(i)] = get_port_name(sr->argument(i));
 	}
 	// create node modules and ios first
-	for (const auto node : jive::topdown_traverser(sr)) {
-		if (dynamic_cast<jive::simple_node *>(node)) {
+	for (const auto node : jlm::rvsdg::topdown_traverser(sr)) {
+		if (dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
 			auto node_module = node_to_firrtl(node, 2);
 			std::string inst_name = get_node_name(node);
 			if (node_module.has_mem) {
@@ -915,7 +915,7 @@ jlm::hls::FirrtlHLS::lambda_node_to_firrtl(const jlm::lambda::node *ln) {
 }
 
 std::string
-jlm::hls::FirrtlHLS::get_module_name(const jive::node *node) {
+jlm::hls::FirrtlHLS::get_module_name(const jlm::rvsdg::node *node) {
 	auto new_name = util::strfmt("op_", node->operation().debug_string(), "_", modules.size());
 	// remove chars that are not valid in firrtl module names
 	std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');

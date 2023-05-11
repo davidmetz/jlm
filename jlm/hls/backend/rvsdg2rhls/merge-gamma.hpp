@@ -12,12 +12,12 @@
 namespace jlm{
 	namespace hls{
 		void
-		merge_gamma(jive::region *region);
+		merge_gamma(jlm::rvsdg::region *region);
 
 		void
 		merge_gamma(jlm::RvsdgModule &rm);
 
-        bool merge_gamma(jive::gamma_node *gamma);
+        bool merge_gamma(jlm::rvsdg::gamma_node *gamma);
     }
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP

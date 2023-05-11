@@ -9,8 +9,8 @@
 #include <jlm/rvsdg/traverser.hpp>
 #include <jlm/rvsdg/view.hpp>
 
-bool eliminate_buf(jive::output * o){
-    if(auto so = dynamic_cast<jive::simple_output*>(o)){
+bool eliminate_buf(jlm::rvsdg::output * o){
+    if(auto so = dynamic_cast<jlm::rvsdg::simple_output*>(o)){
         auto node = so->node();
         if (auto branch = dynamic_cast<const jlm::hls::branch_op *>(&node->operation())){
             return eliminate_buf(node->input(1)->origin());
@@ -24,13 +24,13 @@ bool eliminate_buf(jive::output * o){
 }
 
 void
-jlm::hls::remove_redundant_buf(jive::region *region) {
-	for (auto &node : jive::topdown_traverser(region)) {
-		if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+jlm::hls::remove_redundant_buf(jlm::rvsdg::region *region) {
+	for (auto &node : jlm::rvsdg::topdown_traverser(region)) {
+		if (auto structnode = dynamic_cast<jlm::rvsdg::structural_node *>(node)) {
             for (size_t n = 0; n < structnode->nsubregions(); n++) {
                 remove_redundant_buf(structnode->subregion(n));
             }
-		} else if (auto simplenode = dynamic_cast<jive::simple_node *>(node)) {
+		} else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
             if (auto buf = dynamic_cast<const jlm::hls::buffer_op *>(&node->operation())){
                 if(dynamic_cast<const jlm::MemoryStateType*>(&buf->argument(0).type())){
                     if(!buf->pass_through && eliminate_buf(node->input(0)->origin())){

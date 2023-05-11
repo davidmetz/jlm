@@ -13,10 +13,10 @@
 
 namespace jlm{
 	namespace hls{
-		static inline bool is_constant(const jive::node *node) {
-			return jive::is<jive::bitconstant_op>(node) ||
-				   jive::is<jlm::UndefValueOperation>(node) ||
-				   jive::is<jive::ctlconstant_op>(node);
+		static inline bool is_constant(const jlm::rvsdg::node *node) {
+			return jlm::rvsdg::is<jlm::rvsdg::bitconstant_op>(node) ||
+				   jlm::rvsdg::is<jlm::UndefValueOperation>(node) ||
+				   jlm::rvsdg::is<jlm::rvsdg::ctlconstant_op>(node);
 		}
 
 		void
@@ -28,8 +28,8 @@ namespace jlm{
 		void
 		dump_ref(jlm::RvsdgModule &rhls, std::string &path);
 
-        const jive::output *
-        trace_call(jive::input *input);
+        const jlm::rvsdg::output *
+        trace_call(jlm::rvsdg::input *input);
 
         std::unique_ptr<RvsdgModule>
         split_hls_function(RvsdgModule &rm, const std::string &function_name);

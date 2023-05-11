@@ -55,7 +55,7 @@ jlm::hls::remove_loop_passthrough(hls::loop_node *ln) {
         auto arg = in->arguments.begin();
 		if (arg->nusers() == 1) {
             auto user = *arg->begin();
-            if(auto result = dynamic_cast<jive::result*>(user)){
+            if(auto result = dynamic_cast<jlm::rvsdg::result*>(user)){
                 auto out = result->output();
                 out->divert_users(in->origin());
                 sr->remove_result(result->index());
@@ -102,7 +102,7 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node *ln) {
 	return any_changed;
 }
 
-bool dead_spec_gamma(jive::node *dmux_node){
+bool dead_spec_gamma(jlm::rvsdg::node *dmux_node){
     auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&dmux_node->operation());
     JLM_ASSERT(mux_op);
     JLM_ASSERT(mux_op->discarding);
@@ -123,15 +123,15 @@ bool dead_spec_gamma(jive::node *dmux_node){
     return false;
 }
 
-bool dead_nonspec_gamma(jive::node *ndmux_node){
+bool dead_nonspec_gamma(jlm::rvsdg::node *ndmux_node){
     auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&ndmux_node->operation());
     JLM_ASSERT(mux_op);
     JLM_ASSERT(!mux_op->discarding);
     // check if all inputs go to outputs of same branch
     bool all_inputs_same_branch = true;
-    jive::node * origin_branch;
+    jlm::rvsdg::node * origin_branch;
     for (size_t i = 1; i < ndmux_node->ninputs(); ++i) {
-        if(auto no = dynamic_cast<jive::node_output*>(ndmux_node->input(i)->origin())){
+        if(auto no = dynamic_cast<jlm::rvsdg::node_output*>(ndmux_node->input(i)->origin())){
             if(dynamic_cast<const jlm::hls::branch_op*>(&no->node()->operation())
                 && no->nusers() == 1){
                 if(i==1){
@@ -156,7 +156,7 @@ bool dead_nonspec_gamma(jive::node *ndmux_node){
     return false;
 }
 
-bool dead_loop(jive::node *ndmux_node){
+bool dead_loop(jlm::rvsdg::node *ndmux_node){
     auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&ndmux_node->operation());
     JLM_ASSERT(mux_op);
     JLM_ASSERT(!mux_op->discarding);
@@ -169,7 +169,7 @@ bool dead_loop(jive::node *ndmux_node){
     if(ndmux_node->output(0)->nusers()!=1){
         return false;
     }
-    auto branch_in = dynamic_cast<jive::node_input*>(*ndmux_node->output(0)->begin());
+    auto branch_in = dynamic_cast<jlm::rvsdg::node_input*>(*ndmux_node->output(0)->begin());
     if(!branch_in || !dynamic_cast<const jlm::hls::branch_op*>(&branch_in->node()->operation())){
         return false;
     }
@@ -177,7 +177,7 @@ bool dead_loop(jive::node *ndmux_node){
     if(branch_in->node()->output(1)->nusers()!=1){
         return false;
     }
-    auto buf_in = dynamic_cast<jive::node_input*>(*branch_in->node()->output(1)->begin());
+    auto buf_in = dynamic_cast<jlm::rvsdg::node_input*>(*branch_in->node()->output(1)->begin());
     if(!buf_in || !dynamic_cast<const jlm::hls::buffer_op*>(&buf_in->node()->operation())){
         return false;
     }
@@ -188,13 +188,13 @@ bool dead_loop(jive::node *ndmux_node){
     }
     // depend on same control
     auto branch_cond_origin = branch_in->node()->input(0)->origin();
-    auto pred_buf_out = dynamic_cast<jive::node_output*>(ndmux_node->input(0)->origin());
+    auto pred_buf_out = dynamic_cast<jlm::rvsdg::node_output*>(ndmux_node->input(0)->origin());
     if(!pred_buf_out || !dynamic_cast<const jlm::hls::predicate_buffer_op*>(&pred_buf_out->node()->operation())){
         return false;
     }
     auto pred_buf_cond_origin = pred_buf_out->node()->input(0)->origin();
     // TODO: remove this once predicate buffers decouple combinatorial loops
-    auto extra_buf_out = dynamic_cast<jive::node_output*>(pred_buf_cond_origin);
+    auto extra_buf_out = dynamic_cast<jlm::rvsdg::node_output*>(pred_buf_cond_origin);
     if(!extra_buf_out || !dynamic_cast<const jlm::hls::buffer_op*>(&extra_buf_out->node()->operation())){
         return false;
     }
@@ -218,12 +218,12 @@ bool dead_loop(jive::node *ndmux_node){
 }
 
 bool
-jlm::hls::dne(jive::region *sr) {
+jlm::hls::dne(jlm::rvsdg::region *sr) {
 	bool any_changed = false;
 	bool changed;
 	do {
 		changed = false;
-		for (auto &node : jive::bottomup_traverser(sr)) {
+		for (auto &node : jlm::rvsdg::bottomup_traverser(sr)) {
 			if (!node->has_users()) {
                 if(dynamic_cast<const jlm::hls::mem_req_op*>(&node->operation())){
                     // TODO: fix this once memory connections are explicit

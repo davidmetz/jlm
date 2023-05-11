@@ -11,7 +11,7 @@ namespace jlm{
 	namespace hls{
 
 		void
-		dae_conv(jive::region *region);
+		dae_conv(jlm::rvsdg::region *region);
 
 		void
 		dae_conv(jlm::RvsdgModule &rm);

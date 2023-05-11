@@ -18,15 +18,15 @@ jlm::hls::merge_gamma(jlm::RvsdgModule &rm) {
 }
 
 void
-jlm::hls::merge_gamma(jive::region *region) {
+jlm::hls::merge_gamma(jlm::rvsdg::region *region) {
     bool changed = true;
     while (changed) {
         changed = false;
-        for (auto &node: jive::topdown_traverser(region)) {
-            if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+        for (auto &node: jlm::rvsdg::topdown_traverser(region)) {
+            if (auto structnode = dynamic_cast<jlm::rvsdg::structural_node *>(node)) {
                 for (size_t n = 0; n < structnode->nsubregions(); n++)
                     merge_gamma(structnode->subregion(n));
-                if (auto gamma = dynamic_cast<jive::gamma_node *>(node)) {
+                if (auto gamma = dynamic_cast<jlm::rvsdg::gamma_node *>(node)) {
                     changed = changed != merge_gamma(gamma);
                 }
             }
@@ -34,17 +34,17 @@ jlm::hls::merge_gamma(jive::region *region) {
     }
 }
 
-bool is_output_of(jive::output * output, jive::node * node){
-    auto no = dynamic_cast<jive::node_output*>(output);
+bool is_output_of(jlm::rvsdg::output * output, jlm::rvsdg::node * node){
+    auto no = dynamic_cast<jlm::rvsdg::node_output*>(output);
     return no && no->node()==node;
 }
 
-bool depends_on(jive::output * output, jive::node * node){
-    auto arg = dynamic_cast<jive::argument*>(output);
+bool depends_on(jlm::rvsdg::output * output, jlm::rvsdg::node * node){
+    auto arg = dynamic_cast<jlm::rvsdg::argument*>(output);
     if(arg){
         return false;
     }
-    auto no = dynamic_cast<jive::node_output*>(output);
+    auto no = dynamic_cast<jlm::rvsdg::node_output*>(output);
     JLM_ASSERT(no);
     if(no->node()==node){
         return true;
@@ -57,9 +57,9 @@ bool depends_on(jive::output * output, jive::node * node){
     return false;
 }
 
-jive::gamma_input * get_entryvar(jive::output * origin, jive::gamma_node *gamma){
+jlm::rvsdg::gamma_input * get_entryvar(jlm::rvsdg::output * origin, jlm::rvsdg::gamma_node *gamma){
     for (auto user: *origin) {
-        auto gi = dynamic_cast<jive::gamma_input*>(user);
+        auto gi = dynamic_cast<jlm::rvsdg::gamma_input*>(user);
         if(gi && gi->node() == gamma){
             return gi;
         }
@@ -67,9 +67,9 @@ jive::gamma_input * get_entryvar(jive::output * origin, jive::gamma_node *gamma)
     return gamma->add_entryvar(origin);
 }
 
-bool jlm::hls::merge_gamma(jive::gamma_node *gamma) {
+bool jlm::hls::merge_gamma(jlm::rvsdg::gamma_node *gamma) {
     for(auto user: *gamma->predicate()->origin()){
-        auto gi = dynamic_cast<jive::gamma_input*>(user);
+        auto gi = dynamic_cast<jlm::rvsdg::gamma_input*>(user);
         if(gi && gi!=gamma->predicate()){
             // other gamma depending on same predicate
             auto other_gamma = gi->node();
@@ -86,12 +86,12 @@ bool jlm::hls::merge_gamma(jive::gamma_node *gamma) {
                 can_merge &= !depends_on(oev->origin(), gamma);
             }
             if(can_merge){
-                std::vector<jive::substitution_map> rmap(gamma->nsubregions());
+                std::vector<jlm::rvsdg::substitution_map> rmap(gamma->nsubregions());
                 // populate argument mappings
                 for (size_t i = 0; i < gamma->nentryvars(); ++i) {
                     auto ev = gamma->entryvar(i);
                     if(is_output_of(ev->origin(), other_gamma)){
-                        auto go = dynamic_cast<jive::gamma_output*>(ev->origin());
+                        auto go = dynamic_cast<jlm::rvsdg::gamma_output*>(ev->origin());
                         for (size_t j = 0; j < gamma->nsubregions(); ++j) {
                             rmap[j].insert(ev->argument(j), go->result(j)->origin());
                         }
@@ -109,7 +109,7 @@ bool jlm::hls::merge_gamma(jive::gamma_node *gamma) {
                 // handle exitvars
                 for (size_t i = 0; i < gamma->nexitvars(); ++i) {
                     auto ex = gamma->exitvar(i);
-                    std::vector<jive::output*> operands;
+                    std::vector<jlm::rvsdg::output*> operands;
                     for (size_t j = 0; j < ex->nresults(); j++){
                         operands.push_back(rmap[j].lookup(ex->result(j)->origin()));
                     }

@@ -29,37 +29,37 @@ jlm::hls::mem_sep_argument(jlm::RvsdgModule &rm) {
 }
 
 // from MemoryStateEncoder.cpp
-jive::argument *
+jlm::rvsdg::argument *
 jlm::hls::GetMemoryStateArgument(const jlm::lambda::node & lambda)
 {
     auto subregion = lambda.subregion();
     for (size_t n = 0; n < subregion->narguments(); n++) {
         auto argument = subregion->argument(n);
-        if (jive::is<jlm::MemoryStateType>(argument->type()))
+        if (jlm::rvsdg::is<jlm::MemoryStateType>(argument->type()))
             return argument;
     }
     return nullptr;
 }
 
-jive::result *
+jlm::rvsdg::result *
 jlm::hls::GetMemoryStateResult(const jlm::lambda::node & lambda)
 {
     auto subregion = lambda.subregion();
     for (size_t n = 0; n < subregion->nresults(); n++) {
         auto result = subregion->result(n);
-        if (jive::is<jlm::MemoryStateType>(result->type()))
+        if (jlm::rvsdg::is<jlm::MemoryStateType>(result->type()))
             return result;
     }
 
     JLM_UNREACHABLE("This should have never happened!");
 }
 
-void gather_mem_nodes(jive::region *region, std::vector<jive::simple_node *> &mem_nodes) {
-    for (auto &node: jive::topdown_traverser(region)) {
-        if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
+void gather_mem_nodes(jlm::rvsdg::region *region, std::vector<jlm::rvsdg::simple_node *> &mem_nodes) {
+    for (auto &node: jlm::rvsdg::topdown_traverser(region)) {
+        if (auto structnode = dynamic_cast<jlm::rvsdg::structural_node *>(node)) {
             for (size_t n = 0; n < structnode->nsubregions(); n++)
                 gather_mem_nodes(structnode->subregion(n), mem_nodes);
-        } else if (auto simplenode = dynamic_cast<jive::simple_node * >(node)) {
+        } else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node * >(node)) {
             if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
                 mem_nodes.push_back(simplenode);
             } else if (dynamic_cast<const jlm::LoadOperation *>(&simplenode->operation())) {
@@ -69,15 +69,15 @@ void gather_mem_nodes(jive::region *region, std::vector<jive::simple_node *> &me
     }
 }
 
-jive::output *route_through(jive::region *target, jive::output *response) {
+jlm::rvsdg::output *route_through(jlm::rvsdg::region *target, jlm::rvsdg::output *response) {
     if (response->region() == target) {
         return response;
     } else {
         auto parent_response = route_through(target->node()->region(), response);
         auto parrent_user = *parent_response->begin();
-        if (auto gn = dynamic_cast<jive::gamma_node*>(target->node())){
+        if (auto gn = dynamic_cast<jlm::rvsdg::gamma_node*>(target->node())){
             auto ip = gn->add_entryvar(parent_response);
-            std::vector<jive::output*> vec;
+            std::vector<jlm::rvsdg::output*> vec;
             for(auto &arg:ip->arguments){
                 vec.push_back(&arg);
             }
@@ -88,7 +88,7 @@ jive::output *route_through(jive::region *target, jive::output *response) {
                 }
             }
             JLM_UNREACHABLE("THIS SHOULD NOT HAPPEN");
-        } else if (auto tn = dynamic_cast<jive::theta_node*>(target->node())){
+        } else if (auto tn = dynamic_cast<jlm::rvsdg::theta_node*>(target->node())){
             auto lv = tn->add_loopvar(parent_response);
             parrent_user->divert_to(lv);
             return lv->argument();
@@ -97,7 +97,7 @@ jive::output *route_through(jive::region *target, jive::output *response) {
     }
 }
 /* assign each load and store its own state edge. */
-void jlm::hls::mem_sep_independent(jive::region *region) {
+void jlm::hls::mem_sep_independent(jlm::rvsdg::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
@@ -106,7 +106,7 @@ void jlm::hls::mem_sep_independent(jive::region *region) {
         return;
     }
     auto state_user = *state_arg->begin();
-    std::vector<jive::simple_node *> mem_nodes;
+    std::vector<jlm::rvsdg::simple_node *> mem_nodes;
     gather_mem_nodes(lambda_region, mem_nodes);
     auto entry_states = jlm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+mem_nodes.size());
     auto state_result = GetMemoryStateResult(*lambda);
@@ -131,12 +131,12 @@ void jlm::hls::mem_sep_independent(jive::region *region) {
     }
 }
 
-jive::result *trace_edge(
-        jive::output *common_edge,
-        jive::output *new_edge,
-        std::vector<jive::simple_node *> &load_nodes,
-        const std::vector<jive::simple_node *> &store_nodes,
-        std::vector<jive::simple_node *> &decouple_nodes) {
+jlm::rvsdg::result *trace_edge(
+        jlm::rvsdg::output *common_edge,
+        jlm::rvsdg::output *new_edge,
+        std::vector<jlm::rvsdg::simple_node *> &load_nodes,
+        const std::vector<jlm::rvsdg::simple_node *> &store_nodes,
+        std::vector<jlm::rvsdg::simple_node *> &decouple_nodes) {
     // follows along common edge and routes new edge through the same regions
     // redirects the supplied loads, stores and decouples to the new edge
     // the new edge might be routed through unnecessary regions. This should be fixed by running DNE
@@ -146,13 +146,13 @@ jive::result *trace_edge(
         assert(new_edge->nusers() == 1);
         auto user = *common_edge->begin();
         auto new_next = *new_edge->begin();
-        if(auto res = dynamic_cast<jive::result*>(user)){
+        if(auto res = dynamic_cast<jlm::rvsdg::result*>(user)){
             // end of region reached
             return res;
-        } else if (auto gi = dynamic_cast<jive::gamma_input*>(user)){
+        } else if (auto gi = dynamic_cast<jlm::rvsdg::gamma_input*>(user)){
             auto gn = gi->node();
             auto ip = gn->add_entryvar(new_edge);
-            std::vector<jive::output*> vec;
+            std::vector<jlm::rvsdg::output*> vec;
             for(auto &arg:ip->arguments){
                 vec.push_back(&arg);
             }
@@ -162,14 +162,14 @@ jive::result *trace_edge(
                 auto subres = trace_edge(gi->argument(i), ip->argument(i), load_nodes, store_nodes, decouple_nodes);
                 common_edge = subres->output();
             }
-        } else if (auto ti = dynamic_cast<jive::theta_input*>(user)){
+        } else if (auto ti = dynamic_cast<jlm::rvsdg::theta_input*>(user)){
             auto tn = ti->node();
             auto lv = tn->add_loopvar(new_edge);
             trace_edge(ti->argument(), lv->argument(), load_nodes, store_nodes, decouple_nodes);
             common_edge = ti->output();
             new_edge = lv;
             new_next->divert_to(new_edge);
-        } else if (auto si = dynamic_cast<jive::simple_input*>(user)){
+        } else if (auto si = dynamic_cast<jlm::rvsdg::simple_input*>(user)){
             auto sn = si->node();
             auto op = &si->node()->operation();
             if (dynamic_cast<const jlm::StoreOperation *>(op)) {
@@ -216,7 +216,7 @@ jive::result *trace_edge(
 }
 
 /* assign each pointer argument its own state edge. */
-void jlm::hls::mem_sep_argument(jive::region *region) {
+void jlm::hls::mem_sep_argument(jlm::rvsdg::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);

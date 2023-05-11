@@ -14,7 +14,7 @@
 
 // Handles nodes with 2 inputs and 1 output
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jlm::rvsdg::simple_node *node) {
 	// Only handles nodes with a single output
 	if (node->noutputs() != 1) {
 		throw std::logic_error(node->operation().debug_string() + " has more than 1 output");
@@ -41,46 +41,46 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	// Get the data signal from the bundle
 	auto outData = GetSubfield(body, outBundle, "data");
 
-	if (dynamic_cast<const jive::bitadd_op *>(&(node->operation()))) {
+	if (dynamic_cast<const jlm::rvsdg::bitadd_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAddOp(body, input0, input1);
 		// Connect the op to the output data
 		// We drop the carry bit
 		Connect(body, outData, DropMSBs(body, op, 1));
-	} else if (dynamic_cast<const jive::bitsub_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsub_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddSubOp(body, input0, input1);
 		// Connect the op to the output data
 		// We drop the carry bit
 		Connect(body, outData, DropMSBs(body, op, 1));
-	} else if (dynamic_cast<const jive::bitand_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitand_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAndOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitxor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddXorOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddOrOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (auto bitmulOp = dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
+	} else if (auto bitmulOp = dynamic_cast<const jlm::rvsdg::bitmul_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddMulOp(body, input0, input1);
 		// Connect the op to the output data
 		// Multiplication results are double the input width, so we drop the upper half of the result
 		Connect(body, outData, DropMSBs(body, op, bitmulOp->type().nbits()));
-	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsdiv_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -89,13 +89,13 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto uIntOp = AddAsUIntOp(body, divOp);
 		// Connect the op to the output data
 		Connect(body, outData, DropMSBs(body, uIntOp, 1));
-	} else if (dynamic_cast<const jive::bitshr_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitshr_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddDShrOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitashr_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitashr_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -103,7 +103,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto uIntOp = AddAsUIntOp(body, shrOp);
 		// Connect the op to the output data
 		Connect(body, outData, uIntOp);
-	} else if (dynamic_cast<const jive::bitshl_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitshl_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto bitsOp = AddBitsOp(body, input1, 7, 0);
@@ -112,7 +112,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto slice = AddBitsOp(body, op, outSize - 1, 0);
 		// Connect the op to the output data
 		Connect(body, outData, slice);
-	} else if (dynamic_cast<const jive::bitsmod_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsmod_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -120,19 +120,19 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto remOp = AddRemOp(body, sIntOp0, sIntOp1);
 		auto uIntOp = AddAsUIntOp(body, remOp);
 		Connect(body, outData, uIntOp);
-	} else if (dynamic_cast<const jive::biteq_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::biteq_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddEqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	}  else if (dynamic_cast<const jive::bitne_op *>(&(node->operation()))) {
+	}  else if (dynamic_cast<const jlm::rvsdg::bitne_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddNeqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitsgt_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsgt_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -140,25 +140,25 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddGtOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitult_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitult_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddLtOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitule_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitule_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddLeqOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitugt_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitugt_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddGtOp(body, input0, input1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitsge_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsge_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -166,7 +166,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto op = AddGeqOp(body, sIntOp0, sIntOp1);
 		// Connect the op to the output data
 		Connect(body, outData, op);
-	} else if (dynamic_cast<const jive::bitsle_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitsle_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sIntOp0 = AddAsSIntOp(body, input0);
@@ -193,18 +193,18 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto padOp = AddPadOp(body, sintOp, op->ndstbits());
 		auto uintOp = AddAsUIntOp(body, padOp);
 		Connect(body, outData, uintOp);
-	} else if (auto op = dynamic_cast<const jive::bitconstant_op *>(&(node->operation()))) {
+	} else if (auto op = dynamic_cast<const jlm::rvsdg::bitconstant_op *>(&(node->operation()))) {
 		auto value = op->value();
 		auto size = value.nbits();
 		// Create a constant of UInt<size>(value) and connect to output data
 		auto constant = GetConstant(body, size, value.to_uint());
 		Connect(body, outData, constant);
-	} else if (auto op = dynamic_cast<const jive::ctlconstant_op *>(&(node->operation()))) {
+	} else if (auto op = dynamic_cast<const jlm::rvsdg::ctlconstant_op *>(&(node->operation()))) {
 		auto value = op->value().alternative();
 		auto size = ceil(log2(op->value().nalternatives()));
 		auto constant = GetConstant(body, size, value);
 		Connect(body, outData, constant);
-	} else if (dynamic_cast<const jive::bitslt_op *>(&(node->operation()))) {
+	} else if (dynamic_cast<const jlm::rvsdg::bitslt_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto sInt0 = AddAsSIntOp(body, input0);
@@ -214,7 +214,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	}  else if (dynamic_cast<const jlm::bitcast_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		Connect(body, outData, input0);
-	} else if (auto op = dynamic_cast<const jive::match_op *>(&(node->operation()))) {
+	} else if (auto op = dynamic_cast<const jlm::rvsdg::match_op *>(&(node->operation()))) {
 		auto inData = GetSubfield(body, inBundles[0], "data");
 		auto outData = GetSubfield(body, outBundle, "data");
 		int inSize = JlmSize(&node->input(0)->type());
@@ -244,10 +244,10 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		mlir::Value result = AddCvtOp(body, input0);
 
 		//TODO: support structs
-		const jive::type *pointeeType = &op->GetPointeeType();
+		const jlm::rvsdg::type *pointeeType = &op->GetPointeeType();
 		for (size_t i = 1; i < node->ninputs(); i++) {
 			int bits = JlmSize(pointeeType);
-			if (dynamic_cast<const jive::bittype *>(pointeeType)) {
+			if (dynamic_cast<const jlm::rvsdg::bittype *>(pointeeType)) {
 				;
 			} else if (auto arrayType = dynamic_cast<const jlm::arraytype *>(pointeeType)) {
 				pointeeType = &arrayType->element_type();
@@ -296,7 +296,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenSink(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenSink(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -320,7 +320,7 @@ jlm::hls::MLIRGenImpl::MlirGenSink(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -370,7 +370,7 @@ jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenFork(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -449,7 +449,7 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenStateGate(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenStateGate(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node);
     auto body = module.getBodyBlock();
@@ -535,7 +535,7 @@ jlm::hls::MLIRGenImpl::MlirGenStateGate(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBodyBlock();
@@ -583,7 +583,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBodyBlock();
@@ -667,7 +667,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         // no data or write
         int bitWidth;
 		auto loadType = loadTypes->at(i).get();
-        if (auto bitType = dynamic_cast<const jive::bittype *>(loadType)) {
+        if (auto bitType = dynamic_cast<const jlm::rvsdg::bittype *>(loadType)) {
             bitWidth = bitType->nbits();
         } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
             bitWidth = 64;
@@ -701,7 +701,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         // no data or write
         int bitWidth;
 		auto storeType = storeTypes->at(i).get();
-        if (auto bitType = dynamic_cast<const jive::bittype *>(storeType)) {
+        if (auto bitType = dynamic_cast<const jlm::rvsdg::bittype *>(storeType)) {
             bitWidth = bitType->nbits();
         } else if (dynamic_cast<const jlm::PointerType *>(storeType)) {
             bitWidth = 64;
@@ -719,7 +719,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBodyBlock();
@@ -884,7 +884,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
 
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBodyBlock();
@@ -930,7 +930,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsLocalMem(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsLocalMem(const jlm::rvsdg::simple_node *node) {
     auto lmem_op = dynamic_cast<const jlm::hls::local_mem_op *>(&(node->operation()));
     JLM_ASSERT(lmem_op);
     auto res_node = input_node(*node->output(0)->begin());
@@ -1101,7 +1101,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLocalMem(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jlm::rvsdg::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBodyBlock();
@@ -1236,7 +1236,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenMem(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node, true);
 	auto body = module.getBodyBlock();
@@ -1353,12 +1353,12 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 	if (store) {
 		Connect(body, memReqWrite, oneBitValue);
 		Connect(body, memReqData, inData1);
-		bitWidth = dynamic_cast<const jive::bittype *>(&node->input(1)->type())->nbits();
+		bitWidth = dynamic_cast<const jlm::rvsdg::bittype *>(&node->input(1)->type())->nbits();
 	} else {
 		Connect(body, memReqWrite, zeroBitValue);
 		auto invalid = GetInvalid(body, 32);
 		Connect(body, memReqData, invalid);
-		if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
+		if (auto bitType = dynamic_cast<const jlm::rvsdg::bittype *>(&node->output(0)->type())) {
 			bitWidth = bitType->nbits();
 		} else if (dynamic_cast<const jlm::PointerType *>(&node->output(0)->type())) {
 			bitWidth = 64;
@@ -1431,7 +1431,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenTrigger(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenTrigger(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1464,7 +1464,7 @@ jlm::hls::MLIRGenImpl::MlirGenTrigger(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenPrint(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1494,7 +1494,7 @@ jlm::hls::MLIRGenImpl::MlirGenPrint(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenPredicationBuffer(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenPredicationBuffer(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1558,7 +1558,7 @@ jlm::hls::MLIRGenImpl::MlirGenPredicationBuffer(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenBuffer(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1691,7 +1691,7 @@ jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenAddrQueue(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenAddrQueue(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1847,7 +1847,7 @@ jlm::hls::MLIRGenImpl::MlirGenAddrQueue(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenDMux(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1949,7 +1949,7 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenNDMux(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenNDMux(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -1994,7 +1994,7 @@ jlm::hls::MLIRGenImpl::MlirGenNDMux(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGenBranch(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGenBranch(const jlm::rvsdg::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
 	auto body = module.getBodyBlock();
@@ -2039,7 +2039,7 @@ jlm::hls::MLIRGenImpl::MlirGenBranch(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::MlirGen(const jlm::rvsdg::simple_node *node) {
 	if (dynamic_cast<const hls::sink_op *>(&(node->operation()))) {
 		return MlirGenSink(node);
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
@@ -2095,7 +2095,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 	return MlirGenSimpleNode(node);
 }
 
-std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
+std::unordered_map<jlm::rvsdg::simple_node *, circt::firrtl::InstanceOp>
 jlm::hls::MLIRGenImpl::MlirGen(hls::loop_node *loopNode, mlir::Block *body, mlir::Block *circuitBody) {
 	auto subRegion = loopNode->subregion();
 	return createInstances(subRegion, circuitBody, body);
@@ -2115,8 +2115,8 @@ jlm::hls::MLIRGenImpl::DropMSBs(mlir::Block *body, mlir::Value value, int amount
 // Trace the argument back to the "node" generating the value
 // Returns the output of a node or the argument of a region that has
 // been instantiated as a module
-jive::output *
-jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
+jlm::rvsdg::output *
+jlm::hls::MLIRGenImpl::TraceArgument(jlm::rvsdg::argument *arg) {
 	// Check if the argument is part of a hls::loop_node
 	auto region = arg->region();
 	auto node = region->node();
@@ -2130,10 +2130,10 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 			// Check if we are in a nested region and directly
 			// connected to the outer regions argument
 			auto origin = arg->input()->origin();
-			if (auto o = dynamic_cast<jive::argument *>(origin)) {
+			if (auto o = dynamic_cast<jlm::rvsdg::argument *>(origin)) {
 				// Need to find the source of the outer regions argument
 				return TraceArgument(o);
-			} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+			} else if (auto o = dynamic_cast<jlm::rvsdg::structural_output *>(origin)) {
 				// Check if we the input of one loop_node is connected to the output of another structural_node,
 				// i.e., if the input is connected to the output of another loop_node
 				return TraceStructuralOutput(o);
@@ -2147,7 +2147,7 @@ jlm::hls::MLIRGenImpl::TraceArgument(jive::argument *arg) {
 }
 
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody) {
+jlm::hls::MLIRGenImpl::MlirGen(jlm::rvsdg::region *subRegion, mlir::Block *circuitBody) {
 	// Generate a vector with all inputs and outputs of the module
 	llvm::SmallVector<circt::firrtl::PortInfo> ports;
 
@@ -2179,9 +2179,8 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 	auto body = module.getBodyBlock();
 
 	// First we create and instantiate all the modules and keep them in a dictionary
-    std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances = createInstances(subRegion,
+    std::unordered_map<jlm::rvsdg::simple_node *, circt::firrtl::InstanceOp> instances = createInstances(subRegion,
                                                                                                    circuitBody, body);
-
 	// Wire up the instances
 	for (const auto & instance : instances) {
 		// RVSDG node
@@ -2195,17 +2194,17 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 			// The port of the instance is connected to another instance
 
 			// Get the RVSDG node that's the origin of this input
-			jive::simple_input *input = rvsdgNode->input(i);
+			jlm::rvsdg::simple_input *input = rvsdgNode->input(i);
 			auto origin = input->origin();
-            if (auto o = dynamic_cast<jive::argument *>(origin)) {
+            if (auto o = dynamic_cast<jlm::rvsdg::argument *>(origin)) {
                 origin = TraceArgument(o);
             }
-            if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+            if (auto o = dynamic_cast<jlm::rvsdg::structural_output *>(origin)) {
                 // Need to trace through the region to find the source node
                 origin = TraceStructuralOutput(o);
             }
             // now origin is either a simple_output or a top-level argument
-            if (auto o = dynamic_cast<jive::argument *>(origin)) {
+            if (auto o = dynamic_cast<jlm::rvsdg::argument *>(origin)) {
                 // The port of the instance is connected to an argument
                 // of the region
                 // Calculate the result port of the instance:
@@ -2215,13 +2214,13 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
                 auto sourcePort = body->getArgument(sourceIndex);
                 auto sinkPort = sinkNode->getResult(i+2);
                 Connect(body, sinkPort, sourcePort);
-            } else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+            } else if (auto o = dynamic_cast<jlm::rvsdg::simple_output *>(origin)) {
                 // Get RVSDG node of the source
                 auto source = o->node();
                 if(dynamic_cast<const hls::local_mem_resp_op *>(&(source->operation()))){
                     // Connect directly to mem
-                    auto mem_out = dynamic_cast<jive::node_output*>(source->input(0)->origin());
-                    auto sourceNode = instances[dynamic_cast<jive::simple_node *>(mem_out->node())];
+                    auto mem_out = dynamic_cast<jlm::rvsdg::node_output*>(source->input(0)->origin());
+                    auto sourceNode = instances[dynamic_cast<jlm::rvsdg::simple_node *>(mem_out->node())];
                     auto sourcePort = GetInstancePort(sourceNode, "o"+std::to_string(o->index()));
                     auto sinkPort = sinkNode->getResult(i+2);
                     Connect(body, sinkPort, sourcePort);
@@ -2248,17 +2247,17 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
             // skip connection to mem
             for (size_t i = 1; i < requestNode->ninputs(); i++) {
                 // Get the RVSDG node that's the origin of this input
-                auto *input = dynamic_cast<jive::simple_input *>(requestNode->input(i));
+                auto *input = dynamic_cast<jlm::rvsdg::simple_input *>(requestNode->input(i));
                 auto origin = input->origin();
-                if (auto o = dynamic_cast<jive::argument *>(origin)) {
+                if (auto o = dynamic_cast<jlm::rvsdg::argument *>(origin)) {
                     origin = TraceArgument(o);
                 }
-                if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+                if (auto o = dynamic_cast<jlm::rvsdg::structural_output *>(origin)) {
                     // Need to trace through the region to find the source node
                     origin = TraceStructuralOutput(o);
                 }
                 // we know this has to be a simple_output now
-                if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+                if (auto o = dynamic_cast<jlm::rvsdg::simple_output *>(origin)) {
                     // Get RVSDG node of the source
                     auto source = o->node();
                     // Calculate the result port of the instance:
@@ -2285,18 +2284,18 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 	for (size_t i = 0; i < subRegion->nresults(); i++) {
 		auto result = subRegion->result(i);
 		auto origin = result->origin();
-		jive::simple_output *output;
-		if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+		jlm::rvsdg::simple_output *output;
+		if (auto o = dynamic_cast<jlm::rvsdg::simple_output *>(origin)) {
 			// We have found the source output
 			output = o;
-		} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+		} else if (auto o = dynamic_cast<jlm::rvsdg::structural_output *>(origin)) {
 			// Need to trace through the region to find the source node
 			output = TraceStructuralOutput(o);
 		} else {
 			throw std::logic_error("Unsupported output");
 		}
 		// Get the node of the output
-		jive::simple_node *source = output->node();
+		jlm::rvsdg::simple_node *source = output->node();
 		// Get the corresponding InstanceOp
 		auto sourceNode = instances[source];
 		// Calculate the result port of the instance:
@@ -2320,14 +2319,14 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
         return module;
 }
 
-std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
-jlm::hls::MLIRGenImpl::createInstances(jive::region *subRegion, mlir::Block *circuitBody, mlir::Block *body) {
+std::unordered_map<jlm::rvsdg::simple_node *, circt::firrtl::InstanceOp>
+jlm::hls::MLIRGenImpl::createInstances(jlm::rvsdg::region *subRegion, mlir::Block *circuitBody, mlir::Block *body) {
     // create and instantiate all the modules and keep them in a dictionary
     auto clock = body->getArgument(0);
     auto reset = body->getArgument(1);
-    std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances;
-    for (const auto node : jive::topdown_traverser(subRegion)) {
-        if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
+    std::unordered_map<jlm::rvsdg::simple_node *, circt::firrtl::InstanceOp> instances;
+    for (const auto node : jlm::rvsdg::topdown_traverser(subRegion)) {
+        if (auto sn = dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
             if (dynamic_cast<const hls::local_mem_req_op *>(&(node->operation())) ||
                 dynamic_cast<const hls::local_mem_resp_op *>(&(node->operation()))) {
                 // these are virtual - connections go to local_mem instead
@@ -2352,8 +2351,8 @@ jlm::hls::MLIRGenImpl::createInstances(jive::region *subRegion, mlir::Block *cir
 
 // Trace a structural output back to the "node" generating the value
 // Returns the output of the node
-jive::simple_output *
-jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
+jlm::rvsdg::simple_output *
+jlm::hls::MLIRGenImpl::TraceStructuralOutput(jlm::rvsdg::structural_output *output) {
 	auto node = output->node();
 
 	// We are only expecting hls::loop_node to have a structural output
@@ -2362,13 +2361,13 @@ jlm::hls::MLIRGenImpl::TraceStructuralOutput(jive::structural_output *output) {
 	}
     assert(output->results.size()==1);
     auto origin = output->results.begin().ptr()->origin();
-    if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+    if (auto o = dynamic_cast<jlm::rvsdg::structural_output *>(origin)) {
         // Need to trace the output of the nested structural node
         return TraceStructuralOutput(o);
-    } else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+    } else if (auto o = dynamic_cast<jlm::rvsdg::simple_output *>(origin)) {
         // Found the source node
         return o;
-    } else if (auto a = dynamic_cast<jive::argument *>(origin)) {
+    } else if (auto a = dynamic_cast<jlm::rvsdg::argument *>(origin)) {
         throw std::logic_error("Encountered pass through argument - should be eliminated");
     } else {
         throw std::logic_error("Encountered an unexpected output type");
@@ -3291,7 +3290,7 @@ jlm::hls::MLIRGenImpl::check_module(circt::firrtl::FModuleOp &module){
 }
 
 circt::firrtl::InstanceOp
-jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node) {
+jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jlm::rvsdg::simple_node *node) {
 	auto name = GetModuleName(node);
 	// Check if the module has already been instantiated else we need to generate it
 	if (!modules[name]) {
@@ -3405,11 +3404,11 @@ jlm::hls::MLIRGenImpl::InitializeMemReq(circt::firrtl::FModuleOp module) {
 	Connect(body, memWidth, invalid3);
 }
 
-// Takes a jive::simple_node and creates a firrtl module with an input
+// Takes a jlm::rvsdg::simple_node and creates a firrtl module with an input
 // bundle for each node input and output bundle for each node output
 // Returns a circt::firrtl::FModuleOp with an empty body
 circt::firrtl::FModuleOp
-jlm::hls::MLIRGenImpl::nodeToModule(const jive::simple_node *node, bool mem) {
+jlm::hls::MLIRGenImpl::nodeToModule(const jlm::rvsdg::simple_node *node, bool mem) {
 	// Generate a vector with all inputs and outputs of the module
 	llvm::SmallVector<circt::firrtl::PortInfo> ports;
 
@@ -3459,16 +3458,16 @@ jlm::hls::MLIRGenImpl::GetIntType(int size) {
 }
 
 // Return unsigned IntType with the bit width specified by the
-// jive::type. The extend argument extends the width of the IntType,
+// jlm::rvsdg::type. The extend argument extends the width of the IntType,
 // which is useful for, e.g., additions where the result has to be 1
 // larger than the operands to accommodate for the carry.
 circt::firrtl::IntType
-jlm::hls::MLIRGenImpl::GetIntType(const jive::type *type, int extend) {
+jlm::hls::MLIRGenImpl::GetIntType(const jlm::rvsdg::type *type, int extend) {
 	return circt::firrtl::IntType::get(builder.getContext(), false, JlmSize(type)+extend);
 }
 
 circt::firrtl::FIRRTLBaseType
-jlm::hls::MLIRGenImpl::GetFirrtlType(const jive::type *type){
+jlm::hls::MLIRGenImpl::GetFirrtlType(const jlm::rvsdg::type *type){
     if(auto bt = dynamic_cast<const jlm::hls::bundletype*>(type)){
         using BundleElement = circt::firrtl::BundleType::BundleElement;
         llvm::SmallVector<BundleElement> elements;
@@ -3486,7 +3485,7 @@ jlm::hls::MLIRGenImpl::GetFirrtlType(const jive::type *type){
 }
 
 std::string
-jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
+jlm::hls::MLIRGenImpl::GetModuleName(const jlm::rvsdg::node *node) {
 
 	std::string append = "";
 	for (size_t i = 0; i < node->ninputs(); ++i) {
@@ -3500,10 +3499,10 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
 		append.append("W");
 	}
     if(auto op = dynamic_cast<const jlm::GetElementPtrOperation *>(&node->operation())){
-        const jive::type *pointeeType = &op->GetPointeeType();
+        const jlm::rvsdg::type *pointeeType = &op->GetPointeeType();
         for (size_t i = 1; i < node->ninputs(); i++) {
             int bits = JlmSize(pointeeType);
-            if (dynamic_cast<const jive::bittype *>(pointeeType)) {
+            if (dynamic_cast<const jlm::rvsdg::bittype *>(pointeeType)) {
                 ;
             } else if (auto arrayType = dynamic_cast<const jlm::arraytype *>(pointeeType)) {
                 pointeeType = &arrayType->element_type();
@@ -3521,7 +3520,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
 		{
             int bitWidth;
 			auto loadType = loadTypes->at(i).get();
-            if (auto bitType = dynamic_cast<const jive::bittype *>(loadType)) {
+            if (auto bitType = dynamic_cast<const jlm::rvsdg::bittype *>(loadType)) {
                 bitWidth = bitType->nbits();
             } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
                 bitWidth = 64;
@@ -3549,7 +3548,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
 }
 
 bool
-jlm::hls::MLIRGenImpl::IsIdentityMapping(const jive::match_op &op) {
+jlm::hls::MLIRGenImpl::IsIdentityMapping(const jlm::rvsdg::match_op &op) {
 	for (const auto &pair : op) {
 		if (pair.first != pair.second)
 			return false;
@@ -3561,7 +3560,7 @@ jlm::hls::MLIRGenImpl::IsIdentityMapping(const jive::match_op &op) {
 // Used for debugging a module by wrapping it in a circuit and writing it to a file
 // Node is simply a convenience for generating the circuit name
 void
-jlm::hls::MLIRGenImpl::WriteModuleToFile(const circt::firrtl::FModuleOp fModuleOp, const jive::node *node) {
+jlm::hls::MLIRGenImpl::WriteModuleToFile(const circt::firrtl::FModuleOp fModuleOp, const jlm::rvsdg::node *node) {
 	if (!fModuleOp)
 		return;
 

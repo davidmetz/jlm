@@ -12,7 +12,7 @@
 namespace jlm{
 	namespace hls{
 		void
-		alloca_conv(jive::region *region);
+		alloca_conv(jlm::rvsdg::region *region);
 
 		void
 		alloca_conv(jlm::RvsdgModule &rm);

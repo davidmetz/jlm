@@ -16,12 +16,12 @@ namespace jlm{
 		void
 		instrument_ref
 		(
-			jive::region * region,
-			jive::output * load_func,
+			jlm::rvsdg::region * region,
+			jlm::rvsdg::output * load_func,
 			jlm::FunctionType & loadFunctionType,
-			jive::output * store_func,
+			jlm::rvsdg::output * store_func,
 			jlm::FunctionType & storeFunctionType,
-			jive::output * alloca_func,
+			jlm::rvsdg::output * alloca_func,
 			jlm::FunctionType & allocaFunctionType
 		);
 	}
