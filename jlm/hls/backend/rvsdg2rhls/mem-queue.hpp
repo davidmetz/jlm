@@ -14,7 +14,7 @@ namespace jlm{
 		mem_queue(jlm::rvsdg::region *region);
 
 		void
-		mem_queue(jlm::RvsdgModule &rm);
+		mem_queue(llvm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEM_QUEUE_HPP

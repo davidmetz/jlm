@@ -17,7 +17,7 @@
 #include <deque>
 
 void
-jlm::hls::mem_queue(jlm::RvsdgModule &rm) {
+jlm::hls::mem_queue(llvm::RvsdgModule &rm) {
     auto &graph = rm.Rvsdg();
     auto root = graph.root();
     mem_queue(root);
@@ -36,7 +36,7 @@ void find_load_store(
         std::vector<jlm::rvsdg::simple_node *> &store_nodes,
 //        std::vector<jlm::rvsdg::simple_node *> &decouple_nodes,
         std::unordered_set<jlm::rvsdg::output*> & visited){
-    if(!dynamic_cast<const jlm::MemoryStateType*>(&op->type())){
+    if(!dynamic_cast<const jlm::llvm::MemoryStateType*>(&op->type())){
         return;
     }
     if(visited.count(op)){
@@ -47,9 +47,9 @@ void find_load_store(
     for (auto user: *op) {
         if(auto si = dynamic_cast<jlm::rvsdg::simple_input*>(user)){
             auto simplenode = si->node();
-            if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
+            if (dynamic_cast<const jlm::llvm::StoreOperation *>(&simplenode->operation())) {
                 store_nodes.push_back(simplenode);
-            } else if (dynamic_cast<const jlm::LoadOperation *>(&simplenode->operation())) {
+            } else if (dynamic_cast<const jlm::llvm::LoadOperation *>(&simplenode->operation())) {
                 load_nodes.push_back(simplenode);
 //            }  else if (auto co = dynamic_cast<const jlm::CallOperation *>(&simplenode->operation())) {
 //                // TODO: verify this is the right type of function call
@@ -107,7 +107,7 @@ jlm::rvsdg::structural_output * find_loop_output(jlm::rvsdg::structural_input* s
 std::deque<jlm::rvsdg::region *> get_parent_regions(jlm::rvsdg::region *region) {
     std::deque<jlm::rvsdg::region *> regions;
     jlm::rvsdg::region * target_region = region;
-    while (!dynamic_cast<const jlm::lambda::operation*>(&target_region->node()->operation())){
+    while (!dynamic_cast<const jlm::llvm::lambda::operation*>(&target_region->node()->operation())){
         regions.push_front(target_region);
         target_region = target_region->node()->region();
     }
@@ -224,7 +224,7 @@ jlm::rvsdg::output * separate_load_edge(
                 assert(new_mem_edge);
                 *new_mem_edge = mem_edge;
                 return addr_edge;
-            } else if (dynamic_cast<const jlm::StoreOperation *>(op)) {
+            } else if (dynamic_cast<const jlm::llvm::StoreOperation *>(op)) {
                 auto sg_out = jlm::hls::state_gate_op::create(*sn->input(0)->origin(), {addr_edge});
                 addr_edge = sg_out[1];
                 addr_edge_user->divert_to(addr_edge);
@@ -234,10 +234,10 @@ jlm::rvsdg::output * separate_load_edge(
                 assert(mem_edge->nusers() == 1);
                 user = *mem_edge->begin();
                 auto ui = dynamic_cast<jlm::rvsdg::simple_input*>(user);
-                if (ui && dynamic_cast<const jlm::MemStateSplitOperator*>(&ui->node()->operation())){
-                    auto msso = dynamic_cast<const jlm::MemStateSplitOperator*>(&ui->node()->operation());
+                if (ui && dynamic_cast<const jlm::llvm::MemStateSplitOperator*>(&ui->node()->operation())){
+                    auto msso = dynamic_cast<const jlm::llvm::MemStateSplitOperator*>(&ui->node()->operation());
                     // handle case where output of store is already connected to a MemStateSplit by adding an output
-                    auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, msso->nresults()+1);
+                    auto store_split = jlm::llvm::MemStateSplitOperator::Create(mem_edge, msso->nresults()+1);
                     for (size_t i = 0; i < msso->nresults(); ++i) {
                         ui->node()->output(i)->divert_users(store_split[i]);
                     }
@@ -245,12 +245,12 @@ jlm::rvsdg::output * separate_load_edge(
                     mem_edge = store_split[0];
                     store_dequeues.push_back(route_to_region((*load)->region(), store_split.back()));
                 } else{
-                    auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, 2);
+                    auto store_split = jlm::llvm::MemStateSplitOperator::Create(mem_edge, 2);
                     mem_edge = store_split[0];
                     user->divert_to(mem_edge);
                     store_dequeues.push_back(route_to_region((*load)->region(), store_split[1]));
                 }
-            } else if (auto lo = dynamic_cast<const jlm::LoadOperation *>(op)) {
+            } else if (auto lo = dynamic_cast<const jlm::llvm::LoadOperation *>(op)) {
                 assert(sn->noutputs() == 2);
                 if(sn == *load){
                     // create state gate for addr edge
@@ -261,7 +261,7 @@ jlm::rvsdg::output * separate_load_edge(
                     addr_edge = addr_sg_out2[1];
                     addr_edge_user->divert_to(addr_edge);
                     // remove state edges from load
-                    auto new_load_outputs = jlm::LoadNode::Create(addr_sg_out2[0], {}, lo->GetLoadedType(), lo->GetAlignment());
+                    auto new_load_outputs = jlm::llvm::LoadNode::Create(addr_sg_out2[0], {}, lo->GetLoadedType(), lo->GetAlignment());
                     // create state gate for mem edge and load data
                     auto mem_sg_out = jlm::hls::state_gate_op::create(*new_load_outputs[0], {mem_edge});
                     mem_edge = mem_sg_out[1];
@@ -277,7 +277,7 @@ jlm::rvsdg::output * separate_load_edge(
                 }
             } else if (dynamic_cast<const jlm::hls::state_gate_op *>(op)) {
                 mem_edge = sn->output(1);
-            } else if (auto co = dynamic_cast<const jlm::CallOperation *>(op)) {
+            } else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(op)) {
                 // TODO: verify this is the right type of function call
 //                if(decouple_nodes.end() != std::find(decouple_nodes.begin(), decouple_nodes.end(),sn)){
 //                    auto new_next = *new_edge->begin();
@@ -288,7 +288,7 @@ jlm::rvsdg::output * separate_load_edge(
 //                }
                 throw jlm::util::error("not implemented yet");
 
-            } else if (auto co = dynamic_cast<const jlm::MemStateMergeOperator *>(op)) {
+            } else if (auto co = dynamic_cast<const jlm::llvm::MemStateMergeOperator *>(op)) {
                 auto si_load_user =dynamic_cast<jlm::rvsdg::simple_input*>(addr_edge_user);
                 if(si_load_user && si->node() == sn){
                     return nullptr;
@@ -327,11 +327,11 @@ jlm::rvsdg::output * process_loops(jlm::rvsdg::output * state_edge){
                 // end of gamma
                 assert(sn->noutputs() == 1);
                 return sn->output(0);
-            } else if (dynamic_cast<const jlm::aa::LambdaExitMemStateOperator *>(op)) {
+            } else if (dynamic_cast<const jlm::llvm::aa::LambdaExitMemStateOperator *>(op)) {
                 // end of lambda
                 assert(sn->noutputs() == 1);
                 return sn->output(0);
-            }  else if (dynamic_cast<const jlm::LoadOperation *>(op)) {
+            }  else if (dynamic_cast<const jlm::llvm::LoadOperation *>(op)) {
                 // load
                 assert(sn->noutputs() == 2);
                 state_edge = sn->output(1);
@@ -357,12 +357,12 @@ jlm::rvsdg::output * process_loops(jlm::rvsdg::output * state_edge){
 //                state_edge = mem_edge_after_loop;
 //                continue;
 //            }
-            auto split_states = jlm::MemStateSplitOperator::Create(sti->origin(), load_nodes.size()+1);
+            auto split_states = jlm::llvm::MemStateSplitOperator::Create(sti->origin(), load_nodes.size()+1);
             // handle common edge
             auto mem_edge = split_states[0];
             sti->divert_to(mem_edge);
             split_states[0] = mem_edge_after_loop;
-            state_edge = jlm::MemStateMergeOperator::Create(split_states);
+            state_edge = jlm::llvm::MemStateMergeOperator::Create(split_states);
             common_user->divert_to(state_edge);
             for (size_t i = 0; i < load_nodes.size(); ++i) {
                 auto load = load_nodes[i];
@@ -389,7 +389,7 @@ jlm::rvsdg::output * process_loops(jlm::rvsdg::output * state_edge){
 }
 
 void jlm::hls::mem_queue(jlm::rvsdg::region *region) {
-    auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.first());
+    auto lambda = dynamic_cast<const jlm::llvm::lambda::node *>(region->nodes.first());
     auto state_arg = GetMemoryStateArgument(*lambda);
     if(!state_arg){
         //no memstate - i.e. no memory used
@@ -400,7 +400,7 @@ void jlm::hls::mem_queue(jlm::rvsdg::region *region) {
     auto entry_input = dynamic_cast<jlm::rvsdg::simple_input*>(state_user);
     assert(entry_input);
     auto entry_node = entry_input->node();
-    assert(dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator*>(&entry_node->operation()));
+    assert(dynamic_cast<const jlm::llvm::aa::LambdaEntryMemStateOperator*>(&entry_node->operation()));
     // for each state edge:
     //    for each outer loop (theta/loop in lambda region):
     //        split state edge before the loop

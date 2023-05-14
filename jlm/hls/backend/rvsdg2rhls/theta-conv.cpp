@@ -64,7 +64,7 @@ jlm::hls::theta_conv(jlm::rvsdg::region *region) {
 }
 
 void
-jlm::hls::theta_conv(jlm::RvsdgModule &rm) {
+jlm::hls::theta_conv(jlm::llvm::RvsdgModule &rm) {
 	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	theta_conv(root);

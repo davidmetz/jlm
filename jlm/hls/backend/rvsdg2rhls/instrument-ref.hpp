@@ -11,18 +11,18 @@
 namespace jlm{
 	namespace hls{
 		void
-		instrument_ref(jlm::RvsdgModule &rm);
+		instrument_ref(llvm::RvsdgModule &rm);
 
 		void
 		instrument_ref
 		(
 			jlm::rvsdg::region * region,
 			jlm::rvsdg::output * load_func,
-			jlm::FunctionType & loadFunctionType,
+			llvm::FunctionType & loadFunctionType,
 			jlm::rvsdg::output * store_func,
-			jlm::FunctionType & storeFunctionType,
+			llvm::FunctionType & storeFunctionType,
 			jlm::rvsdg::output * alloca_func,
-			jlm::FunctionType & allocaFunctionType
+			llvm::FunctionType & allocaFunctionType
 		);
 	}
 }

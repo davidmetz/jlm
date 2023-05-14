@@ -7,7 +7,7 @@
 #include <jlm/hls/backend/rhls2firrtl/json-hls.hpp>
 
 std::string
-jlm::hls::JsonHLS::get_text(jlm::RvsdgModule &rm) {
+jlm::hls::JsonHLS::get_text(llvm::RvsdgModule &rm) {
 	std::ostringstream json;
 	auto ln = get_hls_lambda(rm);
 	auto function_name = ln->name();

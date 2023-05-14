@@ -22,7 +22,7 @@ namespace jlm {
 		class BaseHLS {
 		public:
 			std::string
-			run(jlm::RvsdgModule &rm) {
+			run(llvm::RvsdgModule &rm) {
 				assert(node_map.empty());
 				// ensure consistent naming across runs
 				create_node_names(get_hls_lambda(rm)->subregion());
@@ -49,19 +49,19 @@ namespace jlm {
 			static std::string
 			get_port_name(jlm::rvsdg::output *port);
 
-			const jlm::lambda::node *
-			get_hls_lambda(jlm::RvsdgModule &rm);
+			const llvm::lambda::node *
+			get_hls_lambda(llvm::RvsdgModule &rm);
 
 			void
 			create_node_names(jlm::rvsdg::region *r);
 
 			virtual std::string
-			get_text(jlm::RvsdgModule &rm) = 0;
+			get_text(llvm::RvsdgModule &rm) = 0;
 
 			static std::string
-			get_base_file_name(const RvsdgModule &rm);
+			get_base_file_name(const llvm::RvsdgModule &rm);
 
-            std::vector<jlm::rvsdg::argument*> get_mem_resps(const jlm::lambda::node * lambda){
+            std::vector<jlm::rvsdg::argument*> get_mem_resps(const llvm::lambda::node * lambda){
                 std::vector<jlm::rvsdg::argument*> mem_resps;
                 for (size_t i = 0; i < lambda->subregion()->narguments(); ++i) {
                     auto arg = lambda->subregion()->argument(i);
@@ -72,7 +72,7 @@ namespace jlm {
                 return mem_resps;
             }
 
-            std::vector<jlm::rvsdg::result*> get_mem_reqs(const jlm::lambda::node * lambda){
+            std::vector<jlm::rvsdg::result*> get_mem_reqs(const llvm::lambda::node * lambda){
                 std::vector<jlm::rvsdg::result*> mem_resps;
                 for (size_t i = 0; i < lambda->subregion()->nresults(); ++i) {
                     if(dynamic_cast<const jlm::hls::bundletype *>(&lambda->subregion()->result(i)->type())){
@@ -82,7 +82,7 @@ namespace jlm {
                 return mem_resps;
             }
 
-            std::vector<jlm::rvsdg::argument*> get_reg_args(const jlm::lambda::node * lambda){
+            std::vector<jlm::rvsdg::argument*> get_reg_args(const llvm::lambda::node * lambda){
                 std::vector<jlm::rvsdg::argument*> args;
                 for (size_t i = 0; i < lambda->subregion()->narguments(); ++i) {
                     auto argtype = &lambda->subregion()->argument(i)->type();
@@ -93,7 +93,7 @@ namespace jlm {
                 return args;
             }
 
-            std::vector<jlm::rvsdg::result*> get_reg_results(const jlm::lambda::node * lambda){
+            std::vector<jlm::rvsdg::result*> get_reg_results(const llvm::lambda::node * lambda){
                 std::vector<jlm::rvsdg::result*> results;
                 for (size_t i = 0; i < lambda->subregion()->nresults(); ++i) {
                     auto argtype = &lambda->subregion()->result(i)->type();
@@ -104,7 +104,7 @@ namespace jlm {
                 return results;
             }
 
-//            std::vector<jlm::rvsdg::argument*> get_state_args(const jlm::lambda::node * lambda){
+//            std::vector<jlm::rvsdg::argument*> get_state_args(const llvm::lambda::node * lambda){
 //                std::vector<jlm::rvsdg::argument*> args;
 //                for (size_t i = 0; i < lambda->subregion()->narguments(); ++i) {
 //                    auto argtype = &lambda->subregion()->argument(i)->type();
@@ -115,7 +115,7 @@ namespace jlm {
 //                return args;
 //            }
 //
-//            std::vector<jlm::rvsdg::result*> get_state_results(const jlm::lambda::node * lambda){
+//            std::vector<jlm::rvsdg::result*> get_state_results(const llvm::lambda::node * lambda){
 //                std::vector<jlm::rvsdg::result*> results;
 //                for (size_t i = 0; i < lambda->subregion()->nresults(); ++i) {
 //                    auto argtype = &lambda->subregion()->result(i)->type();
@@ -125,7 +125,6 @@ namespace jlm {
 //                }
 //                return results;
 //            }
-            
             
 		};
 	}

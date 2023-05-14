@@ -14,7 +14,7 @@ namespace jlm{
 		dae_conv(jlm::rvsdg::region *region);
 
 		void
-		dae_conv(jlm::RvsdgModule &rm);
+		dae_conv(llvm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_DAE_CONV_HPP

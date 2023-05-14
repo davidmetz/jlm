@@ -693,8 +693,8 @@ namespace jlm {
             static std::vector<jlm::rvsdg::port>
             CreateInPorts(const jlm::rvsdg::valuetype & pointeeType, size_t numStates)
             {
-                std::vector<jlm::rvsdg::port> ports(1, { jlm::PointerType::Create() }); //addr
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> ports(1, { jlm::llvm::PointerType::Create() }); //addr
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 ports.emplace_back(pointeeType); // result
                 return ports;
@@ -704,9 +704,9 @@ namespace jlm {
             CreateOutPorts(const jlm::rvsdg::valuetype & pointeeType, size_t numStates)
             {
                 std::vector<jlm::rvsdg::port> ports(1, { pointeeType });
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
-                ports.emplace_back(jlm::PointerType::Create()); // addr
+                ports.emplace_back(jlm::llvm::PointerType::Create()); // addr
                 return ports;
             }
 
@@ -735,10 +735,10 @@ namespace jlm {
                 return jlm::rvsdg::simple_node::create_normalized(region, op, inputs);
             }
 
-            [[nodiscard]] const PointerType &
+            [[nodiscard]] const jlm::llvm::PointerType &
             GetPointerType() const noexcept
             {
-                return *util::AssertedCast<const PointerType>(&argument(0).type());
+                return *util::AssertedCast<const jlm::llvm::PointerType>(&argument(0).type());
             }
 
             [[nodiscard]] const jlm::rvsdg::valuetype &
@@ -754,7 +754,7 @@ namespace jlm {
             ~addr_queue_op() {}
 
             addr_queue_op(
-                    const PointerType & pointerType,
+                    const jlm::llvm::PointerType & pointerType,
                     size_t capacity,
                     bool combinatorial)
                     : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), combinatorial(combinatorial), capacity(capacity) {}
@@ -770,16 +770,16 @@ namespace jlm {
             }
 
             static std::vector<jlm::rvsdg::port>
-            CreateInPorts(const PointerType & pointerType)
+            CreateInPorts(const jlm::llvm::PointerType & pointerType)
             {
                 // check, enq
                 std::vector<jlm::rvsdg::port> ports(2, {pointerType});
-                ports.emplace_back(MemoryStateType::Create()); // deq
+                ports.emplace_back(llvm::MemoryStateType::Create()); // deq
                 return ports;
             }
 
             static std::vector<jlm::rvsdg::port>
-            CreateOutPorts(const PointerType & pointerType)
+            CreateOutPorts(const jlm::llvm::PointerType & pointerType)
             {
                 return {pointerType};
             }
@@ -806,7 +806,7 @@ namespace jlm {
                     size_t capacity = 10
             ) {
                 auto region = check.region();
-                auto pointerType = dynamic_cast<const PointerType*>(&check.type());
+                auto pointerType = dynamic_cast<const jlm::llvm::PointerType*>(&check.type());
                 addr_queue_op op(*pointerType, capacity, combinatorial);
                 return jlm::rvsdg::simple_node::create_normalized(region, op, {&check, &enq, &deq})[0];
             }
@@ -839,7 +839,7 @@ namespace jlm {
             CreateInOutPorts(const jlm::rvsdg::type & type, size_t numStates)
             {
                 std::vector<jlm::rvsdg::port> ports(1, {type});
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 return ports;
             }
@@ -889,7 +889,7 @@ namespace jlm {
             static std::vector<jlm::rvsdg::port>
             CreateInPorts(const jlm::rvsdg::valuetype & pointeeType)
             {
-                std::vector<jlm::rvsdg::port> ports(1, { PointerType() });
+                std::vector<jlm::rvsdg::port> ports(1, { jlm::llvm::PointerType() });
                 ports.emplace_back(pointeeType); // result
                 return ports;
             }
@@ -898,7 +898,7 @@ namespace jlm {
             CreateOutPorts(const jlm::rvsdg::valuetype & pointeeType)
             {
                 std::vector<jlm::rvsdg::port> ports(1, { pointeeType });
-                ports.emplace_back(PointerType()); // addr
+                ports.emplace_back(jlm::llvm::PointerType()); // addr
                 return ports;
             }
 
@@ -924,10 +924,10 @@ namespace jlm {
                 return jlm::rvsdg::simple_node::create_normalized(load_result.region(), op, inputs);
             }
 
-            [[nodiscard]] const PointerType &
+            [[nodiscard]] const jlm::llvm::PointerType &
             GetPointerType() const noexcept
             {
-                return *util::AssertedCast<const PointerType>(&argument(0).type());
+                return *util::AssertedCast<const jlm::llvm::PointerType>(&argument(0).type());
             }
 
             [[nodiscard]] const jlm::rvsdg::valuetype &
@@ -1025,7 +1025,7 @@ namespace jlm {
                 StoreTypes_ = new std::vector<std::unique_ptr<jlm::rvsdg::type>>();
                 for (auto loadType : load_types)
                 {
-                    JLM_ASSERT(dynamic_cast<const jlm::rvsdg::bittype *>(loadType) || dynamic_cast<const jlm::PointerType *>(loadType));
+                    JLM_ASSERT(dynamic_cast<const jlm::rvsdg::bittype *>(loadType) || dynamic_cast<const jlm::llvm::PointerType *>(loadType));
                     LoadTypes_->emplace_back(loadType->copy());
                 }
                 for (auto storeType : store_types)
@@ -1068,11 +1068,11 @@ namespace jlm {
                 std::vector<jlm::rvsdg::port> ports;
                 for (size_t i=0; i < load_types.size(); i++)
                 {
-                    ports.emplace_back(PointerType()); // addr
+                    ports.emplace_back(jlm::llvm::PointerType()); // addr
                 }
                 for (auto storeType : store_types)
                 {
-                    ports.emplace_back(PointerType()); // addr
+                    ports.emplace_back(jlm::llvm::PointerType()); // addr
                     ports.emplace_back(*storeType); // data
                 }
                 return ports;
@@ -1173,8 +1173,8 @@ namespace jlm {
             static std::vector<jlm::rvsdg::port>
             CreateInPorts(const jlm::rvsdg::valuetype & pointeeType, size_t numStates)
             {
-                std::vector<jlm::rvsdg::port> ports({ PointerType(), pointeeType });
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> ports({ jlm::llvm::PointerType(), pointeeType });
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 return ports;
             }
@@ -1182,8 +1182,8 @@ namespace jlm {
             static std::vector<jlm::rvsdg::port>
             CreateOutPorts(const jlm::rvsdg::valuetype & pointeeType, size_t numStates)
             {
-                std::vector<jlm::rvsdg::port> ports(numStates, {MemoryStateType::Create()});
-                ports.emplace_back(PointerType()); // addr
+                std::vector<jlm::rvsdg::port> ports(numStates, {llvm::MemoryStateType::Create()});
+                ports.emplace_back(jlm::llvm::PointerType()); // addr
                 ports.emplace_back(pointeeType); // data
                 return ports;
             }
@@ -1212,10 +1212,10 @@ namespace jlm {
                 return jlm::rvsdg::simple_node::create_normalized(value.region(), op, inputs);
             }
 
-            [[nodiscard]] const PointerType &
+            [[nodiscard]] const jlm::llvm::PointerType &
             GetPointerType() const noexcept
             {
-                return *util::AssertedCast<const PointerType>(&argument(0).type());
+                return *util::AssertedCast<const jlm::llvm::PointerType>(&argument(0).type());
             }
 
             [[nodiscard]] const jlm::rvsdg::valuetype &
@@ -1231,7 +1231,7 @@ namespace jlm {
             ~local_mem_op() {}
 
             local_mem_op(
-                    const arraytype & at)
+                    const llvm::arraytype & at)
                     : simple_op({}, CreateOutPorts(at)) {}
 
             bool
@@ -1243,7 +1243,7 @@ namespace jlm {
             }
 
             static std::vector<jlm::rvsdg::port>
-            CreateOutPorts(const arraytype & at)
+            CreateOutPorts(const llvm::arraytype & at)
             {
                 std::vector<jlm::rvsdg::port> ports(2, {at});
                 return ports;
@@ -1261,7 +1261,7 @@ namespace jlm {
 
             static std::vector<jlm::rvsdg::output *>
             create(
-                    const jlm::arraytype & at, jlm::rvsdg::region * region
+                    const llvm::arraytype & at, jlm::rvsdg::region * region
             ) {
                 local_mem_op op(at);
                 return jlm::rvsdg::simple_node::create_normalized(region, op, {});
@@ -1274,7 +1274,7 @@ namespace jlm {
             ~local_mem_resp_op() {}
 
             local_mem_resp_op(
-                    const jlm::arraytype &at,
+                    const llvm::arraytype &at,
                     size_t resp_count)
                     : simple_op({at}, CreateOutPorts(at, resp_count)) {}
 
@@ -1290,7 +1290,7 @@ namespace jlm {
 
 
             static std::vector<jlm::rvsdg::port>
-            CreateOutPorts(const jlm::arraytype &at,
+            CreateOutPorts(const llvm::arraytype &at,
                            size_t resp_count)
             {
                 std::vector<jlm::rvsdg::port> ports(resp_count, at.element_type());
@@ -1313,7 +1313,7 @@ namespace jlm {
                     size_t resp_count
             ) {
                 auto region = mem.region();
-                auto at = dynamic_cast<const jlm::arraytype*>(&mem.type());
+                auto at = dynamic_cast<const llvm::arraytype*>(&mem.type());
                 local_mem_resp_op op(*at, resp_count);
                 return jlm::rvsdg::simple_node::create_normalized(region, op, {&mem});
             }
@@ -1343,7 +1343,7 @@ namespace jlm {
             CreateInPorts(const jlm::rvsdg::valuetype & valuetype, size_t numStates)
             {
                 std::vector<jlm::rvsdg::port> ports(1, {jlm::rvsdg::bit64});
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 ports.emplace_back(valuetype); // result
                 return ports;
@@ -1353,7 +1353,7 @@ namespace jlm {
             CreateOutPorts(const jlm::rvsdg::valuetype & valuetype, size_t numStates)
             {
                 std::vector<jlm::rvsdg::port> ports(1, {valuetype});
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 ports.emplace_back(jlm::rvsdg::bit64); // addr
                 return ports;
@@ -1416,7 +1416,7 @@ namespace jlm {
             CreateInPorts(const jlm::rvsdg::valuetype & valuetype, size_t numStates)
             {
                 std::vector<jlm::rvsdg::port> ports({jlm::rvsdg::bit64, valuetype});
-                std::vector<jlm::rvsdg::port> states(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> states(numStates, {llvm::MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 return ports;
             }
@@ -1424,7 +1424,7 @@ namespace jlm {
             static std::vector<jlm::rvsdg::port>
             CreateOutPorts(const jlm::rvsdg::valuetype & valuetype, size_t numStates)
             {
-                std::vector<jlm::rvsdg::port> ports(numStates, {MemoryStateType::Create()});
+                std::vector<jlm::rvsdg::port> ports(numStates, {llvm::MemoryStateType::Create()});
                 ports.emplace_back(jlm::rvsdg::bit64); // addr
                 ports.emplace_back(valuetype); // data
                 return ports;
@@ -1469,7 +1469,7 @@ namespace jlm {
             ~local_mem_req_op() {}
 
             local_mem_req_op(
-                    const jlm::arraytype &at,
+                    const llvm::arraytype &at,
                     size_t load_cnt,
                     size_t store_cnt)
                     : simple_op(CreateInPorts(at, load_cnt, store_cnt), {}) {}
@@ -1487,7 +1487,7 @@ namespace jlm {
 
             static std::vector<jlm::rvsdg::port>
             CreateInPorts(
-                    const jlm::arraytype &at,
+                    const llvm::arraytype &at,
                     size_t load_cnt,
                     size_t store_cnt)
             {
@@ -1519,7 +1519,7 @@ namespace jlm {
                     const std::vector<jlm::rvsdg::output *> &store_operands
             ) {
                 auto region = mem.region();
-                auto at = dynamic_cast<const jlm::arraytype*>(&mem.type());
+                auto at = dynamic_cast<const llvm::arraytype*>(&mem.type());
                 JLM_ASSERT(store_operands.size()%2==0);
                 local_mem_req_op op(*at, load_operands.size(), store_operands.size()/2);
                 std::vector<jlm::rvsdg::output*> operands(1, &mem);

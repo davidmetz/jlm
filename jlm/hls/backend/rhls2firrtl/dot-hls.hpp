@@ -17,7 +17,7 @@ namespace jlm::hls {
 		extension() override;
 
 		std::string
-		get_text(jlm::RvsdgModule &rm) override;
+		get_text(llvm::RvsdgModule &rm) override;
 
 		std::string
 		subregion_to_dot(jlm::rvsdg::region *sr);

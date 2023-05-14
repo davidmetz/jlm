@@ -15,14 +15,14 @@
 #include <jlm/rvsdg/view.hpp>
 
 void
-jlm::hls::mem_sep_independent(jlm::RvsdgModule &rm) {
+jlm::hls::mem_sep_independent(llvm::RvsdgModule &rm) {
     auto &graph = rm.Rvsdg();
     auto root = graph.root();
     mem_sep_independent(root);
 }
 
 void
-jlm::hls::mem_sep_argument(jlm::RvsdgModule &rm) {
+jlm::hls::mem_sep_argument(llvm::RvsdgModule &rm) {
     auto &graph = rm.Rvsdg();
     auto root = graph.root();
     mem_sep_argument(root);
@@ -30,24 +30,24 @@ jlm::hls::mem_sep_argument(jlm::RvsdgModule &rm) {
 
 // from MemoryStateEncoder.cpp
 jlm::rvsdg::argument *
-jlm::hls::GetMemoryStateArgument(const jlm::lambda::node & lambda)
+jlm::hls::GetMemoryStateArgument(const llvm::lambda::node & lambda)
 {
     auto subregion = lambda.subregion();
     for (size_t n = 0; n < subregion->narguments(); n++) {
         auto argument = subregion->argument(n);
-        if (jlm::rvsdg::is<jlm::MemoryStateType>(argument->type()))
+        if (jlm::rvsdg::is<jlm::llvm::MemoryStateType>(argument->type()))
             return argument;
     }
     return nullptr;
 }
 
 jlm::rvsdg::result *
-jlm::hls::GetMemoryStateResult(const jlm::lambda::node & lambda)
+jlm::hls::GetMemoryStateResult(const llvm::lambda::node & lambda)
 {
     auto subregion = lambda.subregion();
     for (size_t n = 0; n < subregion->nresults(); n++) {
         auto result = subregion->result(n);
-        if (jlm::rvsdg::is<jlm::MemoryStateType>(result->type()))
+        if (jlm::rvsdg::is<jlm::llvm::MemoryStateType>(result->type()))
             return result;
     }
 
@@ -60,9 +60,9 @@ void gather_mem_nodes(jlm::rvsdg::region *region, std::vector<jlm::rvsdg::simple
             for (size_t n = 0; n < structnode->nsubregions(); n++)
                 gather_mem_nodes(structnode->subregion(n), mem_nodes);
         } else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node * >(node)) {
-            if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
+            if (dynamic_cast<const jlm::llvm::StoreOperation *>(&simplenode->operation())) {
                 mem_nodes.push_back(simplenode);
-            } else if (dynamic_cast<const jlm::LoadOperation *>(&simplenode->operation())) {
+            } else if (dynamic_cast<const jlm::llvm::LoadOperation *>(&simplenode->operation())) {
                 mem_nodes.push_back(simplenode);
             }
         }
@@ -98,7 +98,7 @@ jlm::rvsdg::output *route_through(jlm::rvsdg::region *target, jlm::rvsdg::output
 }
 /* assign each load and store its own state edge. */
 void jlm::hls::mem_sep_independent(jlm::rvsdg::region *region) {
-    auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
+    auto lambda = dynamic_cast<const llvm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
     if(!state_arg){
@@ -108,13 +108,13 @@ void jlm::hls::mem_sep_independent(jlm::rvsdg::region *region) {
     auto state_user = *state_arg->begin();
     std::vector<jlm::rvsdg::simple_node *> mem_nodes;
     gather_mem_nodes(lambda_region, mem_nodes);
-    auto entry_states = jlm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+mem_nodes.size());
+    auto entry_states = jlm::llvm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+mem_nodes.size());
     auto state_result = GetMemoryStateResult(*lambda);
     // handle existing state edge - TODO: remove entirely?
     state_user->divert_to(entry_states.back());
     entry_states.pop_back();
     entry_states.push_back(state_result->origin());
-    auto merged_state = jlm::aa::LambdaExitMemStateOperator::Create(lambda_region, entry_states);
+    auto merged_state = jlm::llvm::aa::LambdaExitMemStateOperator::Create(lambda_region, entry_states);
     entry_states.pop_back();
     state_result->divert_to(merged_state);
     for (auto node : mem_nodes) {
@@ -172,7 +172,7 @@ jlm::rvsdg::result *trace_edge(
         } else if (auto si = dynamic_cast<jlm::rvsdg::simple_input*>(user)){
             auto sn = si->node();
             auto op = &si->node()->operation();
-            if (dynamic_cast<const jlm::StoreOperation *>(op)) {
+            if (dynamic_cast<const jlm::llvm::StoreOperation *>(op)) {
                 assert(sn->noutputs() == 1);
                 if(store_nodes.end() != std::find(store_nodes.begin(), store_nodes.end(),sn)){
                     si->divert_to(new_edge);
@@ -182,7 +182,7 @@ jlm::rvsdg::result *trace_edge(
                 } else {
                     common_edge = sn->output(0);
                 }
-            } else if (dynamic_cast<const jlm::LoadOperation *>(op)) {
+            } else if (dynamic_cast<const jlm::llvm::LoadOperation *>(op)) {
                 assert(sn->noutputs() == 2);
                 if(load_nodes.end() != std::find(load_nodes.begin(), load_nodes.end(),sn)){
                     auto new_next = *new_edge->begin();
@@ -194,7 +194,7 @@ jlm::rvsdg::result *trace_edge(
                 } else {
                     common_edge = sn->output(1);
                 }
-            }  else if (auto co = dynamic_cast<const jlm::CallOperation *>(op)) {
+            }  else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(op)) {
                 // TODO: verify this is the right type of function call
 //                if(decouple_nodes.end() != std::find(decouple_nodes.begin(), decouple_nodes.end(),sn)){
 //                    auto new_next = *new_edge->begin();
@@ -217,7 +217,7 @@ jlm::rvsdg::result *trace_edge(
 
 /* assign each pointer argument its own state edge. */
 void jlm::hls::mem_sep_argument(jlm::rvsdg::region *region) {
-    auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
+    auto lambda = dynamic_cast<const llvm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
     if(!state_arg){
@@ -227,14 +227,14 @@ void jlm::hls::mem_sep_argument(jlm::rvsdg::region *region) {
     auto state_user = *state_arg->begin();
     port_load_store_decouple port_nodes;
     trace_pointer_arguments(lambda, port_nodes);
-    auto entry_states = jlm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+port_nodes.size());
+    auto entry_states = jlm::llvm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+port_nodes.size());
     auto state_result = GetMemoryStateResult(*lambda);
     // handle existing state edge - TODO: remove entirely?
     auto common_edge = entry_states.back();
     entry_states.pop_back();
     state_user->divert_to(common_edge);
     entry_states.push_back(state_result->origin());
-    auto merged_state = jlm::aa::LambdaExitMemStateOperator::Create(lambda_region, entry_states);
+    auto merged_state = jlm::llvm::aa::LambdaExitMemStateOperator::Create(lambda_region, entry_states);
     entry_states.pop_back();
     state_result->divert_to(merged_state);
     for (auto tp : port_nodes) {

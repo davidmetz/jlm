@@ -32,7 +32,7 @@ jlm::hls::remove_redundant_buf(jlm::rvsdg::region *region) {
             }
 		} else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node *>(node)) {
             if (auto buf = dynamic_cast<const jlm::hls::buffer_op *>(&node->operation())){
-                if(dynamic_cast<const jlm::MemoryStateType*>(&buf->argument(0).type())){
+                if(dynamic_cast<const jlm::llvm::MemoryStateType*>(&buf->argument(0).type())){
                     if(!buf->pass_through && eliminate_buf(node->input(0)->origin())){
                         auto new_out = jlm::hls::buffer_op::create(*node->input(0)->origin(), buf->capacity, true)[0];
                         node->output(0)->divert_users(new_out);
@@ -45,7 +45,7 @@ jlm::hls::remove_redundant_buf(jlm::rvsdg::region *region) {
 }
 
 void
-jlm::hls::remove_redundant_buf(jlm::RvsdgModule &rm) {
+jlm::hls::remove_redundant_buf(llvm::RvsdgModule &rm) {
 	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
 	remove_redundant_buf(root);

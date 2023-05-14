@@ -13,7 +13,7 @@
 #include <jlm/llvm/opt/alias-analyses/Operators.hpp>
 
 void
-jlm::hls::memstate_conv(jlm::RvsdgModule &rm) {
+jlm::hls::memstate_conv(llvm::RvsdgModule &rm) {
     auto &graph = rm.Rvsdg();
     auto root = graph.root();
     memstate_conv(root);
@@ -25,8 +25,8 @@ void jlm::hls::memstate_conv(jlm::rvsdg::region *region) {
             for (size_t n = 0; n < structnode->nsubregions(); n++)
                 memstate_conv(structnode->subregion(n));
         } else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node * >(node)) {
-            if (dynamic_cast<const jlm::aa::LambdaEntryMemStateOperator *>(&simplenode->operation())||
-                    dynamic_cast<const jlm::MemStateSplitOperator *>(&simplenode->operation())) {
+            if (dynamic_cast<const llvm::aa::LambdaEntryMemStateOperator *>(&simplenode->operation())||
+                    dynamic_cast<const jlm::llvm::MemStateSplitOperator *>(&simplenode->operation())) {
                 auto new_outs = hls::fork_op::create(simplenode->noutputs(), *simplenode->input(0)->origin());
                 for (size_t i = 0; i < simplenode->noutputs(); ++i) {
                     simplenode->output(i)->divert_users(new_outs[i]);

@@ -22,7 +22,7 @@ namespace jlm::hls {
     view_dot(jlm::rvsdg::region * region, FILE * out);
 
     void
-    dump_dot(jlm::RvsdgModule &rvsdgModule, const std::string &file_name);
+    dump_dot(llvm::RvsdgModule &rvsdgModule, const std::string &file_name);
 }
 
 

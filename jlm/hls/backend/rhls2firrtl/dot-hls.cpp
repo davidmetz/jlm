@@ -16,7 +16,7 @@ jlm::hls::DotHLS::extension() {
 }
 
 std::string
-jlm::hls::DotHLS::get_text(jlm::RvsdgModule &rm) {
+jlm::hls::DotHLS::get_text(llvm::RvsdgModule &rm) {
 	return subregion_to_dot(get_hls_lambda(rm)->subregion());
 }
 
@@ -153,7 +153,7 @@ jlm::hls::DotHLS::edge(std::string src, std::string snk, const jlm::rvsdg::type 
 	JLM_ASSERT(src != "" && snk != "");
 	if (dynamic_cast<const jlm::rvsdg::ctltype *>(&type)) {
 		color = "green";
-	} else if (dynamic_cast<const jlm::MemoryStateType *>(&type)) {
+	} else if (dynamic_cast<const llvm::MemoryStateType *>(&type)) {
 		color = "blue";
 	}
 	if (!back) {

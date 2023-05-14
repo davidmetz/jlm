@@ -15,7 +15,7 @@ namespace jlm{
 		merge_gamma(jlm::rvsdg::region *region);
 
 		void
-		merge_gamma(jlm::RvsdgModule &rm);
+		merge_gamma(llvm::RvsdgModule &rm);
 
         bool merge_gamma(jlm::rvsdg::gamma_node *gamma);
     }

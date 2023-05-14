@@ -40,9 +40,9 @@ namespace jlm {
 				return ".fir";
 				}
 		public:
-			std::string get_text(jlm::RvsdgModule &rvsdgModule) override {return "MLIR/FIRRTL generator";}
+			std::string get_text(llvm::RvsdgModule &rvsdgModule) override {return "MLIR/FIRRTL generator";}
 			MLIRGenImpl(mlir::MLIRContext &context) : builder(&context) {}
-			circt::firrtl::CircuitOp MlirGen(const jlm::lambda::node *lamdaNode);
+			circt::firrtl::CircuitOp MlirGen(const llvm::lambda::node *lamdaNode);
 			void WriteModuleToFile(const circt::firrtl::FModuleOp fModuleOp, const jlm::rvsdg::node *node);
 			void WriteCircuitToFile(const circt::firrtl::CircuitOp circuit, std::string name);
 			std::string toString(const circt::firrtl::CircuitOp circuit);
@@ -82,12 +82,12 @@ namespace jlm {
 			circt::firrtl::FModuleOp MlirGenSimpleNode(const jlm::rvsdg::simple_node *node);
 
 			// Helper functions
-			void AddClockPort(llvm::SmallVector<circt::firrtl::PortInfo> *ports);
-			void AddResetPort(llvm::SmallVector<circt::firrtl::PortInfo> *ports);
-			void AddMemReqPort(llvm::SmallVector<circt::firrtl::PortInfo> *ports);
-			void AddMemResPort(llvm::SmallVector<circt::firrtl::PortInfo> *ports);
+			void AddClockPort(::llvm::SmallVector<circt::firrtl::PortInfo> *ports);
+			void AddResetPort(::llvm::SmallVector<circt::firrtl::PortInfo> *ports);
+			void AddMemReqPort(::llvm::SmallVector<circt::firrtl::PortInfo> *ports);
+			void AddMemResPort(::llvm::SmallVector<circt::firrtl::PortInfo> *ports);
 			void AddBundlePort(
-					llvm::SmallVector<circt::firrtl::PortInfo> *ports,
+					::llvm::SmallVector<circt::firrtl::PortInfo> *ports,
 					circt::firrtl::Direction direction,
 					std::string name,
 					circt::firrtl::FIRRTLBaseType type);
@@ -98,7 +98,7 @@ namespace jlm {
 			circt::firrtl::SubfieldOp GetSubfield(
 					mlir::Block *body,
 					mlir::Value value,
-					llvm::StringRef fieldName);
+					::llvm::StringRef fieldName);
             mlir::OpResult GetInstancePort(circt::firrtl::InstanceOp& instance, std::string portName);
 			mlir::BlockArgument GetPort(circt::firrtl::FModuleOp &module, std::string portName);
 			mlir::BlockArgument GetInPort(circt::firrtl::FModuleOp &module, size_t portNr);
@@ -217,10 +217,10 @@ namespace jlm {
 				return ".fir";
 			}
 
-			std::string get_text(jlm::RvsdgModule &rm) override {return "";}
+			std::string get_text(llvm::RvsdgModule &rm) override {return "";}
 		public:
 			std::string
-			run(jlm::RvsdgModule &rvsdgModule) {
+			run(llvm::RvsdgModule &rvsdgModule) {
 				// Load the FIRRTLDialect
 				mlir::MLIRContext context;
 				context.getOrLoadDialect<circt::firrtl::FIRRTLDialect>();
@@ -247,10 +247,10 @@ namespace jlm {
                         extension() override {
                                 return ".fir";
                         }
-                        std::string get_text(jlm::RvsdgModule &rm) override {return "";}
+                        std::string get_text(llvm::RvsdgModule &rm) override {return "";}
                 public:
 			std::string
-                        run(jlm::RvsdgModule &rvsdgModule) {
+                        run(llvm::RvsdgModule &rvsdgModule) {
 				throw util::error("This version of jlm-hls has not been compiled with support for the CIRCT backend\n");
                         }
                         private:

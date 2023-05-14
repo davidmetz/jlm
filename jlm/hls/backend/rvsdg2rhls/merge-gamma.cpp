@@ -11,7 +11,7 @@
 #include <jlm/rvsdg/region.hpp>
 
 void
-jlm::hls::merge_gamma(jlm::RvsdgModule &rm) {
+jlm::hls::merge_gamma(llvm::RvsdgModule &rm) {
 	auto &graph = rm.Rvsdg();
 	auto root = graph.root();
     merge_gamma(root);

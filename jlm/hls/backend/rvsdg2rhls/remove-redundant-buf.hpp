@@ -13,7 +13,7 @@
 namespace jlm {
 	namespace hls {
 		void
-		remove_redundant_buf(jlm::RvsdgModule &rm);
+		remove_redundant_buf(llvm::RvsdgModule &rm);
 
 		void
 		remove_redundant_buf(jlm::rvsdg::region *region);

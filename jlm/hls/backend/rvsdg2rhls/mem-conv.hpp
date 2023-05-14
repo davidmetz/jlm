@@ -12,10 +12,10 @@ namespace jlm::hls{
     typedef std::vector<std::tuple<std::vector<jlm::rvsdg::simple_node *>, std::vector<jlm::rvsdg::simple_node *>, std::vector<jlm::rvsdg::simple_node *>>> port_load_store_decouple;
 
     void
-    trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decouple &port_nodes);
+    trace_pointer_arguments(const llvm::lambda::node * ln, port_load_store_decouple &port_nodes);
 
     void
-    MemoryConverter(jlm::RvsdgModule &rm);
+    MemoryConverter(llvm::RvsdgModule &rm);
 
     /**
      * @param lambda The lambda node for wich the load and store operations are to be connected to response (arguemnts) ports
@@ -27,7 +27,7 @@ namespace jlm::hls{
      * @result The request output to which the memory operations are connected
      */
     jlm::rvsdg::output *
-    ConnectRequestResponseMemPorts(const jlm::lambda::node * lambda,
+    ConnectRequestResponseMemPorts(const llvm::lambda::node * lambda,
                         size_t argumentIndex,
                         jlm::rvsdg::substitution_map & smap,
                         const std::vector<jlm::rvsdg::simple_node *> & originalLoadNodes,

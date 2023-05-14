@@ -15,7 +15,7 @@ namespace jlm{
 		alloca_conv(jlm::rvsdg::region *region);
 
 		void
-		alloca_conv(jlm::RvsdgModule &rm);
+		alloca_conv(llvm::RvsdgModule &rm);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP

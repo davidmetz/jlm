@@ -7,7 +7,7 @@
 #include <jlm/llvm/ir/operators/delta.hpp>
 
 std::string
-jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
+jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule &rm) {
 	std::ostringstream cpp;
 	auto ln = get_hls_lambda(rm);
 	auto function_name = ln->name();
@@ -344,8 +344,8 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
     // imports
     auto root = rm.Rvsdg().root();
     for (size_t i = 0; i < root->narguments(); ++i) {
-        if(auto ip = dynamic_cast<const impport*>(&root->argument(i)->port())){
-            if (auto t = dynamic_cast<const jlm::PointerType *>(&ip->type())) {
+        if(auto ip = dynamic_cast<const llvm::impport*>(&root->argument(i)->port())){
+            if (auto t = dynamic_cast<const jlm::llvm::PointerType *>(&ip->type())) {
                 cpp << "extern " << convert_to_c_type(&root->argument(i)->port().type()) << " " << ip->name() << ";\n";
             } else{
                 throw util::error("unexpected impport type");
@@ -421,7 +421,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
 		std::string name;
 		if(auto a = dynamic_cast<jlm::rvsdg::argument *>(ln->input(i)->origin())){
-			if(auto ip = dynamic_cast<const impport*>(&a->port())){
+			if(auto ip = dynamic_cast<const llvm::impport*>(&a->port())){
 				name = ip->name();
 			}
 		} else{
@@ -552,7 +552,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	return cpp.str();
 }
 
-void jlm::hls::VerilatorHarnessHLS::call_function(std::ostringstream &cpp, const jlm::lambda::node *ln,
+void jlm::hls::VerilatorHarnessHLS::call_function(std::ostringstream &cpp, const jlm::llvm::lambda::node *ln,
                                                   const std::string &function_name) {
     cpp << function_name << "(";
     for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
@@ -573,7 +573,7 @@ void jlm::hls::VerilatorHarnessHLS::call_function(std::ostringstream &cpp, const
 
 void jlm::hls::VerilatorHarnessHLS::get_function_header(
         std::ostringstream &cpp,
-        const jlm::lambda::node *ln,
+        const jlm::llvm::lambda::node *ln,
         const std::string &function_name) {
     std::string return_type;
     if (ln->type().NumResults() == 0) {
@@ -614,9 +614,9 @@ std::string
 jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type *type) {
 	if (auto t = dynamic_cast<const jlm::rvsdg::bittype *>(type)) {
 		return "int" + util::strfmt(t->nbits()) + "_t";
-	} else if (is<PointerType>(*type)) {
+	} else if (jlm::rvsdg::is<llvm::PointerType>(*type)) {
 		return "void*";
-	} else if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
+	} else if (auto t = dynamic_cast<const llvm::arraytype *>(type)) {
 		return convert_to_c_type(&t->element_type());
 	} else {
 		throw std::logic_error(type->debug_string() + " not implemented!");
@@ -625,7 +625,7 @@ jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type *type) {
 
 std::string
 jlm::hls::VerilatorHarnessHLS::convert_to_c_type_postfix(const jlm::rvsdg::type *type) {
-	if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
+	if (auto t = dynamic_cast<const llvm::arraytype *>(type)) {
 		return util::strfmt("[", t->nelements(), "]", convert_to_c_type(&t->element_type()));
 	} else {
 		return "";

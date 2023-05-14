@@ -15,19 +15,19 @@ namespace jlm{
 		mem_sep_independent(jlm::rvsdg::region *region);
 
 		void
-		mem_sep_independent(jlm::RvsdgModule &rm);
+		mem_sep_independent(llvm::RvsdgModule &rm);
 
 		void
 		mem_sep_argument(jlm::rvsdg::region *region);
 
 		void
-		mem_sep_argument(jlm::RvsdgModule &rm);
+		mem_sep_argument(llvm::RvsdgModule &rm);
 
         jlm::rvsdg::argument *
-        GetMemoryStateArgument(const jlm::lambda::node & lambda);
+        GetMemoryStateArgument(const llvm::lambda::node & lambda);
 
         jlm::rvsdg::result *
-        GetMemoryStateResult(const jlm::lambda::node & lambda);
+        GetMemoryStateResult(const llvm::lambda::node & lambda);
 	}
 }
 #endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEM_SEP_HPP
