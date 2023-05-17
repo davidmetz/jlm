@@ -50,7 +50,7 @@ llvmToFile(
 int
 main(int argc, char ** argv)
 {
-  auto & commandLineOptions = jlm::JlmHlsCommandLineParser::Parse(argc, argv);
+  auto & commandLineOptions = jlm::tooling::JlmHlsCommandLineParser::Parse(argc, argv);
 
 	llvm::LLVMContext ctx;
 	llvm::SMDiagnostic err;
@@ -82,9 +82,9 @@ main(int argc, char ** argv)
 		return 0;
 	}
 
-	if (commandLineOptions.OutputFormat_ == jlm::JlmHlsCommandLineOptions::OutputFormat::Firrtl) {
-        jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
-        jlm::hls::rvsdg2rhls(*rvsdgModule);
+	if (commandLineOptions.OutputFormat_ == jlm::tooling::JlmHlsCommandLineOptions::OutputFormat::Firrtl) {
+        	jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
+		jlm::hls::rvsdg2rhls(*rvsdgModule);
 
 		std::string output;
 		if (commandLineOptions.UseCirct_) {
@@ -107,7 +107,7 @@ main(int argc, char ** argv)
 		stringToFile(
                 jhls.run(*rvsdgModule),
       commandLineOptions.OutputFolder_.path() + "/jlm_hls.json");
-	} else if (commandLineOptions.OutputFormat_ == jlm::JlmHlsCommandLineOptions::OutputFormat::Dot) {
+	} else if (commandLineOptions.OutputFormat_ == jlm::tooling::JlmHlsCommandLineOptions::OutputFormat::Dot) {
 		jlm::hls::rvsdg2rhls(*rvsdgModule);
 
 		jlm::hls::DotHLS dhls;
