@@ -24,7 +24,7 @@ jlm::hls::mem_conv(jlm::RvsdgModule &rm) {
     mem_conv(root);
 }
 
-jive::output *route_response(jive::region *target, jive::output *response) {
+jive::output *jlm::hls::route_response(jive::region *target, jive::output *response) {
     if (response->region() == target) {
         return response;
     } else {
@@ -37,7 +37,7 @@ jive::output *route_response(jive::region *target, jive::output *response) {
     }
 }
 
-jive::output *route_request(jive::region *target, jive::output *request) {
+jive::output *jlm::hls::route_request(jive::region *target, jive::output *request) {
     if (request->region() == target) {
         return request;
     } else {
@@ -286,13 +286,13 @@ jive::simple_node *replace_decouple(const jlm::lambda::node * lambda, jive::simp
         decouple_response->output(i-2+1)->divert_users(decouple_response->input(i)->origin());
     }
     // create this outside loop - need to tunnel outward from request and inward to response
-    auto routed_addr = route_request(lambda->subregion(), addr);
+    auto routed_addr = jlm::hls::route_request(lambda->subregion(), addr);
     // response is not routed inward for this case
     auto dload_out = jlm::hls::decoupled_load_op::create(*routed_addr, *resp);
     // use a buffer here to make ready logic for response easy and consistent
     auto buf = jlm::hls::buffer_op::create(*dload_out[0], 2, true)[0];
 
-    auto routed_data = route_response(decouple_response->region(), buf);
+    auto routed_data = jlm::hls::route_response(decouple_response->region(), buf);
     decouple_response->output(0)->divert_users(routed_data);
     // TODO: handle state edges?
     remove(decouple_request);
@@ -340,9 +340,9 @@ typedef std::vector<std::tuple<std::vector<jive::simple_node *>, std::vector<jiv
 
 // trace each input pointer to loads and stores
 void trace_pointer_arguments(jive::output * op, std::vector<jive::simple_node *> &load_nodes,
-                             std::vector<jive::simple_node *> &store_nodes,
-                             std::vector<jive::simple_node *> &decouple_nodes,
-                             std::unordered_set<jive::output*> & visited) {
+                       std::vector<jive::simple_node *> &store_nodes,
+                       std::vector<jive::simple_node *> &decouple_nodes,
+                       std::unordered_set<jive::output*> & visited) {
     if(!dynamic_cast<const jlm::PointerType*>(&op->type())){
         // only process pointer outputs
         return;
