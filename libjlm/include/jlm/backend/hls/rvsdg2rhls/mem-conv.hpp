@@ -17,6 +17,12 @@ namespace jlm{
 		void
 		mem_conv(jlm::RvsdgModule &rm);
 
+        jive::output *
+        route_response(jive::region *target, jive::output *response);
+
+        jive::output *
+        route_request(jive::region *target, jive::output *request);
+
         void generate_mem_port(const jlm::lambda::node * lambda, std::vector<jive::simple_node *> &load_nodes,
                                const std::vector<jive::simple_node *> &store_nodes, std::vector<jive::simple_node *> &decouple_nodes);
     }

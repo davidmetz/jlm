@@ -228,6 +228,8 @@ jlm::hls::dne(jive::region *sr) {
                 if(dynamic_cast<const jlm::hls::mem_req_op*>(&node->operation())){
                     // TODO: fix this once memory connections are explicit
                     continue;
+                } else if(dynamic_cast<const jlm::hls::local_mem_req_op*>(&node->operation())){
+                    continue;
                 }
 				remove(node);
 				changed = true;

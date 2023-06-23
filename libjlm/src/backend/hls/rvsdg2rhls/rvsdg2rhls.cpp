@@ -20,6 +20,7 @@
 #include <jive/rvsdg/traverser.hpp>
 #include <jlm/ir/operators/delta.hpp>
 #include <jlm/backend/hls/rvsdg2rhls/add-prints.hpp>
+#include <jlm/backend/hls/rvsdg2rhls/alloca-conv.hpp>
 #include <jlm/backend/llvm/rvsdg2jlm/rvsdg2jlm.hpp>
 #include <jlm/backend/llvm/jlm2llvm/jlm2llvm.hpp>
 
@@ -179,9 +180,9 @@ namespace jlm {
 				region->graph()->add_export(delta, {delta_type, delta_name});
 				auto delta_local = jlm::hls::route_to_region(delta, region);
 				node->output(0)->divert_users(delta_local);
-                // TODO: handle general case of other nodes getting state edge without a merge
 				// TODO: check that the input to alloca is a bitconst 1
-				JLM_ASSERT(node->output(1)->nusers() == 1);
+                // TODO: handle general case of other nodes getting state edge without a merge
+                JLM_ASSERT(node->output(1)->nusers() == 1);
 				auto mux_in = *node->output(1)->begin();
 				auto mux_node = input_node(mux_in);
 				if(dynamic_cast<const jlm::MemStateMergeOperator *>(&mux_node->operation())){
@@ -275,7 +276,7 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
             dump_xml(rm, "post_inline.rvsdg");
             split_opt(rm);
             dump_xml(rm, "post_opt.rvsdg");
-            convert_alloca(ln->subregion());
+//            convert_alloca(ln->subregion());
             jive::substitution_map smap;
             for (size_t i = 0; i < ln->ninputs(); ++i) {
                 auto orig_node_output = dynamic_cast<jive::node_output *>(ln->input(i)->origin());
@@ -341,6 +342,7 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	jlm::hls::theta_conv(rhls);
 	// rhls optimization
 	jlm::hls::dne(rhls);
+    jlm::hls::alloca_conv(rhls);
     jlm::hls::memstate_conv(rhls);
     jlm::hls::mem_conv(rhls);
 	// enforce 1:1 input output relationship
