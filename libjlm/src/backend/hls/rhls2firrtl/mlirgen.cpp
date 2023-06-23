@@ -664,7 +664,8 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
     auto body = module.getBody();
 
     auto load = dynamic_cast<const jlm::hls::load_op *>(&(node->operation()));
-    JLM_ASSERT(load);
+    auto local_load = dynamic_cast<const jlm::hls::local_load_op *>(&(node->operation()));
+    JLM_ASSERT(load || local_load);
 
     // Input signals
     auto inBundleAddr = GetInPort(module, 0);
@@ -867,13 +868,185 @@ jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenHlsLocalMem(const jive::simple_node *node) {
+    auto lmem_op = dynamic_cast<const jlm::hls::local_mem_op *>(&(node->operation()));
+    JLM_ASSERT(lmem_op);
+    auto res_node = input_node(*node->output(0)->begin());
+    auto res_op = dynamic_cast<const jlm::hls::local_mem_resp_op*>(&res_node->operation());
+    JLM_ASSERT(res_op);
+    auto req_node = input_node(*node->output(1)->begin());
+    auto req_op = dynamic_cast<const jlm::hls::local_mem_req_op*>(&req_node->operation());
+    JLM_ASSERT(req_op);
+    // Create the module and its input/output ports - we use a non-standard way here
+    // Generate a vector with all inputs and outputs of the module
+    llvm::SmallVector<circt::firrtl::PortInfo> ports;
+    // Clock and reset ports
+    AddClockPort(&ports);
+    AddResetPort(&ports);
+    // Input bundle port
+    // virtual in/outputs based on request/reponse ports
+    for (size_t i = 1; i < req_node->ninputs(); ++i) {
+        std::string name("i");
+        name.append(std::to_string(i-1));
+        AddBundlePort(
+                &ports,
+                circt::firrtl::Direction::In,
+                name,
+                GetFirrtlType(&req_node->input(i)->type()));
+    }
+    for (size_t i = 0; i < res_node->noutputs(); ++i) {
+        std::string name("o");
+        name.append(std::to_string(i));
+        AddBundlePort(
+                &ports,
+                circt::firrtl::Direction::Out,
+                name,
+                GetFirrtlType(&res_node->output(i)->type()));
+    }
+
+    // Creat a name for the module
+    auto nodeName = GetModuleName(node);
+    mlir::StringAttr name = builder.getStringAttr(nodeName);
+    // Create the module
+    auto module = builder.create<circt::firrtl::FModuleOp>(location, name, ports);
+
+    auto body = module.getBody();
+
+    size_t loads = input_node(*node->output(0)->begin())->noutputs();
+
+    // Input signals
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrReadys;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrValids;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrDatas;
+
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrReadys;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrValids;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrDatas;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeDataReadys;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeDataValids;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> storeDataDatas;
+    // the ports for loads come first and consist only of addresses. Stores have both addresses and data
+    for (size_t i = 1; i < req_node->ninputs(); ++i) {
+        if(i-1<loads){
+            // Load
+            JLM_ASSERT(storeAddrReadys.empty()); // no stores yet
+            auto bundle = GetInPort(module, i-1);
+            loadAddrReadys.push_back(GetSubfield(body, bundle, "ready"));
+            loadAddrValids.push_back(GetSubfield(body, bundle, "valid"));
+            loadAddrDatas.push_back(GetSubfield(body, bundle, "data"));
+        } else{
+            // Store
+            auto addrBundle = GetInPort(module, i-1);
+            storeAddrReadys.push_back(GetSubfield(body, addrBundle, "ready"));
+            storeAddrValids.push_back(GetSubfield(body, addrBundle, "valid"));
+            storeAddrDatas.push_back(GetSubfield(body, addrBundle, "data"));
+            i++;
+            auto dataBundle = GetInPort(module, i-1);
+            storeDataReadys.push_back(GetSubfield(body, dataBundle, "ready"));
+            storeDataValids.push_back(GetSubfield(body, dataBundle, "valid"));
+            storeDataDatas.push_back(GetSubfield(body, dataBundle, "data"));
+        }
+    }
+
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadDataReadys;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadDataValids;
+    llvm::SmallVector<circt::firrtl::SubfieldOp> loadDataDatas;
+    for (size_t i = 0; i < res_node->noutputs(); ++i) {
+        auto bundle = GetOutPort(module, i);
+        loadDataReadys.push_back(GetSubfield(body, bundle, "ready"));
+        loadDataValids.push_back(GetSubfield(body, bundle, "valid"));
+        loadDataDatas.push_back(GetSubfield(body, bundle, "data"));
+    }
+
+    auto clock = GetClockSignal(module);
+    auto reset = GetResetSignal(module);
+    auto zeroBitValue = GetConstant(body, 1, 0);
+    auto oneBitValue = GetConstant(body, 1, 1);
+
+    // memory
+    auto arraytype = dynamic_cast<const jlm::arraytype*>(&lmem_op->result(0).type());
+    size_t depth=arraytype->nelements();
+    auto dataType = GetFirrtlType(&arraytype->element_type());
+    llvm::SmallVector<mlir::Type> memTypes;
+    llvm::SmallVector<mlir::Attribute> memNames;
+    memTypes.push_back(circt::firrtl::MemOp::getTypeForPort(depth, dataType, circt::firrtl::MemOp::PortKind::ReadWrite));
+    memNames.push_back(builder.getStringAttr("rw0"));
+//    memTypes.push_back(circt::firrtl::MemOp::getTypeForPort(depth, dataType, circt::firrtl::MemOp::PortKind::ReadWrite));
+//    memNames.push_back(builder.getStringAttr("rw1"));
+    // TODO: figure out why writeLatency is wrong here
+    auto memory = builder.create<circt::firrtl::MemOp>(location, memTypes, 2, 1, depth, RUWAttr::New, memNames, "mem");
+    body->push_back(memory);
+    auto rw0 = memory.getPortNamed("rw0");
+    Connect(body, GetSubfield(body, rw0, "clk"), clock);
+    auto rw0_wmode = GetSubfield(body, rw0, "wmode");
+    Connect(body, GetSubfield(body, rw0, "en"), oneBitValue);
+    Connect(body, GetSubfield(body, rw0, "wmask"), oneBitValue);
+    auto rw0_addr = GetSubfield(body, rw0, "addr");
+    auto rw0_rdata = GetSubfield(body, rw0, "rdata");
+    auto rw0_wdata = GetSubfield(body, rw0, "wdata");
+    Connect(body, rw0_wdata, GetConstant(body, JlmSize(&arraytype->element_type()), 0));
+//    auto rw1 = memory.getPortNamed("rw1");
+//    Connect(body, GetSubfield(body, rw1, "clk"), clock);
+    int addrwidth = ceil(log2(depth));
+
+// do stores first, because they pass state edges on directly; having loads first might create a combinatorial cycle
+    for (size_t i = 0; i < storeDataReadys.size(); ++i) {
+        Connect(body, storeDataReadys[i], zeroBitValue);
+        Connect(body, storeAddrReadys[i], zeroBitValue);
+    }
+    llvm::SmallVector<circt::firrtl::RegResetOp> loadValidRegs;
+    for (size_t i = 0; i < loadAddrReadys.size(); ++i) {
+        auto validReg = builder.create<circt::firrtl::RegResetOp>(
+            location,
+            GetIntType(1),
+            clock,
+            reset,
+            zeroBitValue,
+            builder.getStringAttr("load_valid_"+std::to_string(i)));
+        body->push_back(validReg);
+        loadValidRegs.push_back(validReg);
+        Connect(body, validReg, zeroBitValue);
+        Connect(body, loadDataValids[i], validReg);
+        Connect(body, loadDataDatas[i], rw0_rdata);
+        Connect(body, loadAddrReadys[i], zeroBitValue);
+    }
+//    mlir::Value assigned = zeroBitValue;
+    mlir::Block* elsewhen = body;
+    for (size_t i = 0; i < storeDataReadys.size(); ++i) {
+        auto whenReqFireOp = AddWhenOp(elsewhen, AddAndOp(elsewhen, storeAddrValids[i], storeDataValids[i]), true);
+        auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
+        Connect(whenReqFireBody, storeDataReadys[i], oneBitValue);
+        Connect(whenReqFireBody, storeAddrReadys[i], oneBitValue);
+        Connect(whenReqFireBody, rw0_wmode, oneBitValue);
+        Connect(whenReqFireBody, rw0_wdata, storeDataDatas[i]);
+        Connect(whenReqFireBody, rw0_addr, AddBitsOp(whenReqFireBody, storeAddrDatas[i], addrwidth - 1, 0));
+        elsewhen = whenReqFireOp.getElseBodyBuilder().getBlock();
+    }
+    for (size_t i = 0; i < loadAddrReadys.size(); ++i) {
+        auto whenReqFireOp = AddWhenOp(elsewhen, loadAddrValids[i], true);
+        auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
+        Connect(whenReqFireBody, loadAddrReadys[i], oneBitValue);
+        Connect(whenReqFireBody, rw0_wmode, zeroBitValue);
+        Connect(whenReqFireBody, rw0_addr, AddBitsOp(whenReqFireBody, loadAddrDatas[i], addrwidth - 1, 0));
+        Connect(whenReqFireBody, loadValidRegs[i], oneBitValue);
+        elsewhen = whenReqFireOp.getElseBodyBuilder().getBlock();
+    }
+    Connect(elsewhen, rw0_wmode, zeroBitValue);
+    Connect(elsewhen, rw0_addr, GetConstant(elsewhen, addrwidth, 0));
+
+
+    return module;
+}
+
+circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBody();
 
     auto store = dynamic_cast<const jlm::hls::store_op *>(&(node->operation()));
-    JLM_ASSERT(store);
+    auto local_store = dynamic_cast<const jlm::hls::local_store_op *>(&(node->operation()));
+    JLM_ASSERT(store || local_store);
 
     // Input signals
     auto inBundleAddr = GetInPort(module, 0);
@@ -1672,6 +1845,14 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenHlsDLoad(node);
 	} else if (dynamic_cast<const hls::store_op *>(&(node->operation()))) {
 		return MlirGenHlsStore(node);
+    } else if (dynamic_cast<const hls::local_load_op *>(&(node->operation()))) {
+        // same as normal load for now, but with index instead of address
+        return MlirGenHlsLoad(node);
+	} else if (dynamic_cast<const hls::local_store_op *>(&(node->operation()))) {
+        // same as normal store for now, but with index instead of address
+		return MlirGenHlsStore(node);
+	} else if (dynamic_cast<const hls::local_mem_op *>(&(node->operation()))) {
+		return MlirGenHlsLocalMem(node);
 	} else if (dynamic_cast<const hls::mem_resp_op *>(&(node->operation()))) {
 		return MlirGenHlsMemResp(node);
 	}  else if (dynamic_cast<const hls::mem_req_op *>(&(node->operation()))) {
@@ -1704,26 +1885,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
 jlm::hls::MLIRGenImpl::MlirGen(hls::loop_node *loopNode, mlir::Block *body, mlir::Block *circuitBody) {
 	auto subRegion = loopNode->subregion();
-
-	// First we create and instantiate all the modules and keep them in a dictionary
-	auto clock = body->getArgument(0);
-	auto reset = body->getArgument(1);
-	std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances;
-	for (const auto node : jive::topdown_traverser(subRegion)) {
-		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
-			instances[sn] = AddInstanceOp(circuitBody, sn);
-			body->push_back(instances[sn]);
-			Connect(body, instances[sn]->getResult(0), clock);
-			Connect(body, instances[sn]->getResult(1), reset);
-		} else if (auto oln = dynamic_cast<hls::loop_node *>(node)) {
-			auto inst = MlirGen(oln, body, circuitBody);
-			instances.merge(inst);
-		} else {
-			throw jlm::error("Unimplemented op (unexpected structural node) : " +
-					 node->operation().debug_string());
-		}
-	}
-	return instances;
+	return createInstances(subRegion, circuitBody, body);
 }
 
 // Trace the argument back to the "node" generating the value
@@ -1792,26 +1954,9 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 	// Get the body of the module such that we can add contents to the module
 	auto body = module.getBody();
 
-	// Get the clock and reset signal of the module
-	auto clock = GetClockSignal(module);
-	auto reset = GetResetSignal(module);
 	// First we create and instantiate all the modules and keep them in a dictionary
-	std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances;
-	for (const auto node : jive::topdown_traverser(subRegion)) {
-		if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
-			instances[sn] = AddInstanceOp(circuitBody, sn);
-			body->push_back(instances[sn]);
-			// Connect clock and reset to the instance
-			Connect(body, instances[sn]->getResult(0), clock);
-			Connect(body, instances[sn]->getResult(1), reset);
-		} else if (auto oln = dynamic_cast<hls::loop_node *>(node)) {
-			auto inst = MlirGen(oln, body, circuitBody);
-			instances.merge(inst);
-		} else {
-			throw jlm::error("Unimplemented op (unexpected structural node) : " +
-					 node->operation().debug_string());
-		}
-	}
+    std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances = createInstances(subRegion,
+                                                                                                   circuitBody, body);
 
 	// Wire up the instances
 	for (const auto & instance : instances) {
@@ -1828,84 +1973,88 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 			// Get the RVSDG node that's the origin of this input
 			jive::simple_input *input = rvsdgNode->input(i);
 			auto origin = input->origin();
-
-			// If the origin is a jive::simple_node then we connect the source output
-			// with the sink input
-			if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
-				// Get RVSDG node of the source
-				auto source = o->node();
-				// Calculate the result port of the instance:
-				//   2 for clock and reset +
-				//   Number of inputs of the node +
-				//   The index of the output of the node
-				auto sourceIndex = 2 + source->ninputs() + o->index();
-				// Get the corresponding InstanceOp
-				auto sourceNode = instances[source];
-
-				auto sourcePort = sourceNode->getResult(sourceIndex);
-				auto sinkPort = sinkNode->getResult(i+2);
-
-				// If the source is a load operation then its output will be
-				// 64 bits wide. The default width of operations is 32 bits so
-				// the port widths will differ and cause errors.
-//				if (dynamic_cast<const jlm::LoadOperation *>(&(source->operation())))
-//					PartialConnect(body, sinkPort, sourcePort);
-//				else
-					Connect(body, sinkPort, sourcePort);
-			} else if (auto o = dynamic_cast<jive::argument *>(origin)) {
-				auto origin = TraceArgument(o);
-				if (auto o = dynamic_cast<jive::argument *>(origin)) {
-					// The port of the instance is connected to an argument
-					// of the region
-					// Calculate the result port of the instance:
-					//   2 for clock and reset +
-					//   The index of the input of the region
-					auto sourceIndex = 2 + o->index();
-					auto sourcePort = body->getArgument(sourceIndex);
-					auto sinkPort = sinkNode->getResult(i+2);
-					Connect(body, sinkPort, sourcePort);
-				} else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
-					// Get RVSDG node of the source
-					auto source = o->node();
-					// Calculate the result port of the instance:
-					//   2 for clock and reset +
-					//   Number of inputs of the node +
-					//   The index of the output of the node
-					auto sourceIndex = 2 + source->ninputs() + o->index();
-					// Get the corresponding InstanceOp
-					auto sourceNode = instances[source];
-					auto sourcePort = sourceNode->getResult(sourceIndex);
-					auto sinkPort = sinkNode->getResult(i+2);
-
-					// If the source is a load operation then its output will be
-					// 64 bits wide. The default width of operations is 32 bits so
-					// the port widths will differ and cause errors.
-					if (dynamic_cast<const jlm::LoadOperation *>(&(source->operation())))
-						PartialConnect(body, sinkPort, sourcePort);
-					else
-						Connect(body, sinkPort, sourcePort);
-				} else {
-					throw std::logic_error("Unsupported output");
-				}
-			} else if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
-				// Need to trace through the region to find the source node
-				auto output = TraceStructuralOutput(o);
-				// Get the node of the output
-				jive::simple_node *source = output->node();
-				// Get the corresponding InstanceOp
-				auto sourceNode = instances[source];
-				// Calculate the result port of the instance:
-				//   2 for clock and reset +
-				//   Number of inputs of the node +
-				//   The index of the output of the node
-				auto sourceIndex = 2 + source->ninputs() + output->index();
-				auto sourcePort = sourceNode->getResult(sourceIndex);
-				auto sinkPort = sinkNode->getResult(i+2);
-				Connect(body, sinkPort, sourcePort);
-			} else {
-				throw std::logic_error("Unsupported output");
-			}
+            if (auto o = dynamic_cast<jive::argument *>(origin)) {
+                origin = TraceArgument(o);
+            }
+            if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+                // Need to trace through the region to find the source node
+                origin = TraceStructuralOutput(o);
+            }
+            // now origin is either a simple_output or a top-level argument
+            if (auto o = dynamic_cast<jive::argument *>(origin)) {
+                // The port of the instance is connected to an argument
+                // of the region
+                // Calculate the result port of the instance:
+                //   2 for clock and reset +
+                //   The index of the input of the region
+                auto sourceIndex = 2 + o->index();
+                auto sourcePort = body->getArgument(sourceIndex);
+                auto sinkPort = sinkNode->getResult(i+2);
+                Connect(body, sinkPort, sourcePort);
+            } else if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+                // Get RVSDG node of the source
+                auto source = o->node();
+                if(dynamic_cast<const hls::local_mem_resp_op *>(&(source->operation()))){
+                    // Connect directly to mem
+                    auto mem_out = dynamic_cast<jive::node_output*>(source->input(0)->origin());
+                    auto sourceNode = instances[dynamic_cast<jive::simple_node *>(mem_out->node())];
+                    auto sourcePort = GetInstancePort(sourceNode, "o"+std::to_string(o->index()));
+                    auto sinkPort = sinkNode->getResult(i+2);
+                    Connect(body, sinkPort, sourcePort);
+                } else{
+                    // Calculate the result port of the instance:
+                    //   2 for clock and reset +
+                    //   Number of inputs of the node +
+                    //   The index of the output of the node
+                    auto sourceIndex = 2 + source->ninputs() + o->index();
+                    // Get the corresponding InstanceOp
+                    auto sourceNode = instances[source];
+                    auto sourcePort = sourceNode->getResult(sourceIndex);
+                    auto sinkPort = sinkNode->getResult(i+2);
+                    Connect(body, sinkPort, sourcePort);
+                }
+            } else {
+                throw std::logic_error("Unsupported output");
+            }
 		}
+
+        if(dynamic_cast<const hls::local_mem_op *>(&(rvsdgNode->operation()))){
+            // hook up request port
+            auto requestNode = input_node(*rvsdgNode->output(1)->begin());
+            // skip connection to mem
+            for (size_t i = 1; i < requestNode->ninputs(); i++) {
+                // Get the RVSDG node that's the origin of this input
+                auto *input = dynamic_cast<jive::simple_input *>(requestNode->input(i));
+                auto origin = input->origin();
+                if (auto o = dynamic_cast<jive::argument *>(origin)) {
+                    origin = TraceArgument(o);
+                }
+                if (auto o = dynamic_cast<jive::structural_output *>(origin)) {
+                    // Need to trace through the region to find the source node
+                    origin = TraceStructuralOutput(o);
+                }
+                // we know this has to be a simple_output now
+                if (auto o = dynamic_cast<jive::simple_output *>(origin)) {
+                    // Get RVSDG node of the source
+                    auto source = o->node();
+                    // Calculate the result port of the instance:
+                    //   2 for clock and reset +
+                    //   Number of inputs of the node +
+                    //   The index of the output of the node
+                    auto sourceIndex = 2 + source->ninputs() + o->index();
+                    // Get the corresponding InstanceOp
+                    auto sourceNode = instances[source];
+                    auto sourcePort = sourceNode->getResult(sourceIndex);
+//                    for (size_t i = 0; i < sinkNode.getNumResults(); ++i) {
+//                        std::cout << sinkNode.getPortName(i).str() << std::endl;
+//                    }
+                    auto sinkPort = GetInstancePort(sinkNode, "i"+std::to_string(input->index()-1));
+                    Connect(body, sinkPort, sourcePort);
+                } else {
+                    throw std::logic_error("Unsupported output");
+                }
+            }
+        }
 	}
 
 	// Connect the results of the region
@@ -1945,6 +2094,35 @@ jlm::hls::MLIRGenImpl::MlirGen(jive::region *subRegion, mlir::Block *circuitBody
 	}
 
         return module;
+}
+
+std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
+jlm::hls::MLIRGenImpl::createInstances(jive::region *subRegion, mlir::Block *circuitBody, mlir::Block *body) {
+    // create and instantiate all the modules and keep them in a dictionary
+    auto clock = body->getArgument(0);
+    auto reset = body->getArgument(1);
+    std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp> instances;
+    for (const auto node : jive::topdown_traverser(subRegion)) {
+        if (auto sn = dynamic_cast<jive::simple_node *>(node)) {
+            if (dynamic_cast<const hls::local_mem_req_op *>(&(node->operation())) ||
+                dynamic_cast<const hls::local_mem_resp_op *>(&(node->operation()))) {
+                // these are virtual - connections go to local_mem instead
+                continue;
+            }
+            instances[sn] = AddInstanceOp(circuitBody, sn);
+            body->push_back(instances[sn]);
+            // Connect clock and reset to the instance
+            Connect(body, instances[sn]->getResult(0), clock);
+            Connect(body, instances[sn]->getResult(1), reset);
+        } else if (auto oln = dynamic_cast<loop_node *>(node)) {
+            auto inst = MlirGen(oln, body, circuitBody);
+            instances.merge(inst);
+        } else {
+            throw error("Unimplemented op (unexpected structural node) : " +
+                     node->operation().debug_string());
+        }
+    }
+    return instances;
 }
 
 
@@ -2959,6 +3137,16 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
             append.append("_");
             append.append(std::to_string(bytes));
         }
+    }
+    if(auto op = dynamic_cast<const jlm::hls::local_mem_op *>(&node->operation())){
+        append.append("_S");
+        append.append(std::to_string(dynamic_cast<const jlm::arraytype*>(&op->result(0).type())->nelements()));
+        append.append("_L");
+        size_t loads = input_node(*node->output(0)->begin())->noutputs();
+        append.append(std::to_string(loads));
+        append.append("_S");
+        size_t stores = (input_node(*node->output(1)->begin())->ninputs()-1-loads)/2;
+        append.append(std::to_string(stores));
     }
 	auto name = jive::detail::strfmt("op_", node->operation().debug_string() + append);
 	// Remove characters that are not valid in firrtl module names

@@ -68,6 +68,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp MlirGenHlsMemReq(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsLoad(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsDLoad(const jive::simple_node *node);
+			circt::firrtl::FModuleOp MlirGenHlsLocalMem(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenHlsStore(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenTrigger(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenPrint(const jive::simple_node *node);
@@ -200,7 +201,9 @@ namespace jlm {
 			std::string GetModuleName(const jive::node *node);
 			bool IsIdentityMapping(const jive::match_op &op);
 
-		};
+            std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
+            createInstances(jive::region *subRegion, mlir::Block *circuitBody, mlir::Block *body);
+        };
 
 		class MLIRGen : public BaseHLS {
 			std::string
