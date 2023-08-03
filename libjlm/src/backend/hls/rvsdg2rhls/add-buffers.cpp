@@ -22,6 +22,8 @@ jlm::hls::add_buffers(jive::region *region, bool pass_through) {
 				continue;
 			} else if (jive::is<hls::print_op>(node)) {
 				continue;
+			} else if (!jive::is<hls::fork_op>(node)) {
+				continue;
 			}
 			for (size_t i = 0; i < node->noutputs(); ++i) {
 				auto out = node->output(i);

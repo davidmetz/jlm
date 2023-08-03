@@ -754,50 +754,22 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
             builder.getStringAttr("sent_reg"));
     body->push_back(sentReg);
 
-    mlir::Value canRequest = AddNotOp(body, sentReg);
+    mlir::Value canRequest = AddOrOp(body, AddNotOp(body, sentReg), AddAndOp(body, inValidMemData, outReadyData));
     canRequest = AddAndOp(body, canRequest, inValidAddr);
     for (auto vld: inValidStates) {
         canRequest = AddAndOp(body, canRequest, vld);
     }
-    for (auto reg: oValidRegs) {
-        canRequest = AddAndOp(body, canRequest, AddNotOp(body, reg));
+    canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[0]), outReadyData));
+    for (size_t i = 1; i < oValidRegs.size(); i++) {
+        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i-1]));
     }
 
     // Block until all inputs and no outputs are valid
     Connect(body, outValidMemAddr, canRequest);
     Connect(body, outDataMemAddr, inDataAddr);
 
-    // mem_req fire
-    auto whenReqFireOp = AddWhenOp(body, outReadyMemAddr, false);
-    auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
-    Connect(whenReqFireBody, sentReg, oneBitValue);
-    for (size_t i = 1; i < node->noutputs()-1; ++i) {
-        Connect(whenReqFireBody, oValidRegs[i], oneBitValue);
-        Connect(whenReqFireBody, oDataRegs[i], inDataStates[i-1]);
-    }
-
-    // mem_res fire
-    auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, inValidMemData), false);
-    auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
-    Connect(whenResFireBody, sentReg, zeroBitValue);
-    Connect(whenResFireBody, oDataRegs[0], inDataMemData);
-    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
-
-    // Handshaking
-    Connect(body, inReadyAddr, outReadyMemAddr);
-    for (size_t i = 1; i < node->ninputs() - 1; ++i) {
-        Connect(body, inReadyStates[i-1], outReadyMemAddr);
-    }
-    Connect(body, inReadyMemData, sentReg);
-
     Connect(body, outValidData, oValidRegs[0]);
     Connect(body, outDataData, oDataRegs[0]);
-    auto andOp = AddAndOp(body, outReadyData, outValidData);
-    Connect(
-            // When o0 fires
-            AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
-            oValidRegs[0], zeroBitValue
-    );
 
     for (size_t i = 1; i < node->noutputs()-1; ++i) {
         Connect(body, outValidStates[i-1], oValidRegs[i]);
@@ -809,6 +781,38 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
                 oValidRegs[i], zeroBitValue
         );
     }
+
+    // mem_res fire
+    auto whenResFireOp = AddWhenOp(body, AddAndOp(body, sentReg, inValidMemData), false);
+    auto whenResFireBody = whenResFireOp.getThenBodyBuilder().getBlock();
+    Connect(whenResFireBody, sentReg, zeroBitValue);
+    Connect(whenResFireBody, oDataRegs[0], inDataMemData);
+    Connect(whenResFireBody, oValidRegs[0], oneBitValue);
+    Connect(whenResFireBody, outDataData, inDataMemData);
+    Connect(whenResFireBody, outValidData, oneBitValue);
+
+    // mem_req fire
+    auto whenReqFireOp = AddWhenOp(body, outReadyMemAddr, false);
+    auto whenReqFireBody = whenReqFireOp.getThenBodyBuilder().getBlock();
+    Connect(whenReqFireBody, sentReg, oneBitValue);
+    for (size_t i = 1; i < node->noutputs()-1; ++i) {
+        Connect(whenReqFireBody, oValidRegs[i], oneBitValue);
+        Connect(whenReqFireBody, oDataRegs[i], inDataStates[i-1]);
+    }
+
+    // Handshaking
+    Connect(body, inReadyAddr, outReadyMemAddr);
+    for (size_t i = 1; i < node->ninputs() - 1; ++i) {
+        Connect(body, inReadyStates[i-1], outReadyMemAddr);
+    }
+    Connect(body, inReadyMemData, sentReg);
+
+    auto andOp = AddAndOp(body, outReadyData, outValidData);
+    Connect(
+            // When o0 fires
+            AddWhenOp(body, andOp, false).getThenBodyBuilder().getBlock(),
+            oValidRegs[0], zeroBitValue
+    );
 
     return module;
 }
@@ -1132,8 +1136,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
     for (auto vld: inValidStates) {
         canRequest = AddAndOp(body, canRequest, vld);
     }
-    for (auto reg: oValidRegs) {
-        canRequest = AddAndOp(body, canRequest, AddNotOp(body, reg));
+    for (size_t i = 0; i < oValidRegs.size(); ++i) {
+        // register is empty or being drained
+//        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i]));
+        canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
     }
 
     // Block until all inputs and no outputs are valid
@@ -1141,6 +1147,17 @@ jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
     Connect(body, outDataMemAddr, inDataAddr);
     Connect(body, outValidMemData, canRequest);
     Connect(body, outDataMemData, inDataData);
+
+    for (size_t i = 0; i < node->noutputs()-2; ++i) {
+        Connect(body, outValidStates[i], oValidRegs[i]);
+        Connect(body, outDataStates[i], oDataRegs[i]);
+        auto andOp2 = AddAndOp(body, outReadyStates[i], outValidStates[i]);
+        Connect(
+                // When o1 fires
+                AddWhenOp(body, andOp2, false).getThenBodyBuilder().getBlock(),
+                oValidRegs[i], zeroBitValue
+        );
+    }
 
     // mem_req fire
     auto whenReqFireOp = AddWhenOp(body, outReadyMemAddr, false);
@@ -1156,17 +1173,6 @@ jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
     Connect(body, inReadyData, outReadyMemAddr);
     for (size_t i = 2; i < node->ninputs(); ++i) {
         Connect(body, inReadyStates[i-2], outReadyMemAddr);
-    }
-
-    for (size_t i = 0; i < node->noutputs()-2; ++i) {
-        Connect(body, outValidStates[i], oValidRegs[i]);
-        Connect(body, outDataStates[i], oDataRegs[i]);
-        auto andOp2 = AddAndOp(body, outReadyStates[i], outValidStates[i]);
-        Connect(
-                // When o1 fires
-                AddWhenOp(body, andOp2, false).getThenBodyBuilder().getBlock(),
-                oValidRegs[i], zeroBitValue
-        );
     }
 	return module;
 }

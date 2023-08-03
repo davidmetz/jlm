@@ -347,10 +347,11 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     jlm::hls::alloca_conv(rhls);
     jlm::hls::memstate_conv(rhls);
     jlm::hls::mem_conv(rhls);
+    jlm::hls::remove_redundant_buf(rhls);
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(rhls);
 	jlm::hls::add_forks(rhls);
-//	jlm::hls::add_buffers(*rhls, true);
+	jlm::hls::add_buffers(rhls, true);
 	// ensure that all rhls rules are met
 	jlm::hls::check_rhls(rhls);
 }
