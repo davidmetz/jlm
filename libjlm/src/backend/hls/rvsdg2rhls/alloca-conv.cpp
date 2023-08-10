@@ -111,8 +111,8 @@ jlm::hls::alloca_conv(jive::region *region) {
             std::vector<jive::output *> load_addrs;
             for (auto l: ta.load_nodes) {
                 auto index = gep_to_index(l->input(0)->origin());
-                auto response = jlm::hls::route_response(l->region(), resp_outs.back());
-                resp_outs.pop_back();
+                auto response = jlm::hls::route_response(l->region(), resp_outs.front());
+                resp_outs.erase(resp_outs.begin());
                 std::vector<jive::output *> states;
                 for (size_t i = 1; i < l->ninputs(); ++i) {
                     states.push_back(l->input(i)->origin());
