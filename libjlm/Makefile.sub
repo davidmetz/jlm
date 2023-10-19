@@ -17,12 +17,14 @@ LIBJLM_SRC = \
     libjlm/src/backend/hls/rvsdg2rhls/add-prints.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/add-buffers.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/mem-conv.cpp \
+    libjlm/src/backend/hls/rvsdg2rhls/memstate-conv.cpp \
     \
     libjlm/src/backend/hls/rhls2firrtl/base-hls.cpp \
     libjlm/src/backend/hls/rhls2firrtl/dot-hls.cpp \
     libjlm/src/backend/hls/rhls2firrtl/verilator-harness-hls.cpp \
     libjlm/src/backend/hls/rhls2firrtl/firrtl-hls.cpp \
     libjlm/src/backend/hls/rhls2firrtl/mlirgen.cpp \
+    libjlm/src/backend/hls/rhls2firrtl/json-hls.cpp \
     \
     libjlm/src/backend/llvm/jlm2llvm/instruction.cpp \
     libjlm/src/backend/llvm/jlm2llvm/jlm2llvm.cpp \
