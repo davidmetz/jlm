@@ -111,21 +111,21 @@ jlm::hls::remove_gamma_passthrough(jlm::rvsdg::gamma_node *gn) {// remove inputs
 			auto origin = gn->entryvar(i)->origin();
 			// divert users of output to origin of input
 
-			gn->output(res_index)->divert_users(origin);
-			gn->output(res_index)->results.clear();
-			gn->remove_output(res_index);
-			// remove input
-			gn->input(i+1)->arguments.clear();
-			gn->remove_input(i + 1);
-			for (size_t j = 0; j < gn->nsubregions(); ++j) {
-				JLM_ASSERT(gn->subregion(j)->result(res_index)->origin() == gn->subregion(j)->argument(i));
-				JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 1);
-				gn->subregion(j)->remove_result(res_index);
-				JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 0);
-				gn->subregion(j)->remove_argument(i);
-			}
-		}
-	}
+      gn->output(res_index)->divert_users(origin);
+      gn->output(res_index)->results.clear();
+      gn->RemoveOutput(res_index);
+      // remove input
+      gn->input(i + 1)->arguments.clear();
+      gn->RemoveInput(i + 1);
+      for (size_t j = 0; j < gn->nsubregions(); ++j) {
+        JLM_ASSERT(gn->subregion(j)->result(res_index)->origin() == gn->subregion(j)->argument(i));
+        JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 1);
+        gn->subregion(j)->RemoveResult(res_index);
+        JLM_ASSERT(gn->subregion(j)->argument(i)->nusers() == 0);
+        gn->subregion(j)->RemoveArgument(i);
+      }
+    }
+  }
 }
 
 jlm::llvm::lambda::node *
@@ -183,24 +183,24 @@ jlm::hls::remove_lambda_passthrough(llvm::lambda::node *ln) {
 	assert((*ln->output()->begin())->region() == ln->region()->graph()->root());
 
 //	ln->output()->divert_users(new_out); // can't divert since the type changed
-	JLM_ASSERT(ln->output()->nusers()==1);
-	ln->region()->remove_result((*ln->output()->begin())->index());
-	remove(ln);
-	jlm::rvsdg::result::create(new_lambda->region(), new_out, nullptr, new_out->type());
-	return new_lambda;
+  JLM_ASSERT(ln->output()->nusers() == 1);
+  ln->region()->RemoveResult((*ln->output()->begin())->index());
+  remove(ln);
+  jlm::rvsdg::result::create(new_lambda->region(), new_out, nullptr, new_out->type());
+  return new_lambda;
 }
 
 void
 jlm::hls::remove_region_passthrough(const jlm::rvsdg::argument *arg) {
-	auto res = dynamic_cast<jlm::rvsdg::result *>(*arg->begin());
-	auto origin = arg->input()->origin();
-	// divert users of output to origin of input
-	arg->region()->node()->output(res->output()->index())->divert_users(origin);
-	// remove result first so argument has no users
-	arg->region()->remove_result(res->index());
-	arg->region()->remove_argument(arg->index());
-	arg->region()->node()->remove_input(arg->input()->index());
-	arg->region()->node()->remove_output(res->output()->index());
+  auto res = dynamic_cast<jlm::rvsdg::result *>(*arg->begin());
+  auto origin = arg->input()->origin();
+  // divert users of output to origin of input
+  arg->region()->node()->output(res->output()->index())->divert_users(origin);
+  // remove result first so argument has no users
+  arg->region()->RemoveResult(res->index());
+  arg->region()->RemoveArgument(arg->index());
+  arg->region()->node()->RemoveInput(arg->input()->index());
+  arg->region()->node()->RemoveOutput(res->output()->index());
 }
 
 bool

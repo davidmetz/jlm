@@ -517,7 +517,7 @@ jlm::hls::MemoryConverter(jlm::llvm::RvsdgModule &rm)
     jlm::rvsdg::result::create(newLambda->region(), newOut, nullptr, newOut->type());
 
 	JLM_ASSERT(lambda->output()->nusers()==1);
-	lambda->region()->remove_result((*lambda->output()->begin())->index());
+	lambda->region()->RemoveResult((*lambda->output()->begin())->index());
     remove(lambda);
 
     // Remove imports for decouple_ function pointers
@@ -546,14 +546,14 @@ jlm::hls::MemoryConverter(jlm::llvm::RvsdgModule &rm)
                 JLM_ASSERT(cvarg->nusers() == 0);
                 auto cvip = cvarg->input();
                 auto imp = cvip->origin();
-                newLambda->subregion()->remove_argument(cvarg->index());
+                newLambda->subregion()->RemoveArgument(cvarg->index());
                 //TODO: work around const
-                newLambda->remove_input(cvip->index());
+                newLambda->RemoveInput(cvip->index());
                 auto imparg = dynamic_cast<jlm::rvsdg::argument*>(imp);
                 JLM_ASSERT(imparg);
                 auto impprt = dynamic_cast<const jlm::llvm::impport *>(&imparg->port());
                 JLM_ASSERT(impprt);
-                root->remove_argument(imparg->index());
+                root->RemoveArgument(imparg->index());
             }
         }
     }

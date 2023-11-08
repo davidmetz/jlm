@@ -8,24 +8,6 @@
 #include <jlm/rvsdg/traverser.hpp>
 
 bool
-jlm::hls::remove_unused_loop_outputs(hls::loop_node *ln) {
-	bool any_changed = false;
-	auto sr = ln->subregion();
-	// go through in reverse because we remove some
-	for (int i = ln->noutputs() - 1; i >= 0; --i) {
-		auto out = ln->output(i);
-		if (out->nusers() == 0) {
-			assert(out->results.size() == 1);
-			auto result = out->results.begin();
-			sr->remove_result(result->index());
-			ln->remove_output(out->index());
-			any_changed = true;
-		}
-	}
-	return any_changed;
-}
-
-bool
 jlm::hls::remove_unused_loop_backedges(hls::loop_node *ln) {
 	bool any_changed = false;
 	auto sr = ln->subregion();
@@ -35,13 +17,31 @@ jlm::hls::remove_unused_loop_backedges(hls::loop_node *ln) {
 		if (dynamic_cast<jlm::hls::backedge_argument*>(arg) && arg->nusers() == 1) {
             auto user = *arg->begin();
             if(auto result = dynamic_cast<jlm::hls::backedge_result*>(user)){
-                sr->remove_result(result->index());
-                sr->remove_argument(arg->index());
+                sr->RemoveResult(result->index());
+                sr->RemoveArgument(arg->index());
                 any_changed = true;
             }
 		}
 	}
 	return any_changed;
+}
+
+bool
+jlm::hls::remove_unused_loop_outputs(jlm::hls::loop_node *ln) {
+  bool any_changed = false;
+  auto sr = ln->subregion();
+  // go through in reverse because we remove some
+  for (int i = ln->noutputs() - 1; i >= 0; --i) {
+    auto out = ln->output(i);
+    if (out->nusers() == 0) {
+      assert(out->results.size() == 1);
+      auto result = out->results.begin();
+      sr->RemoveResult(result->index());
+      ln->RemoveOutput(out->index());
+      any_changed = true;
+    }
+  }
+  return any_changed;
 }
 
 bool
@@ -58,10 +58,10 @@ jlm::hls::remove_loop_passthrough(hls::loop_node *ln) {
             if(auto result = dynamic_cast<jlm::rvsdg::result*>(user)){
                 auto out = result->output();
                 out->divert_users(in->origin());
-                sr->remove_result(result->index());
-                ln->remove_output(out->index());
-                sr->remove_argument(arg->index());
-                ln->remove_input(arg->input()->index());
+                sr->RemoveResult(result->index());
+                ln->RemoveOutput(out->index());
+                sr->RemoveArgument(arg->index());
+                ln->RemoveInput(arg->input()->index());
                 any_changed = true;
             }
 		}
@@ -79,8 +79,8 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node *ln) {
 		assert(in->arguments.size() == 1);
 		auto arg = in->arguments.begin();
 		if (arg->nusers() == 0) {
-			sr->remove_argument(arg->index());
-			ln->remove_input(in->index());
+			sr->RemoveArgument(arg->index());
+			ln->RemoveInput(in->index());
 			any_changed = true;
 		}
 	}
@@ -92,8 +92,8 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node *ln) {
 			auto result = ba->result();
 			assert(result->type() == arg->type());
 			if (arg->nusers() == 0 || (arg->nusers()==1 && result->origin() == arg)) {
-                sr->remove_result(result->index());
-                sr->remove_argument(arg->index());
+                sr->RemoveResult(result->index());
+                sr->RemoveArgument(arg->index());
 			}
 		} else{
             assert(arg->nusers() != 0);
@@ -212,8 +212,8 @@ bool dead_loop(jlm::rvsdg::node *ndmux_node){
     remove(buf_in->node());
     remove(branch_in->node());
     remove(ndmux_node);
-    ndmux_node->region()->remove_result(backedge_arg->result()->index());
-    ndmux_node->region()->remove_argument(backedge_arg->index());
+    ndmux_node->region()->RemoveResult(backedge_arg->result()->index());
+    ndmux_node->region()->RemoveArgument(backedge_arg->index());
     return true;
 }
 
