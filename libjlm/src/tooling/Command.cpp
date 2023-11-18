@@ -312,8 +312,21 @@ std::string
 LlvmOptCommand::ToString() const
 {
   std::string optimizationArguments;
-  for (auto & optimization : Optimizations_)
-    optimizationArguments += ToString(optimization) + " ";
+  if (!Optimizations_.empty())
+  {
+    optimizationArguments = "-passes=";
+    bool first = true;
+    for (auto & optimization : Optimizations_) {
+      if (first)
+      {
+        optimizationArguments += ToString(optimization) + " ";
+        first = false;
+      } else
+      {
+        optimizationArguments += "," + ToString(optimization) + " ";
+      }
+    }
+  }
 
   return strfmt(
     clangpath.path() + "opt "
@@ -336,7 +349,7 @@ LlvmOptCommand::ToString(const Optimization & optimization)
 {
   static std::unordered_map<Optimization, const char*>
     map({
-          {Optimization::Mem2Reg, "-mem2reg"},
+          {Optimization::Mem2Reg, "mem2reg"},
         });
 
   JLM_ASSERT(map.find(optimization) != map.end());
