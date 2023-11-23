@@ -230,6 +230,9 @@ jlm::hls::dne(jive::region *sr) {
                     continue;
                 } else if(dynamic_cast<const jlm::hls::local_mem_req_op*>(&node->operation())){
                     continue;
+                } else if(dynamic_cast<const jlm::hls::local_mem_resp_op*>(&node->operation())){
+                    // TODO: fix - this scenario has only stores and should just be optimized away completely
+                    continue;
                 }
 				remove(node);
 				changed = true;

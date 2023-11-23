@@ -42,6 +42,9 @@
 #include "jlm/backend/hls/rvsdg2rhls/mem-sep.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/memstate-conv.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/dae-conv.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/remove-redundant-buf.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/add-buffers.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/mem-queue.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
 
 void
@@ -338,6 +341,9 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 
 	// run conversion on copy
 	jlm::hls::remove_unused_state(rhls);
+    jlm::hls::mem_sep_argument(rhls);
+    // run conversion on copy
+    jlm::hls::remove_unused_state(rhls);
 	// main conversion steps
 //	jlm::hls::add_triggers(rhls); // TODO: is this needed?
 	jlm::hls::gamma_conv(rhls, true);
@@ -345,6 +351,8 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	// rhls optimization
 	jlm::hls::dne(rhls);
     jlm::hls::alloca_conv(rhls);
+    jlm::hls::mem_queue(rhls);
+    jlm::hls::mem_conv(rhls);
     jlm::hls::memstate_conv(rhls);
     jlm::hls::mem_conv(rhls);
     jlm::hls::remove_redundant_buf(rhls);

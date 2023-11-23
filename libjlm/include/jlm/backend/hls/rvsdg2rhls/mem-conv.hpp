@@ -14,6 +14,11 @@ namespace jlm{
 		void
 		mem_conv(jive::region *root);
 
+        typedef std::vector<std::tuple<std::vector<jive::simple_node *>, std::vector<jive::simple_node *>, std::vector<jive::simple_node *>>> port_load_store_decouple;
+
+		void
+        trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decouple &port_nodes);
+
 		void
 		mem_conv(jlm::RvsdgModule &rm);
 

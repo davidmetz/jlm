@@ -148,18 +148,26 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"        exit(-1);\n"
 		"    }\n"
 		"    assert(!Verilated::gotFinish());\n"
-		"    top->clk = 1;\n"
-		"    top->eval();\n";
+		"    top->clk = 1;\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
         "    top->mem_" << i << "_res_data_data = mem_resp_data["<<i<<"];\n"
         "    top->mem_" << i << "_res_data_id = mem_resp_id["<<i<<"];\n"
         "    top->mem_" << i << "_res_valid = mem_resp_valid["<<i<<"];\n"
+        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";
+    }
+    cpp <<
+        "    top->eval();\n";
+    for (size_t i = 0; i < mem_reqs.size(); ++i) {
+        cpp <<
         "    if (top->mem_" << i << "_res_valid && top->mem_" << i << "_res_ready) {\n"
         "        mem_resp_valid["<<i<<"] = false;\n"
         "    }\n"
-        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";
+        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";;
     }
+    cpp <<
+        "    // evaluate for a second time to be able to set req to ready if resp fires\n"
+        "    top->eval();\n";
     cpp <<
 		"    // dump before trying to access memory\n"
         "    tfp->dump(main_time * 2);\n";

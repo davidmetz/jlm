@@ -178,6 +178,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 	} else if (dynamic_cast<const jlm::aa::LambdaExitMemStateOperator *>(&(node->operation()))) {
 		auto inData = GetSubfield(body, inBundles[0], "data");
 		Connect(body, outData, inData);
+	}  else if (dynamic_cast<const jlm::MemStateMergeOperator *>(&(node->operation()))) {
+		auto inData = GetSubfield(body, inBundles[0], "data");
+		Connect(body, outData, inData);
 	} else if (auto op = dynamic_cast<const sext_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto sintOp = AddAsSIntOp(body, input0);
@@ -437,7 +440,7 @@ jlm::hls::MLIRGenImpl::MlirGenStateGate(const jive::simple_node *node) {
         Connect(body, outValid, andOp);
         Connect(body, outData, inData);
 
-        auto orOp = AddOrOp(body, outReady, firedReg);
+        auto orOp = AddOrOp(body, AddAndOp(body, outValid, outReady), firedReg);
         allFired = AddAndOp(body, allFired, orOp);
 
         // Conditions needed for the when statements
@@ -504,10 +507,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
     auto elseBody = body;
     for (size_t i = 0; i < node->noutputs(); ++i) {
         auto outBundle = GetOutPort(module, i);
-        auto outValid = GetSubfield(body, outBundle, "valid");
-        auto outReady = GetSubfield(body, outBundle, "ready");
+        auto outValid = GetSubfield(elseBody, outBundle, "valid");
+        auto outReady = GetSubfield(elseBody, outBundle, "ready");
 
-        auto condition = AddEqOp(body, GetConstant(body, 8, i), memResId);
+        auto condition = AddEqOp(elseBody, GetConstant(elseBody, 8, i), memResId);
         auto whenOp = AddWhenOp(elseBody, condition, true);
         auto thenBody = whenOp.getThenBodyBuilder().getBlock();
         Connect(thenBody, outValid, memResValid);
@@ -754,14 +757,17 @@ jlm::hls::MLIRGenImpl::MlirGenHlsLoad(const jive::simple_node *node) {
             builder.getStringAttr("sent_reg"));
     body->push_back(sentReg);
 
-    mlir::Value canRequest = AddOrOp(body, AddNotOp(body, sentReg), AddAndOp(body, inValidMemData, outReadyData));
+//    mlir::Value canRequest = AddOrOp(body, AddNotOp(body, sentReg), AddAndOp(body, inValidMemData, outReadyData));
+    mlir::Value canRequest = AddNotOp(body, sentReg);
     canRequest = AddAndOp(body, canRequest, inValidAddr);
     for (auto vld: inValidStates) {
         canRequest = AddAndOp(body, canRequest, vld);
     }
-    canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[0]), outReadyData));
+//    canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[0]), outReadyData));
+    canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[0]));
     for (size_t i = 1; i < oValidRegs.size(); i++) {
-        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i-1]));
+//        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i-1]));
+        canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
     }
 
     // Block until all inputs and no outputs are valid
@@ -1633,6 +1639,158 @@ jlm::hls::MLIRGenImpl::MlirGenBuffer(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenAddrQueue(const jive::simple_node *node) {
+	// Create the module and its input/output ports
+	auto module = nodeToModule(node);
+	auto body = module.getBody();
+
+	auto op = dynamic_cast<const hls::addr_queue_op *>(&(node->operation()));
+	auto capacity = op->capacity;
+
+	auto clock = GetClockSignal(module);
+	auto reset = GetResetSignal(module);
+	auto zeroBitValue = GetConstant(body, 1, 0);
+	auto zeroValue = GetConstant(body, JlmSize(&node->input(0)->type()), 0);
+	auto oneBitValue = GetConstant(body, 1, 1);
+
+	// Registers
+	llvm::SmallVector<circt::firrtl::RegResetOp> validRegs;
+	llvm::SmallVector<circt::firrtl::RegResetOp> dataRegs;
+	for (size_t i=0; i<=capacity; i++) {
+		std::string validName("buf");
+		validName.append(std::to_string(i));
+		validName.append("_valid_reg");
+		auto validReg = builder.create<circt::firrtl::RegResetOp>(
+				location,
+				GetIntType(1),
+				clock,
+				reset,
+				zeroBitValue,
+				builder.getStringAttr(validName));
+		body->push_back(validReg);
+		validRegs.push_back(validReg);
+
+		std::string dataName("buf");
+		dataName.append(std::to_string(i));
+		dataName.append("_data_reg");
+		auto dataReg = builder.create<circt::firrtl::RegResetOp>(
+				location,
+				GetIntType(&node->input(0)->type()),
+				clock,
+				reset,
+				zeroValue,
+				builder.getStringAttr(dataName));
+		body->push_back(dataReg);
+		dataRegs.push_back(dataReg);
+	}
+	// FIXME
+	// Resource waste as the registers will constantly be set to zero
+	// This simplifies the code below but might waste resources unless
+	// the tools are clever anough to replace it with a constant
+	Connect(body, validRegs[capacity], zeroBitValue);
+	Connect(body, dataRegs[capacity], zeroValue);
+
+	// Add wires
+	llvm::SmallVector<circt::firrtl::WireOp> shiftWires;
+	llvm::SmallVector<circt::firrtl::WireOp> consumedWires;
+	for (size_t i=0; i<=capacity; i++) {
+		std::string shiftName("shift_out");
+		shiftName.append(std::to_string(i));
+		shiftWires.push_back(AddWireOp(body, shiftName, 1));
+		std::string consumedName("in_consumed");
+		consumedName.append(std::to_string(i));
+		consumedWires.push_back(AddWireOp(body, consumedName, 1));
+	}
+
+	auto checkBundle = GetInPort(module, 0);
+	auto checkReady = GetSubfield(body, checkBundle, "ready");
+	auto checkValid = GetSubfield(body, checkBundle, "valid");
+	auto checkData = GetSubfield(body, checkBundle, "data");
+
+	auto enqBundle = GetInPort(module, 1);
+	auto enqReady = GetSubfield(body, enqBundle, "ready");
+	auto enqValid = GetSubfield(body, enqBundle, "valid");
+	auto enqData = GetSubfield(body, enqBundle, "data");
+
+	auto deqBundle = GetInPort(module, 2);
+	auto deqReady = GetSubfield(body, deqBundle, "ready");
+	auto deqValid = GetSubfield(body, deqBundle, "valid");
+
+	auto outBundle = GetOutPort(module, 0);
+	auto outReady = GetSubfield(body, outBundle, "ready");
+	auto outValid = GetSubfield(body, outBundle, "valid");
+	auto outData = GetSubfield(body, outBundle, "data");
+
+	// Connect out to addr
+    auto addr_in_queue_wire = AddWireOp(body, "addr_in_queue", 1);
+    auto addr_out_valid = AddAndOp(body, checkValid, AddNotOp(body, addr_in_queue_wire));
+	Connect(body, outValid, addr_out_valid);
+	Connect(body, outData, checkData);
+    Connect(body, checkReady, AddAndOp(body, outReady, addr_out_valid));
+	auto andOp = AddAndOp(body, deqReady, deqValid);
+
+    Connect(body, deqReady, validRegs[0]);
+    // deq fire
+    Connect(body, shiftWires[0], andOp);
+//	if (op->pass_through) {
+//		auto notOp = AddNotOp(body, validRegs[0]);
+//		andOp = AddAndOp(body, notOp, outReady);
+//		Connect(body, consumedWires[0], andOp);
+//		auto whenOp = AddWhenOp(body, notOp, false);
+//		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+//		Connect(thenBody, outData, inData);
+//		Connect(thenBody, outValid, inValid);
+//	} else {
+		Connect(body, consumedWires[0], zeroBitValue);
+//	}
+
+	// The buffer is ready if the last one is empty
+	auto notOp = AddNotOp(body, validRegs[capacity-1]);
+	Connect(body, enqReady, notOp);
+
+	andOp = AddAndOp(body, enqReady, enqValid);
+    mlir::Value addr_in_queue = zeroBitValue;
+	for (size_t i = 0; i < capacity; ++i) {
+		Connect(body, consumedWires[i+1], consumedWires[i]);
+		Connect(body, shiftWires[i+1], zeroBitValue);
+
+		// When valid reg
+		auto whenOp = AddWhenOp(body, shiftWires[i], false);
+		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, validRegs[i], zeroBitValue);
+
+		// When will be empty
+		auto notOp = AddNotOp(body, validRegs[i]);
+		auto condition = AddOrOp(body, shiftWires[i], notOp);
+		whenOp = AddWhenOp(body, condition, false);
+		thenBody = whenOp.getThenBodyBuilder().getBlock();
+		// Create the condition needed in nested when
+		notOp = AddNotOp(thenBody, consumedWires[i]);
+		auto elseCondition = AddAndOp(thenBody, andOp, notOp);
+
+		// Nested when valid reg
+		whenOp = AddWhenOp(thenBody, validRegs[i+1], true);
+		thenBody = whenOp.getThenBodyBuilder().getBlock();
+		Connect(thenBody, validRegs[i], oneBitValue);
+		Connect(thenBody, dataRegs[i], dataRegs[i+1]);
+		Connect(thenBody, shiftWires[i+1], oneBitValue);
+
+		// Nested else in available
+		auto elseBody = whenOp.getElseBodyBuilder().getBlock();
+		auto nestedWhen = AddWhenOp(elseBody, elseCondition, false);
+		thenBody = nestedWhen.getThenBodyBuilder().getBlock();
+		Connect(thenBody, consumedWires[i+1], oneBitValue);
+		Connect(thenBody, validRegs[i], oneBitValue);
+		Connect(thenBody, dataRegs[i], enqData);
+
+        addr_in_queue = AddOrOp(body, addr_in_queue, AddAndOp(body, validRegs[i], AddEqOp(body, dataRegs[i], checkData)));
+	}
+    Connect(body, addr_in_queue_wire, addr_in_queue);
+
+	return module;
+}
+
+circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
@@ -1875,6 +2033,8 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenStateGate(node);
 	} else if (dynamic_cast<const hls::print_op *>(&(node->operation()))) {
         return MlirGenPrint(node);
+	} else if (dynamic_cast<const hls::addr_queue_op *>(&(node->operation()))) {
+        return MlirGenAddrQueue(node);
 	} else if (dynamic_cast<const hls::merge_op *>(&(node->operation()))) {
 		// return merge_to_firrtl(n);
 		throw std::logic_error(node->operation().debug_string() + " not implemented!");

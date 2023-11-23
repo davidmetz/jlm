@@ -336,10 +336,8 @@ void gather_mem_nodes(
     }
 }
 
-typedef std::vector<std::tuple<std::vector<jive::simple_node *>, std::vector<jive::simple_node *>, std::vector<jive::simple_node *>>> port_load_store_decouple;
-
 // trace each input pointer to loads and stores
-void trace_pointer_arguments(jive::output * op, std::vector<jive::simple_node *> &load_nodes,
+void trace_pointer_argument(jive::output * op, std::vector<jive::simple_node *> &load_nodes,
                        std::vector<jive::simple_node *> &store_nodes,
                        std::vector<jive::simple_node *> &decouple_nodes,
                        std::unordered_set<jive::output*> & visited) {
@@ -364,18 +362,18 @@ void trace_pointer_arguments(jive::output * op, std::vector<jive::simple_node *>
                 decouple_nodes.push_back(simplenode);
             } else {
                 for (size_t i = 0; i < simplenode->noutputs(); ++i) {
-                    trace_pointer_arguments(simplenode->output(i), load_nodes, store_nodes, decouple_nodes, visited);
+                    trace_pointer_argument(simplenode->output(i), load_nodes, store_nodes, decouple_nodes, visited);
                 }
             }
         } else if (auto sti = dynamic_cast<jive::structural_input*>(user)){
             for(auto &arg: sti->arguments){
-                trace_pointer_arguments(&arg, load_nodes, store_nodes, decouple_nodes, visited);
+                trace_pointer_argument(&arg, load_nodes, store_nodes, decouple_nodes, visited);
             }
         } else if (auto r = dynamic_cast<jive::result*>(user)){
             if(auto ber = dynamic_cast<jlm::hls::backedge_result*>(r)){
-                trace_pointer_arguments(ber->argument(), load_nodes, store_nodes, decouple_nodes, visited);
+                trace_pointer_argument(ber->argument(), load_nodes, store_nodes, decouple_nodes, visited);
             } else {
-                trace_pointer_arguments(r->output(), load_nodes, store_nodes, decouple_nodes, visited);
+                trace_pointer_argument(r->output(), load_nodes, store_nodes, decouple_nodes, visited);
             }
         } else {
             JLM_UNREACHABLE("THIS SHOULD BE COVERED");
@@ -383,7 +381,7 @@ void trace_pointer_arguments(jive::output * op, std::vector<jive::simple_node *>
     }
 }
 
-void trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decouple &port_nodes){
+void jlm::hls::trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decouple &port_nodes){
     for (size_t i = 0; i < ln->subregion()->narguments(); ++i) {
         auto arg = ln->subregion()->argument(i);
         if(auto pt = dynamic_cast<const jlm::PointerType*>(&arg->type())){
@@ -393,16 +391,16 @@ void trace_pointer_arguments(const jlm::lambda::node * ln, port_load_store_decou
             }
             port_nodes.emplace_back();
             std::unordered_set<jive::output*> visited;
-            trace_pointer_arguments(arg, std::get<0>(port_nodes.back()), std::get<1>(port_nodes.back()), std::get<2>(port_nodes.back()), visited);
+            trace_pointer_argument(arg, std::get<0>(port_nodes.back()), std::get<1>(port_nodes.back()), std::get<2>(port_nodes.back()), visited);
         }
     }
 }
 
 void jlm::hls::mem_conv(jive::region *root) {
     auto lambda = dynamic_cast<jlm::lambda::node *>(root->nodes.begin().ptr());
-    std::vector<jive::simple_node *> load_nodes;
-    std::vector<jive::simple_node *> store_nodes;
-    gather_mem_nodes(root, load_nodes, store_nodes);
+//    std::vector<jive::simple_node *> load_nodes;
+//    std::vector<jive::simple_node *> store_nodes;
+//    gather_mem_nodes(root, load_nodes, store_nodes);
     port_load_store_decouple port_nodes;
     trace_pointer_arguments(lambda, port_nodes);
     //TODO: extra port for loads/stores not associated to a port yet (i.e. unknown base pointer)
@@ -446,6 +444,11 @@ void jlm::hls::generate_mem_port(const jlm::lambda::node * lambda,
                                  std::vector<jive::simple_node *> &decouple_nodes) {
     auto lambda_region = lambda->subregion();
     std::vector<const jive::type *> load_types;
+    // sort descending by depth
+    std::sort(load_nodes.begin(), load_nodes.end(),
+              [](jive::simple_node * a, jive::simple_node * b){
+        return a->depth() > b->depth();
+    });
     for (auto l: load_nodes) {
         auto pointerType = dynamic_cast<const PointerType*>(&l->input(0)->type());
         load_types.push_back(&pointerType->GetElementType());

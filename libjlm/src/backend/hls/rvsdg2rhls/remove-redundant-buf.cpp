@@ -16,6 +16,8 @@ bool eliminate_buf(jive::output * o){
             return eliminate_buf(node->input(1)->origin());
         } else if (auto local_load = dynamic_cast<const jlm::hls::local_load_op *>(&node->operation())){
             return true;
+        } else if (auto local_store = dynamic_cast<const jlm::hls::local_store_op *>(&node->operation())){
+            return true;
         }
     }
     return false;
