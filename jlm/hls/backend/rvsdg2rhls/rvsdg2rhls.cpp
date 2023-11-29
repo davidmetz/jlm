@@ -22,8 +22,8 @@
 #include <jlm/hls/backend/rvsdg2rhls/remove-unused-state.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/rhls-dne.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/rvsdg2rhls.hpp>
-#include <jlm/hls/backend/rvsdg2rhls/theta-conv.hpp>
 #include <jlm/hls/util/view.hpp>
+#include <jlm/hls/backend/rvsdg2rhls/ThetaConversion.hpp>
 #include <jlm/llvm/backend/jlm2llvm/jlm2llvm.hpp>
 #include <jlm/llvm/backend/rvsdg2jlm/rvsdg2jlm.hpp>
 #include <jlm/llvm/ir/operators/alloca.hpp>
@@ -433,7 +433,7 @@ jlm::hls::rvsdg2rhls(jlm::llvm::RvsdgModule & rhls)
   //	jlm::hls::add_triggers(rhls); // TODO: is this needed?
   jlm::hls::gamma_conv(rhls, true);
   //    dump_dot(rhls, "gamma-converted.dot");
-  jlm::hls::theta_conv(rhls);
+  jlm::hls::ConvertThetaNodes(rhls);
   //    dump_dot(rhls, "theta-converted.dot");
   // rhls optimization
   jlm::hls::dne(rhls);
