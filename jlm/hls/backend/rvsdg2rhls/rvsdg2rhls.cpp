@@ -11,7 +11,7 @@
 #include <jlm/hls/backend/rvsdg2rhls/alloca-conv.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/check-rhls.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/dae-conv.hpp>
-#include <jlm/hls/backend/rvsdg2rhls/gamma-conv.hpp>
+#include <jlm/hls/backend/rvsdg2rhls/GammaConversion.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/instrument-ref.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/mem-conv.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/mem-queue.hpp>
@@ -431,7 +431,7 @@ jlm::hls::rvsdg2rhls(jlm::llvm::RvsdgModule & rhls)
   //    dump_dot(rhls, "removed-state.dot");
   // main conversion steps
   //	jlm::hls::add_triggers(rhls); // TODO: is this needed?
-  jlm::hls::gamma_conv(rhls, true);
+  jlm::hls::ConvertGammaNodes(rhls);
   //    dump_dot(rhls, "gamma-converted.dot");
   jlm::hls::ConvertThetaNodes(rhls);
   //    dump_dot(rhls, "theta-converted.dot");
