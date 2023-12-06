@@ -15,6 +15,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 
     auto mem_reqs = get_mem_reqs(ln);
     auto mem_resps = get_mem_resps(ln);
+    assert(mem_reqs.size() == mem_resps.size());
 	cpp <<
 		"#define TRACE_CHUNK_SIZE 100000\n"
 #ifndef HLS_USE_VCD
@@ -32,6 +33,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"#include <unistd.h>\n"
 		"#include <sstream>\n"
 		"#include <iomanip>\n"
+		"#include <queue>\n"
 		"#ifdef FST\n"
 		"#include \"verilated_fst_c.h\"\n"
 		"#else\n"
@@ -77,6 +79,15 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    delete top;\n"
 		"    top = NULL;\n"
 		"}\n"
+        "\n"
+        "#define MEM_LATENCY 10\n"
+        "typedef struct mem_resp_struct {\n"
+        "    bool valid = false;\n"
+        "    uint64_t data = 0xDEADBEEF;\n"
+        "    uint8_t id = 0;\n"
+        "} mem_resp_struct;\n"
+        "\n"
+        "std::queue<mem_resp_struct>* mem_resp[" << mem_resps.size() << "];"
 		"\n"
 		"void verilator_init(int argc, char **argv) {\n"
 		"    // set up signaling so we can kill the program and still get waveforms\n"
@@ -85,7 +96,19 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    action.sa_handler = term;\n"
 		"    sigaction(SIGTERM, &action, NULL);\n"
 		"    sigaction(SIGKILL, &action, NULL);\n"
-		"    sigaction(SIGINT, &action, NULL);\n"
+		"    sigaction(SIGINT, &action, NULL);\n";
+
+    for (size_t i = 0; i < mem_resps.size(); ++i) {
+        cpp <<
+            "    mem_resp["<< i <<"] = new std::queue<mem_resp_struct>();\n";
+    }
+    cpp << "    for (size_t i = 0; i < MEM_LATENCY; ++i) {\n";
+    for (size_t i = 0; i < mem_resps.size(); ++i) {
+        cpp <<
+            "    mem_resp["<< i <<"]->emplace();\n";
+    }
+    cpp << "    }\n";
+    cpp <<
 		"\n"
 		"	atexit(verilator_finish);\n"
 		"\n"
@@ -137,33 +160,34 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    clock_cycle();\n"
 		"}\n"
 		"\n"
-        "bool mem_resp_valid[" << mem_reqs.size() << "];\n"
-		"uint64_t mem_resp_data[" << mem_reqs.size() << "];\n"
-		"uint8_t mem_resp_id[" << mem_reqs.size() << "];\n"
-		"\n"
-		"void clock_cycle() {\n"
+		"void posedge() {\n"
 		"    if (terminate) {\n"
 		"        std::cout << \"terminating\\n\";\n"
 		"        verilator_finish();\n"
 		"        exit(-1);\n"
 		"    }\n"
 		"    assert(!Verilated::gotFinish());\n"
-		"    top->clk = 1;\n";
+		"    top->clk = 1;\n"
+        "    top->eval(); //eval here to get a clean posedge with the old inputs\n"
+        "}\n"
+        "\n"
+        "void finish_clock_cycle() {\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
-        "    top->mem_" << i << "_res_data_data = mem_resp_data["<<i<<"];\n"
-        "    top->mem_" << i << "_res_data_id = mem_resp_id["<<i<<"];\n"
-        "    top->mem_" << i << "_res_valid = mem_resp_valid["<<i<<"];\n"
-        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";
+        "    top->mem_" << i << "_res_data_data = mem_resp["<<i<<"]->front().data;\n"
+        "    top->mem_" << i << "_res_data_id = mem_resp["<<i<<"]->front().id;\n"
+        "    top->mem_" << i << "_res_valid = mem_resp["<<i<<"]->front().valid;\n"
+        "    top->mem_" << i << "_req_ready = true;\n";
     }
     cpp <<
         "    top->eval();\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
         "    if (top->mem_" << i << "_res_valid && top->mem_" << i << "_res_ready) {\n"
-        "        mem_resp_valid["<<i<<"] = false;\n"
-        "    }\n"
-        "    top->mem_" << i << "_req_ready = !mem_resp_valid["<<i<<"];\n";;
+        "        mem_resp["<< i <<"]->pop();\n"
+        "    } else if (!mem_resp[" << i << "]->front().valid){\n"
+        "        mem_resp[" << i << "]->pop();\n"
+        "    }\n";
     }
     cpp <<
         "    // evaluate for a second time to be able to set req to ready if resp fires\n"
@@ -175,8 +199,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         cpp <<
 		"    // mem_" << i << "\n"
 		"    if (!top->reset && top->mem_" << i << "_req_valid && top->mem_" << i << "_req_ready) {\n"
-		"        mem_resp_valid["<<i<<"] = true;\n"
-		"        mem_resp_id["<<i<<"] = top->mem_" << i << "_req_data_id;\n"
+        "        mem_resp[" << i << "]->emplace();\n"
+		"        mem_resp["<<i<<"]->back().valid = true;\n"
+		"        mem_resp["<<i<<"]->back().id = top->mem_" << i << "_req_data_id;\n"
 		"        void *addr = (void *) top->mem_" << i << "_req_data_addr;\n";
         auto req_bt = dynamic_cast<const jlm::hls::bundletype*>(&mem_reqs[i]->type());
         auto has_write = req_bt->get_element_type("write") != nullptr;
@@ -203,6 +228,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "                default:\n"
         "                    assert(false);\n"
         "            }\n"
+        "            mem_resp["<< i <<"]->back().data = 0xFFFFFFFF;\n"
         "        } else {\n";
         } else {
             cpp <<
@@ -215,29 +241,38 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"        }\n"
 		"        switch (top->mem_" << i << "_req_data_size) {\n"
 		"            case 0:\n"
-		"                mem_resp_data["<<i<<"] = *(uint8_t *) addr;\n"
+		"                mem_resp["<<i<<"]->back().data = *(uint8_t *) addr;\n"
 		"                break;\n"
 		"            case 1:\n"
-		"                mem_resp_data["<<i<<"] = *(uint16_t *) addr;\n"
+		"                mem_resp["<<i<<"]->back().data = *(uint16_t *) addr;\n"
 		"                break;\n"
 		"            case 2:\n"
-		"                mem_resp_data["<<i<<"] = *(uint32_t *) addr;\n"
+		"                mem_resp["<<i<<"]->back().data = *(uint32_t *) addr;\n"
 		"                break;\n"
 		"            case 3:\n"
-		"                mem_resp_data["<<i<<"] = *(uint64_t *) addr;\n"
+		"                mem_resp["<<i<<"]->back().data = *(uint64_t *) addr;\n"
 		"                break;\n"
 		"            default:\n"
 		"                assert(false);\n"
 		"        }\n"
-		"    }\n";
+        "    } else if (mem_resp["<<i<<"]->size()<MEM_LATENCY){\n"
+        "        mem_resp["<<i<<"]->emplace();\n"
+        "    }\n";
         }
         cpp <<
 		"    assert(!Verilated::gotFinish());\n"
 		"    top->clk = 0;\n"
 		"    top->eval();\n"
 		"    tfp->dump(main_time * 2 + 1);\n"
+		"//    tfp->flush();\n"
 		"    main_time++;\n"
 		"}\n"
+        "\n"
+        "void clock_cycle() {\n"
+        "    posedge();\n"
+        "    finish_clock_cycle();\n"
+        "}\n"
+        "\n"
 		"extern \"C\"\n"// TODO: parameter for linkage type here
 		"{\n";
 	// imports
@@ -310,14 +345,17 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"        verilator_finish();\n"
 		"        exit(-1);\n"
 		"    }\n"
+        "    posedge();\n"
 		"    top->i_valid = 1;\n"
 		"    top->o_ready = 1;\n"
-		"    clock_cycle();\n"
-		"    top->i_valid = 0;\n";
+		"    finish_clock_cycle();\n"
+        "    posedge();\n"
+        "    top->i_valid = 0;\n";
 	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
 		cpp << "    top->i_data_" << i << " = 0;\n";
 	}
 	cpp <<
+		"    finish_clock_cycle();\n"
 		"    for (int i = 0; i < TIMEOUT && !top->o_valid; i++) {\n"
 		"        clock_cycle();\n"
 		"    }\n"

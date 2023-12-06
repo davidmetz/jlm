@@ -695,6 +695,68 @@ namespace jlm {
             }
         };
 
+        class addr_queue_op final : public jive::simple_op {
+        public:
+            virtual
+            ~addr_queue_op() {}
+
+            addr_queue_op(
+                    const PointerType & pointerType,
+                    size_t capacity)
+                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), capacity(capacity) {}
+
+            bool
+            operator==(const jive::operation &other) const noexcept override {
+                // TODO:
+                auto ot = dynamic_cast<const addr_queue_op *>(&other);
+                // check predicate and value
+                return ot
+                       && ot->argument(1).type() == argument(1).type()
+                       && ot->narguments() == narguments();
+            }
+
+            static std::vector<jive::port>
+            CreateInPorts(const PointerType & pointerType)
+            {
+                // check, enq
+                std::vector<jive::port> ports(2, {pointerType});
+                ports.emplace_back(MemoryStateType::Create()); // deq
+                return ports;
+            }
+
+            static std::vector<jive::port>
+            CreateOutPorts(const PointerType & pointerType)
+            {
+                return {pointerType};
+            }
+
+            std::string
+            debug_string() const override {
+                return "HLS_ADDR_QUEUE_"+ argument(narguments()-1).type().debug_string();
+            }
+
+            std::unique_ptr<jive::operation>
+            copy() const override {
+                return std::unique_ptr<jive::operation>(new addr_queue_op(*this));
+            }
+
+            static jive::output *
+            create(
+                    jive::output &check,
+                    jive::output &enq,
+                    jive::output &deq,
+                    size_t capacity = 10
+            ) {
+                auto region = check.region();
+                auto pointerType = dynamic_cast<const PointerType*>(&check.type());
+                addr_queue_op op(*pointerType, capacity);
+                return jive::simple_node::create_normalized(region, op, {&check, &enq, &deq})[0];
+            }
+
+
+            size_t capacity;
+        };
+
         class state_gate_op final : public jive::simple_op {
         public:
             virtual
@@ -739,8 +801,8 @@ namespace jlm {
                     const std::vector<jive::output *> &states
             ) {
                 auto region = addr.region();
-                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
-                state_gate_op op(*pointerType, states.size());
+//                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
+                state_gate_op op(addr.type(), states.size());
                 std::vector<jive::output*> inputs;
                 inputs.push_back(&addr);
                 inputs.insert(inputs.end(), states.begin(), states.end());

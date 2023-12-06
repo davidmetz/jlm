@@ -55,8 +55,14 @@ jive::simple_node *replace_load(jive::simple_node *orig, jive::output *resp) {
     for (size_t i = 1; i < orig->ninputs(); ++i) {
         states.push_back(orig->input(i)->origin());
     }
-    auto outputs = jlm::hls::load_op::create(*addr, states, *resp);
-    auto nn = dynamic_cast<jive::node_output*>(outputs[0])->node();
+    jive::node* nn;
+    if(states.empty()){
+        auto outputs = jlm::hls::decoupled_load_op::create(*addr, *resp);
+        nn = dynamic_cast<jive::node_output*>(outputs[0])->node();
+    } else{
+        auto outputs = jlm::hls::load_op::create(*addr, states, *resp);
+        nn = dynamic_cast<jive::node_output*>(outputs[0])->node();
+    }
     for (size_t i = 0; i < orig->noutputs(); ++i) {
         orig->output(i)->divert_users(nn->output(i));
     }

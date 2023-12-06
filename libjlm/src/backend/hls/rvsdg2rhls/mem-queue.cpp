@@ -113,39 +113,38 @@ jive::output * route_to_region(jive::region *target, jive::output *out){
 }
 
 jive::output * separate_load_edge(
-        jive::output * common_edge,
-        jive::output *load_edge,
-        jive::simple_node * load,
-        jive::output ** new_common_edge,
+        jive::output * mem_edge,
+        jive::output *addr_edge,
+        jive::simple_node ** load,
+        jive::output ** new_mem_edge,
         std::vector<jive::output*> &store_addresses,
         std::vector<jive::output*> &store_dequeues
 //        jive::substitution_map & smap
         ){
-    // follows along common edge and routes load edge through the same regions
+    // follows along mem edge and routes addr edge through the same regions
     // redirects the supplied load to the new edge and adds it to stores
     // the new edge might be routed through unnecessary regions. This should be fixed by running DNE
     while (true){
         // each iteration should update common_edge and/or new_edge
-        assert(common_edge->nusers() == 1);
-        if(load_edge->nusers() != 1){
-            dump_xml(load_edge->region(), "no_users.rvsdg");
+        assert(mem_edge->nusers() == 1);
+        if(addr_edge->nusers() != 1){
+            dump_xml(addr_edge->region(), "no_users.rvsdg");
         }
-        assert(load_edge->nusers() == 1);
-        assert(common_edge != load_edge);
-        auto user = *common_edge->begin();
-        auto load_user = *load_edge->begin();
+        assert(addr_edge->nusers() == 1);
+        assert(mem_edge != addr_edge);
+        auto user = *mem_edge->begin();
+        auto addr_edge_user = *addr_edge->begin();
         if(auto res = dynamic_cast<jive::result*>(user)){
             JLM_UNREACHABLE("THIS SHOULD NOT HAPPEN");
             // end of region reached
-//            return res;
         } else if (auto sti = dynamic_cast<jive::structural_input*>(user)){
             auto loop_node = dynamic_cast<jlm::hls::loop_node*>(sti->node());
             assert(loop_node);
             jive::output *buffer;
 
-            load_edge = loop_node->add_loopvar(load_edge, &buffer);
-            load_user->divert_to(load_edge);
-            common_edge = find_loop_output(sti);
+            addr_edge = loop_node->add_loopvar(addr_edge, &buffer);
+            addr_edge_user->divert_to(addr_edge);
+            mem_edge = find_loop_output(sti);
             auto sti_arg = sti->arguments.first();
             assert(sti_arg->nusers() == 1);
             auto user = *sti_arg->begin();
@@ -160,29 +159,29 @@ jive::output * separate_load_edge(
             if (auto br = dynamic_cast<const jlm::hls::branch_op *>(op)) {
                 if(!br->loop){
                     // start of gamma
-                    auto load_branch_out = jlm::hls::branch_op::create(*sn->input(0)->origin(), *load_edge, false);
+                    auto load_branch_out = jlm::hls::branch_op::create(*sn->input(0)->origin(), *addr_edge, false);
                     for (size_t i = 0; i < sn->noutputs(); ++i) {
                         // dummy user for edge
                         jlm::hls::sink_op::create(*load_branch_out[i])[0];
                         auto dummy_user = dynamic_cast<jive::simple_input*>(*load_branch_out[i]->begin())->node();
                         // need both load and common edge here
-                        load_branch_out[i] = separate_load_edge(sn->output(i), load_branch_out[i], load, &common_edge, store_addresses, store_dequeues);
+                        load_branch_out[i] = separate_load_edge(sn->output(i), load_branch_out[i], load, &mem_edge, store_addresses, store_dequeues);
                         assert(load_branch_out[i]->nusers() == 1);
                         assert(dummy_user->input(0)->origin() == load_branch_out[i]);
                         remove(dummy_user);
                     }
                     // create mux
-                    assert(common_edge->nusers() == 1);
-                    auto mux_user = dynamic_cast<jive::simple_input*>(*common_edge->begin());
+                    assert(mem_edge->nusers() == 1);
+                    auto mux_user = dynamic_cast<jive::simple_input*>(*mem_edge->begin());
                     assert(mux_user);
                     auto mux_op = dynamic_cast<const jlm::hls::mux_op*>(&mux_user->node()->operation());
                     assert(mux_op);
-                    load_edge = jlm::hls::mux_op::create(*mux_user->node()->input(0)->origin(), load_branch_out, mux_op->discarding, false)[0];
-                    load_user->divert_to(load_edge);
-                    common_edge = mux_user->node()->output(0);
+                    addr_edge = jlm::hls::mux_op::create(*mux_user->node()->input(0)->origin(), load_branch_out, mux_op->discarding, false)[0];
+                    addr_edge_user->divert_to(addr_edge);
+                    mem_edge = mux_user->node()->output(0);
                 } else {
                     // end of loop
-                    auto load_user_input = dynamic_cast<jive::simple_input*>(load_user);
+                    auto load_user_input = dynamic_cast<jive::simple_input*>(addr_edge_user);
                     assert(load_user_input);
                     assert(dynamic_cast<const jlm::hls::branch_op *>(&load_user_input->node()->operation()));
                     return nullptr;
@@ -190,41 +189,51 @@ jive::output * separate_load_edge(
             } else if (auto mx = dynamic_cast<const jlm::hls::mux_op *>(op)) {
                 assert(!mx->loop);
                 // end of gamma
-                if(!new_common_edge){
-                    dump_xml(load_edge->region(), "no_new_common_edge.rvsdg");
+                if(!new_mem_edge){
+                    dump_xml(addr_edge->region(), "no_new_common_edge.rvsdg");
                 }
-                assert(new_common_edge);
-                *new_common_edge = common_edge;
-                return load_edge;
+                assert(new_mem_edge);
+                *new_mem_edge = mem_edge;
+                return addr_edge;
             } else if (dynamic_cast<const jlm::StoreOperation *>(op)) {
-                // TODO: handle case where input to store is already a MemStateMerge
-                auto sg_out = jlm::hls::state_gate_op::create(*sn->input(0)->origin(), {load_edge});
-                auto load_split = jlm::MemStateSplitOperator::Create(sg_out[1], 2);
-                load_edge = load_split[0];
-                load_user->divert_to(load_edge);
-                store_addresses.push_back(route_to_region(load->region(), sg_out[0]));
-                std::vector<jive::output*> merge_operands({common_edge, load_split[1]});
-                user->divert_to(jlm::MemStateMergeOperator::Create(merge_operands));
-                common_edge = sn->output(0);
-                assert(common_edge->nusers() == 1);
-                user = *common_edge->begin();
+                auto sg_out = jlm::hls::state_gate_op::create(*sn->input(0)->origin(), {addr_edge});
+                addr_edge = sg_out[1];
+                addr_edge_user->divert_to(addr_edge);
+                store_addresses.push_back(route_to_region((*load)->region(), sg_out[0]));
+                mem_edge = sn->output(0);
+                assert(mem_edge->nusers() == 1);
+                user = *mem_edge->begin();
                 // TODO: handle case where input to store is already a MemStateSplit
-                auto store_split = jlm::MemStateSplitOperator::Create(common_edge, 2);
-                common_edge = store_split[0];
-                user->divert_to(common_edge);
-                store_dequeues.push_back(route_to_region(load->region(), store_split[1]));
-            } else if (dynamic_cast<const jlm::LoadOperation *>(op)) {
+                auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, 2);
+                mem_edge = store_split[0];
+                user->divert_to(mem_edge);
+                store_dequeues.push_back(route_to_region((*load)->region(), store_split[1]));
+            } else if (auto lo = dynamic_cast<const jlm::LoadOperation *>(op)) {
                 assert(sn->noutputs() == 2);
-                if(sn == load){
-                    dump_xml(load->region(), "before_divert1.rvsdg");
-                    si->divert_to(load_edge);
-                    sn->output(1)->divert_users(common_edge);
-                    load_edge = sn->output(1);
-                    dump_xml(load->region(), "before_divert2.rvsdg");
-                    load_user->divert_to(load_edge);
+                if(sn == *load){
+                    // create state gate for addr edge
+                    auto addr_sg_out = jlm::hls::state_gate_op::create(*sn->input(0)->origin(), {addr_edge});
+                    addr_edge = addr_sg_out[1];
+                    addr_edge_user->divert_to(addr_edge);
+                    auto addr_sg_out2 = jlm::hls::state_gate_op::create(*addr_sg_out[0], {addr_edge});
+                    addr_edge = addr_sg_out2[1];
+                    addr_edge_user->divert_to(addr_edge);
+                    // remove state edges from load
+                    auto new_load_outputs = jlm::LoadNode::Create(addr_sg_out2[0], {}, lo->GetAlignment());
+                    // create state gate for mem edge and load data
+                    auto mem_sg_out = jlm::hls::state_gate_op::create(*new_load_outputs[0], {mem_edge});
+                    mem_edge = mem_sg_out[1];
+
+                    sn->output(0)->divert_users(mem_sg_out[0]);
+                    si->divert_to(addr_edge);
+                    sn->output(1)->divert_users(mem_edge);
+                    remove(sn);
+                    *load = dynamic_cast<jive::simple_output*>(new_load_outputs[0])->node();
                 } else {
-                    common_edge = sn->output(1);
+                    mem_edge = sn->output(1);
                 }
+            } else if (dynamic_cast<const jlm::hls::state_gate_op *>(op)) {
+                mem_edge = sn->output(1);
             } else if (auto co = dynamic_cast<const jlm::CallOperation *>(op)) {
                 // TODO: verify this is the right type of function call
 //                if(decouple_nodes.end() != std::find(decouple_nodes.begin(), decouple_nodes.end(),sn)){
@@ -237,7 +246,7 @@ jive::output * separate_load_edge(
                 throw jlm::error("not implemented yet");
 
             } else if (auto co = dynamic_cast<const jlm::MemStateMergeOperator *>(op)) {
-                auto si_load_user =dynamic_cast<jive::simple_input*>(load_user);
+                auto si_load_user =dynamic_cast<jive::simple_input*>(addr_edge_user);
                 if(si_load_user && si->node() == sn){
                     return nullptr;
                 }
@@ -287,39 +296,38 @@ jive::output * process_loops(jive::output * state_edge){
             auto ln = dynamic_cast<jlm::hls::loop_node*>(sti->node());
             assert(ln);
             // update to output of loop
-            auto common_edge_after_loop = find_loop_output(sti);
-            assert(common_edge_after_loop->nusers() == 1);
-            auto common_user = *common_edge_after_loop->begin();
+            auto mem_edge_after_loop = find_loop_output(sti);
+            assert(mem_edge_after_loop->nusers() == 1);
+            auto common_user = *mem_edge_after_loop->begin();
 
             std::vector<jive::simple_node *> load_nodes;
             std::vector<jive::simple_node *> store_nodes;
             std::unordered_set<jive::output*> visited;
             // this is a hack to keep search within the loop
-            visited.insert(common_edge_after_loop);
+            visited.insert(mem_edge_after_loop);
             find_load_store(&*sti->arguments.begin(), load_nodes, store_nodes, visited);
-            if(load_nodes.size()+store_nodes.size()<2){
-                state_edge = common_edge_after_loop;
-                continue;
-            }
+//            if(load_nodes.size()+store_nodes.size()<2){
+//                state_edge = mem_edge_after_loop;
+//                continue;
+//            }
             auto split_states = jlm::MemStateSplitOperator::Create(sti->origin(), load_nodes.size()+1);
             // handle common edge
-            auto common_edge = split_states[0];
-            sti->divert_to(common_edge);
-            split_states[0] = common_edge_after_loop;
+            auto mem_edge = split_states[0];
+            sti->divert_to(mem_edge);
+            split_states[0] = mem_edge_after_loop;
             state_edge = jlm::MemStateMergeOperator::Create(split_states);
             common_user->divert_to(state_edge);
             for (size_t i = 0; i < load_nodes.size(); ++i) {
                 auto load = load_nodes[i];
-                auto load_edge = split_states[1+i];
+                auto addr_edge = split_states[1 + i];
                 std::vector<jive::output*> store_addresses;
                 std::vector<jive::output*> store_dequeues;
-//                jive::substitution_map smap;
-//                smap.insert(common_edge, load_edge);
-                separate_load_edge(common_edge, load_edge, load, nullptr, store_addresses, store_dequeues);
+                separate_load_edge(mem_edge, addr_edge, &load, nullptr, store_addresses, store_dequeues);
                 assert(store_nodes.size() == store_addresses.size());
                 assert(store_nodes.size() == store_dequeues.size());
+                auto state_gate_addr_in = dynamic_cast<jive::simple_output*>(load->input(0)->origin())->node()->input(0);
                 for (size_t j = 0; j < store_nodes.size(); ++j) {
-                    load->input(0)->divert_to(jlm::hls::addr_queue_op::create(*load->input(0)->origin(), *store_addresses[i], *store_dequeues[i]));
+                    state_gate_addr_in->divert_to(jlm::hls::addr_queue_op::create(*state_gate_addr_in->origin(), *store_addresses[i], *store_dequeues[i]));
                 }
             }
         } else {
