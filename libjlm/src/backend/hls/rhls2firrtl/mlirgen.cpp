@@ -311,6 +311,71 @@ jlm::hls::MLIRGenImpl::MlirGenSink(const jive::simple_node *node) {
 }
 
 circt::firrtl::FModuleOp
+jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jive::simple_node *node) {
+	// Create the module and its input/output ports
+	auto module = nodeToModule(node);
+	auto body = module.getBody();
+
+    auto clock = GetClockSignal(module);
+    auto reset = GetResetSignal(module);
+    auto zeroBitValue = GetConstant(body, 1, 0);
+    auto oneBitValue = GetConstant(body, 1, 1);
+
+    // Input signals
+    auto predBundle = GetInPort(module, 0);
+    auto predReady = GetSubfield(body, predBundle, "ready");
+    auto predValid = GetSubfield(body, predBundle, "valid");
+    auto predData  = GetSubfield(body, predBundle, "data");
+
+    auto inBundle = GetInPort(module, 1);
+    auto inReady = GetSubfield(body, inBundle, "ready");
+    auto inValid = GetSubfield(body, inBundle, "valid");
+    auto inData  = GetSubfield(body, inBundle, "data");
+
+    // Output signals
+    auto outBundle = GetOutPort(module, 0);
+    auto outReady = GetSubfield(body, outBundle, "ready");
+    auto outValid = GetSubfield(body, outBundle, "valid");
+    auto outData = GetSubfield(body, outBundle, "data");
+
+    auto validReg = builder.create<circt::firrtl::RegResetOp>(
+            location,
+            GetIntType(1),
+            clock,
+            reset,
+            zeroBitValue,
+            builder.getStringAttr("valid_reg"));
+    body->push_back(validReg);
+    auto dataReg = builder.create<circt::firrtl::RegOp>(
+            location,
+            GetIntType(&node->input(1)->type()),
+            clock,
+            builder.getStringAttr("data_reg"));
+    body->push_back(dataReg);
+    // in ready when buffer empty and output ready
+    Connect(body, inReady, AddAndOp(body, outReady, AddNotOp(body, validReg)));
+    Connect(body, outData, dataReg);
+
+    // out valid when buffer valid and getting positive predicate, or when buffer empty and input valid
+    auto dataPassThrough = AddAndOp(body, inValid, AddNotOp(body, validReg));
+    Connect(body, outValid, AddOrOp(body, AddAndOp(body, validReg, AddAndOp(body, predValid, predData)), dataPassThrough));
+    auto dataPassThroughBody = AddWhenOp(body, dataPassThrough, false).getThenBodyBuilder().getBlock();
+    Connect(dataPassThroughBody, outData, inData);
+
+    auto clearBuffer = AddAndOp(body, predValid, AddNotOp(body, predData));
+    auto clearBufferBody = AddWhenOp(body, clearBuffer, false).getThenBodyBuilder().getBlock();
+    Connect(clearBufferBody, validReg, zeroBitValue);
+    Connect(body, predReady, AddOrOp(body, clearBuffer, AddAndOp(body, outReady, outValid)));
+
+    auto inFire = AddAndOp(body, inReady, inValid);
+    auto inFireBody = AddWhenOp(body, inFire, false).getThenBodyBuilder().getBlock();
+    Connect(inFireBody, validReg, oneBitValue);
+    Connect(inFireBody, dataReg, inData);
+
+	return module;
+}
+
+circt::firrtl::FModuleOp
 jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 	// Create the module and its input/output ports
 	auto module = nodeToModule(node);
@@ -1999,6 +2064,8 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenSink(node);
 	} else if (dynamic_cast<const hls::fork_op *>(&(node->operation()))) {
 		return MlirGenFork(node);
+	} else if (dynamic_cast<const hls::loop_constant_buffer_op *>(&(node->operation()))) {
+		return MlirGenLoopConstBuffer(node);
 	} else if (dynamic_cast<const jlm::LoadOperation *>(&(node->operation()))) {
 		return MlirGenMem(node);
 	} else if (dynamic_cast<const jlm::StoreOperation *>(&(node->operation()))) {

@@ -24,6 +24,14 @@ jive::structural_output *jlm::hls::loop_node::add_loopvar(jive::output *origin, 
     return output;
 }
 
+jive::output *jlm::hls::loop_node::add_loopconst(jive::output *origin) {
+    auto input = jive::structural_input::create(this, origin, origin->type());
+
+    auto argument_in = jive::argument::create(subregion(), input, origin->type());
+    auto buffer = hls::loop_constant_buffer_op::create(*predicate_buffer(), *argument_in)[0];
+    return buffer;
+}
+
 jlm::hls::loop_node *jlm::hls::loop_node::copy(jive::region *region, jive::substitution_map &smap) const {
     auto nf = graph()->node_normal_form(typeid(jive::operation));
     nf->set_mutable(false);

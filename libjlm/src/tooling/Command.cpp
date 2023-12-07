@@ -413,7 +413,7 @@ FirtoolCommand::ToString() const {
     firtoolpath.to_str(), " ",
     " -format=fir --verilog ",
     InputFile().to_str(),
-    " > ", OutputFile().to_str());
+    " -o=", OutputFile().to_str());
 }
 
 void

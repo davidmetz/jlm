@@ -208,7 +208,8 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node *ln) {
 	dot << "{rank=same ";
 	for (auto node: jive::topdown_traverser(sr)) {
 		auto mx = dynamic_cast<const hls::mux_op*>(&node->operation());
-		if(mx && !mx->discarding && mx->loop){
+		auto lc = dynamic_cast<const hls::loop_constant_buffer_op*>(&node->operation());
+		if((mx && !mx->discarding && mx->loop)||lc){
 			dot << get_node_name(node) << " ";
 		}
 //        // also have the fork after the pred buf here

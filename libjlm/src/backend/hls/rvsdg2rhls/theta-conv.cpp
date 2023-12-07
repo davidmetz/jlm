@@ -17,13 +17,19 @@ jlm::hls::theta_conv(jive::theta_node *theta) {
 
 	// add loopvars and populate the smap
 	for (size_t i = 0; i < theta->ninputs(); i++) {
-		jive::output *buffer;
-		loop->add_loopvar(theta->input(i)->origin(), &buffer);
-		smap.insert(theta->input(i)->argument(), buffer);
-		// buffer out is only used by branch
-		branches.push_back(*buffer->begin());
-		// divert theta outputs
-		theta->output(i)->divert_users(loop->output(i));
+        if(theta->input(i)->result()->origin() == theta->input(i)->argument()){
+            // value is constant in loop
+            smap.insert(theta->input(i)->argument(), loop->add_loopconst(theta->input(i)->origin()));
+            branches.push_back(nullptr);
+        } else{
+            jive::output *buffer;
+            loop->add_loopvar(theta->input(i)->origin(), &buffer);
+            smap.insert(theta->input(i)->argument(), buffer);
+            // buffer out is only used by branch
+            branches.push_back(*buffer->begin());
+            // divert theta outputs
+            theta->output(i)->divert_users(loop->output(loop->noutputs()-1));
+        }
 	}
 
 
@@ -33,7 +39,9 @@ jlm::hls::theta_conv(jive::theta_node *theta) {
 	// connect predicate/branches in loop to results
 	loop->set_predicate(smap.lookup(theta->predicate()->origin()));
 	for (size_t i = 0; i < theta->ninputs(); i++) {
-		branches[i]->divert_to(smap.lookup(theta->input(i)->result()->origin()));
+        if(branches[i]){
+            branches[i]->divert_to(smap.lookup(theta->input(i)->result()->origin()));
+        }
 	}
 
 	remove(theta);
