@@ -278,6 +278,44 @@ namespace jlm {
 			}
 		};
 
+		class loop_constant_buffer_op final : public jive::simple_op {
+		public:
+			virtual
+			~loop_constant_buffer_op() {}
+
+			loop_constant_buffer_op(const jive::ctltype &ctltype, const jive::type &type)
+					: jive::simple_op({ctltype, type}, {type}) {}
+
+			bool
+			operator==(const jive::operation &other) const noexcept override {
+				auto ot = dynamic_cast<const loop_constant_buffer_op *>(&other);
+				return ot && ot->result(0).type() == result(0).type() && ot->argument(0).type() == argument(0).type();
+			}
+
+			std::string
+			debug_string() const override {
+				return "HLS_LOOP_CONST_BUF";
+			}
+
+			std::unique_ptr<jive::operation>
+			copy() const override {
+				return std::unique_ptr<jive::operation>(new loop_constant_buffer_op(*this));
+			}
+
+			static std::vector<jive::output *>
+			create(
+					jive::output &predicate,
+					jive::output &value
+			) {
+				auto region = predicate.region();
+				auto ctl = dynamic_cast<const jive::ctltype *>(&predicate.type());
+				if (!ctl)
+					throw jlm::error("Predicate needs to be a ctltype.");
+				loop_constant_buffer_op op(*ctl, value.type());
+				return jive::simple_node::create_normalized(region, op, {&predicate, &value});
+			}
+		};
+
 		class buffer_op final : public jive::simple_op {
 		public:
 			virtual
@@ -551,9 +589,11 @@ namespace jlm {
 
 			void set_predicate(jive::output *p);
 
-
 			jive::structural_output *
 			add_loopvar(jive::output *origin, jive::output **buffer = nullptr);
+
+			jive::output *
+			add_loopconst(jive::output *origin);
 
             backedge_argument * add_backedge(const jive::type & type);
 
