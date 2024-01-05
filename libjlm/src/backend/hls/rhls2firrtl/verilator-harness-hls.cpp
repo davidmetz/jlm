@@ -180,7 +180,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "    top->mem_" << i << "_req_ready = true;\n";
     }
     cpp <<
-        "    top->eval();\n";
+        "    top->eval();\n"
+        "    // dump before trying to access memory\n"
+        "    tfp->dump(main_time * 2);\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
         "    if (top->mem_" << i << "_res_valid && top->mem_" << i << "_res_ready) {\n"
@@ -189,12 +191,6 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "        mem_resp[" << i << "]->pop();\n"
         "    }\n";
     }
-    cpp <<
-        "    // evaluate for a second time to be able to set req to ready if resp fires\n"
-        "    top->eval();\n";
-    cpp <<
-		"    // dump before trying to access memory\n"
-        "    tfp->dump(main_time * 2);\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
 		"    // mem_" << i << "\n"
