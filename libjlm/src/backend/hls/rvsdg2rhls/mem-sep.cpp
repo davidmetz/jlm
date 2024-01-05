@@ -38,8 +38,7 @@ jlm::hls::GetMemoryStateArgument(const jlm::lambda::node & lambda)
         if (jive::is<jlm::MemoryStateType>(argument->type()))
             return argument;
     }
-
-    JLM_UNREACHABLE("This should have never happened!");
+    return nullptr;
 }
 
 jive::result *
@@ -102,6 +101,10 @@ void jlm::hls::mem_sep_independent(jive::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
+    if(!state_arg){
+        //no memstate - i.e. no memory used
+        return;
+    }
     auto state_user = *state_arg->begin();
     std::vector<jive::simple_node *> mem_nodes;
     gather_mem_nodes(lambda_region, mem_nodes);
@@ -218,6 +221,10 @@ void jlm::hls::mem_sep_argument(jive::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
+    if(!state_arg){
+        //no memstate - i.e. no memory used
+        return;
+    }
     auto state_user = *state_arg->begin();
     port_load_store_decouple port_nodes;
     trace_pointer_arguments(lambda, port_nodes);
