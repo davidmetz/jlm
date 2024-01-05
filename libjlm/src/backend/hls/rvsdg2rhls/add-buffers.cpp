@@ -28,7 +28,7 @@ jlm::hls::add_buffers(jive::region *region, bool pass_through) {
                 std::vector<jive::input *> old_users(out->begin(), out->end());
                 jive::output* new_out;
                 if(pass_through){
-                    new_out = buffer_op::create(*out, 10, true)[0];
+                    new_out = buffer_op::create(*out, 20, true)[0];
                 } else{
                     new_out = buffer_op::create(*out, 1, false)[0];
                 }
