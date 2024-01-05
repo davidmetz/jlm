@@ -2064,10 +2064,10 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		return MlirGenFork(node);
 	} else if (dynamic_cast<const hls::loop_constant_buffer_op *>(&(node->operation()))) {
 		return MlirGenLoopConstBuffer(node);
-	} else if (dynamic_cast<const jlm::LoadOperation *>(&(node->operation()))) {
-		return MlirGenMem(node);
-	} else if (dynamic_cast<const jlm::StoreOperation *>(&(node->operation()))) {
-		return MlirGenMem(node);
+//	} else if (dynamic_cast<const jlm::LoadOperation *>(&(node->operation()))) {
+//		return MlirGenMem(node);
+//	} else if (dynamic_cast<const jlm::StoreOperation *>(&(node->operation()))) {
+//		return MlirGenMem(node);
 	} else if (dynamic_cast<const hls::load_op *>(&(node->operation()))) {
 		return MlirGenHlsLoad(node);
 	} else if (dynamic_cast<const hls::decoupled_load_op *>(&(node->operation()))) {
