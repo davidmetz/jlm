@@ -592,6 +592,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     // Create the module and its input/output ports
     auto module = nodeToModule(node, false);
     auto body = module.getBody();
+    auto op =dynamic_cast<const jlm::hls::mem_req_op*>(&node->operation());
 
     auto reqType = dynamic_cast<const jlm::hls::bundletype*>(&node->output(0)->type());
     // TODO: more robust check
@@ -627,32 +628,29 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     llvm::SmallVector<mlir::Value> storeIds;
     // the ports for loads come first and consist only of addresses. Stores have both addresses and data
     size_t id = 0;
-    for (size_t i = 0; i < node->ninputs(); ++i) {
-        if(i+1==node->ninputs() || dynamic_cast<const PointerType *>(&node->input(i+1)->type())){
-            // Load
-            JLM_ASSERT(storeAddrTypes.empty()); // no stores yet
-            loadAddrTypes.push_back(&node->input(i)->type());
-            auto bundle = GetInPort(module, i);
-            loadAddrReadys.push_back(GetSubfield(body, bundle, "ready"));
-            loadAddrValids.push_back(GetSubfield(body, bundle, "valid"));
-            loadAddrDatas.push_back(GetSubfield(body, bundle, "data"));
-            loadIds.push_back(GetConstant(body, 8, id));
-            id++;
-        } else{
-            // Store
-            storeAddrTypes.push_back(&node->input(i)->type());
-            auto addrBundle = GetInPort(module, i);
-            storeAddrReadys.push_back(GetSubfield(body, addrBundle, "ready"));
-            storeAddrValids.push_back(GetSubfield(body, addrBundle, "valid"));
-            storeAddrDatas.push_back(GetSubfield(body, addrBundle, "data"));
-            i++;
-            auto dataBundle = GetInPort(module, i);
-            storeDataReadys.push_back(GetSubfield(body, dataBundle, "ready"));
-            storeDataValids.push_back(GetSubfield(body, dataBundle, "valid"));
-            storeDataDatas.push_back(GetSubfield(body, dataBundle, "data"));
-            storeIds.push_back(GetConstant(body, 8, id));
-            id++;
-        }
+    for (size_t i = 0; i < op->get_nloads(); ++i) {
+        loadAddrTypes.push_back(&node->input(i)->type());
+        auto bundle = GetInPort(module, i);
+        loadAddrReadys.push_back(GetSubfield(body, bundle, "ready"));
+        loadAddrValids.push_back(GetSubfield(body, bundle, "valid"));
+        loadAddrDatas.push_back(GetSubfield(body, bundle, "data"));
+        loadIds.push_back(GetConstant(body, 8, id));
+        id++;
+    }
+    for (size_t i = op->get_nloads(); i < node->ninputs(); ++i) {
+        // Store
+        storeAddrTypes.push_back(&node->input(i)->type());
+        auto addrBundle = GetInPort(module, i);
+        storeAddrReadys.push_back(GetSubfield(body, addrBundle, "ready"));
+        storeAddrValids.push_back(GetSubfield(body, addrBundle, "valid"));
+        storeAddrDatas.push_back(GetSubfield(body, addrBundle, "data"));
+        i++;
+        auto dataBundle = GetInPort(module, i);
+        storeDataReadys.push_back(GetSubfield(body, dataBundle, "ready"));
+        storeDataValids.push_back(GetSubfield(body, dataBundle, "valid"));
+        storeDataDatas.push_back(GetSubfield(body, dataBundle, "data"));
+        storeIds.push_back(GetConstant(body, 8, id));
+        id++;
     }
 
     auto zeroBitValue = GetConstant(body, 1,0);
@@ -3369,6 +3367,21 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
             int bytes = bits / 8;
             append.append("_");
             append.append(std::to_string(bytes));
+        }
+    }
+    if(auto op = dynamic_cast<const jlm::hls::mem_req_op *>(&node->operation())){
+        for (size_t i = 0; i < op->get_nloads(); ++i) {
+            auto dataType = &dynamic_cast<const PointerType*>(&node->input(i)->type())->GetElementType();
+            int bitWidth;
+            if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
+                bitWidth = bitType->nbits();
+            } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
+                bitWidth = 64;
+            } else{
+                throw jlm::error("unknown width for mem request");
+            }
+            append.append("_");
+            append.append(std::to_string(bitWidth));
         }
     }
     if(auto op = dynamic_cast<const jlm::hls::local_mem_op *>(&node->operation())){

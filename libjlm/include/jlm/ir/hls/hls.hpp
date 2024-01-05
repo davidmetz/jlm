@@ -946,7 +946,7 @@ namespace jlm {
             mem_req_op(
                     const std::vector<const PointerType *> &load_types,
                     const std::vector<const PointerType *> &store_types)
-                    : simple_op(CreateInPorts(load_types, store_types), CreateOutPorts(load_types, store_types)) {}
+                    : simple_op(CreateInPorts(load_types, store_types), CreateOutPorts(load_types, store_types)), nloads(load_types.size()) {}
 
             bool
             operator==(const jive::operation &other) const noexcept override {
@@ -1031,6 +1031,12 @@ namespace jlm {
                 operands.insert(operands.end(), store_operands.begin(), store_operands.end());
                 return jive::simple_node::create_normalized(region, op, operands);
             }
+
+            size_t get_nloads() const {
+                return nloads;
+            }
+        private:
+            size_t nloads;
         };
 
         class store_op final : public jive::simple_op {
