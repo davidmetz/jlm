@@ -327,16 +327,23 @@ jive::simple_node *replace_store(jive::simple_node *orig) {
 void gather_mem_nodes(
         jive::region *region,
         std::vector<jive::simple_node *> &load_nodes,
-        std::vector<jive::simple_node *> &store_nodes) {
+        std::vector<jive::simple_node *> &store_nodes,
+        std::vector<jive::simple_node *> &decouple_nodes,
+        std::unordered_set<jive::simple_node *> exclude) {
     for (auto &node: jive::topdown_traverser(region)) {
         if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
             for (size_t n = 0; n < structnode->nsubregions(); n++)
-                gather_mem_nodes(structnode->subregion(n), load_nodes, store_nodes);
+                gather_mem_nodes(structnode->subregion(n), load_nodes, store_nodes, decouple_nodes, exclude);
         } else if (auto simplenode = dynamic_cast<jive::simple_node * >(node)) {
-            if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
+            if(exclude.find(simplenode) != exclude.end()){
+                continue;
+            } if (dynamic_cast<const jlm::StoreOperation *>(&simplenode->operation())) {
                 store_nodes.push_back(simplenode);
             } else if (dynamic_cast<const jlm::LoadOperation *>(&simplenode->operation())) {
                 load_nodes.push_back(simplenode);
+            } else if (auto co = dynamic_cast<const jlm::CallOperation *>(&simplenode->operation())) {
+                // TODO: verify this is the right type of function call
+                decouple_nodes.push_back(simplenode);
             }
         }
     }
@@ -404,14 +411,24 @@ void jlm::hls::trace_pointer_arguments(const jlm::lambda::node * ln, port_load_s
 
 void jlm::hls::mem_conv(jive::region *root) {
     auto lambda = dynamic_cast<jlm::lambda::node *>(root->nodes.begin().ptr());
-//    std::vector<jive::simple_node *> load_nodes;
-//    std::vector<jive::simple_node *> store_nodes;
-//    gather_mem_nodes(root, load_nodes, store_nodes);
+
     port_load_store_decouple port_nodes;
     trace_pointer_arguments(lambda, port_nodes);
-    //TODO: extra port for loads/stores not associated to a port yet (i.e. unknown base pointer)
+
+    std::unordered_set<jive::simple_node *> accounted_nodes;
     for(auto & ls: port_nodes){
         generate_mem_port(lambda, std::get<0>(ls), std::get<1>(ls), std::get<2>(ls));
+        accounted_nodes.insert(std::get<0>(ls).begin(), std::get<0>(ls).end());
+        accounted_nodes.insert(std::get<1>(ls).begin(), std::get<1>(ls).end());
+        accounted_nodes.insert(std::get<2>(ls).begin(), std::get<2>(ls).end());
+    }
+    std::vector<jive::simple_node *> unknown_load_nodes;
+    std::vector<jive::simple_node *> unknown_store_nodes;
+    std::vector<jive::simple_node *> unknown_decouple_nodes;
+    gather_mem_nodes(root, unknown_load_nodes, unknown_store_nodes, unknown_decouple_nodes, accounted_nodes);
+    if(!unknown_load_nodes.empty() || !unknown_store_nodes.empty() || !unknown_decouple_nodes.empty()){
+        // extra port for loads/stores not associated to a port yet (i.e. unknown base pointer)
+        generate_mem_port(lambda, unknown_load_nodes, unknown_store_nodes, unknown_decouple_nodes);
     }
     // remove impports for decouple_ function pointers
     dne(lambda->subregion());
