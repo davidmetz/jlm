@@ -8,11 +8,13 @@
 #include "jlm/ir/operators/lambda.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/mem-sep.hpp"
 #include "jive/view.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/mem-conv.hpp"
 #include <jive/rvsdg/substitution.hpp>
 #include <jlm/ir/hls/hls.hpp>
 #include <jive/rvsdg/theta.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include <jlm/opt/alias-analyses/Operators.hpp>
+#include <deque>
 
 void
 jlm::hls::mem_queue(jlm::RvsdgModule &rm) {
@@ -102,14 +104,38 @@ jive::structural_output * find_loop_output(jive::structural_input* sti){
     JLM_UNREACHABLE("This should never happen");
 }
 
+std::deque<jive::region *> get_parent_regions(jive::region *region) {
+    std::deque<jive::region *> regions;
+    jive::region * target_region = region;
+    while (!dynamic_cast<const jlm::lambda::operation*>(&target_region->node()->operation())){
+        regions.push_front(target_region);
+        target_region = target_region->node()->region();
+    }
+    return regions;
+}
+
 jive::output * route_to_region(jive::region *target, jive::output *out){
-    // TODO: generalized routing for nested loops
-    assert(out->region() == target);
-    auto ln = dynamic_cast<jlm::hls::loop_node*>(target->node());
-    assert(ln);
-    auto arg = ln->add_backedge(out->type());
-    arg->result()->divert_to(out);
-    return arg;
+    // create lists of nested regions
+    std::deque<jive::region *> target_regions = get_parent_regions(target);
+    std::deque<jive::region *> out_regions = get_parent_regions(out->region());
+    assert(target_regions.front() == out_regions.front());
+    // remove common ancestor regions
+    jive::region * common_region;
+    while (!target_regions.empty() && !out_regions.empty() && target_regions.front() == out_regions.front()){
+        common_region = target_regions.front();
+        target_regions.pop_front();
+        out_regions.pop_front();
+    }
+    auto common_loop = dynamic_cast<jlm::hls::loop_node*>(common_region->node());
+    assert(common_loop);
+    // route out to convergence point from out
+    jive::output * common_out = jlm::hls::route_request(common_region, out);
+    // add a backedge to prevent cycles
+    auto arg = common_loop->add_backedge(out->type());
+    arg->result()->divert_to(common_out);
+    // route inwards from convergence point to target
+    auto result = jlm::hls::route_response(target, arg);
+    return result;
 }
 
 jive::output * separate_load_edge(
@@ -132,6 +158,7 @@ jive::output * separate_load_edge(
         }
         assert(addr_edge->nusers() == 1);
         assert(mem_edge != addr_edge);
+        assert(mem_edge->region() == addr_edge->region());
         auto user = *mem_edge->begin();
         auto addr_edge_user = *addr_edge->begin();
         if(auto res = dynamic_cast<jive::result*>(user)){
@@ -203,11 +230,23 @@ jive::output * separate_load_edge(
                 mem_edge = sn->output(0);
                 assert(mem_edge->nusers() == 1);
                 user = *mem_edge->begin();
-                // TODO: handle case where input to store is already a MemStateSplit
-                auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, 2);
-                mem_edge = store_split[0];
-                user->divert_to(mem_edge);
-                store_dequeues.push_back(route_to_region((*load)->region(), store_split[1]));
+                auto ui = dynamic_cast<jive::simple_input*>(user);
+                if (ui && dynamic_cast<const jlm::MemStateSplitOperator*>(&ui->node()->operation())){
+                    auto msso = dynamic_cast<const jlm::MemStateSplitOperator*>(&ui->node()->operation());
+                    // handle case where output of store is already connected to a MemStateSplit by adding an output
+                    auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, msso->nresults()+1);
+                    for (size_t i = 0; i < msso->nresults(); ++i) {
+                        ui->node()->output(i)->divert_users(store_split[i]);
+                    }
+                    remove(ui->node());
+                    mem_edge = store_split[0];
+                    store_dequeues.push_back(route_to_region((*load)->region(), store_split.back()));
+                } else{
+                    auto store_split = jlm::MemStateSplitOperator::Create(mem_edge, 2);
+                    mem_edge = store_split[0];
+                    user->divert_to(mem_edge);
+                    store_dequeues.push_back(route_to_region((*load)->region(), store_split[1]));
+                }
             } else if (auto lo = dynamic_cast<const jlm::LoadOperation *>(op)) {
                 assert(sn->noutputs() == 2);
                 if(sn == *load){
@@ -288,6 +327,10 @@ jive::output * process_loops(jive::output * state_edge){
                 // end of lambda
                 assert(sn->noutputs() == 1);
                 return sn->output(0);
+            }  else if (dynamic_cast<const jlm::LoadOperation *>(op)) {
+                // load
+                assert(sn->noutputs() == 2);
+                state_edge = sn->output(1);
             } else {
                 assert(sn->noutputs() == 1);
                 state_edge = sn->output(0);
@@ -327,7 +370,9 @@ jive::output * process_loops(jive::output * state_edge){
                 assert(store_nodes.size() == store_dequeues.size());
                 auto state_gate_addr_in = dynamic_cast<jive::simple_output*>(load->input(0)->origin())->node()->input(0);
                 for (size_t j = 0; j < store_nodes.size(); ++j) {
-                    state_gate_addr_in->divert_to(jlm::hls::addr_queue_op::create(*state_gate_addr_in->origin(), *store_addresses[i], *store_dequeues[i]));
+                    assert(state_gate_addr_in->origin()->region() == store_addresses[j]->region());
+                    assert(store_dequeues[j]->region() == store_addresses[j]->region());
+                    state_gate_addr_in->divert_to(jlm::hls::addr_queue_op::create(*state_gate_addr_in->origin(), *store_addresses[j], *store_dequeues[j]));
                 }
             }
         } else {
@@ -340,6 +385,10 @@ void jlm::hls::mem_queue(jive::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.first());
     auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
+    if(!state_arg){
+        //no memstate - i.e. no memory used
+        return;
+    }
     assert(state_arg->nusers()==1);
     auto state_user = *state_arg->begin();
     auto entry_input = dynamic_cast<jive::simple_input*>(state_user);
