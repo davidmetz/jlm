@@ -25,7 +25,6 @@ jlm::hls::DotHLS::argument_to_dot(jive::argument *port) {
 	auto name = get_port_name(port);
 
 	auto dot = \
-        "{rank=source; " +
 		name +
 		" [shape=plaintext label=<\n"
 		"            <TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n"
@@ -35,7 +34,7 @@ jlm::hls::DotHLS::argument_to_dot(jive::argument *port) {
 		"</FONT></TD>\n"
 		"                </TR>\n"
 		"            </TABLE>\n"
-		">];}\n";
+		">];\n";
 	return dot;
 }
 
@@ -303,6 +302,16 @@ jlm::hls::DotHLS::subregion_to_dot(jive::region *sr) {
 	for (size_t i = 0; i < sr->narguments(); ++i) {
 		dot << argument_to_dot(sr->argument(i));
 	}
+    //order arguments horizontally
+    dot << "{rank=source; ";
+	for (size_t i = 0; i < sr->narguments(); ++i) {
+        if(i>0){
+            dot << " -> ";
+        }
+		dot << get_port_name(sr->argument(i));
+	}
+    dot << "[style = invis]}";
+
 	for (size_t i = 0; i < sr->nresults(); ++i) {
 		dot << result_to_dot(sr->result(i));
 	}
