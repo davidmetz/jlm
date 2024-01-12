@@ -204,7 +204,7 @@ separate_load_edge(
     assert(mem_edge->region() == addr_edge->region());
     auto user = *mem_edge->begin();
     auto addr_edge_user = *addr_edge->begin();
-    if (auto res = dynamic_cast<jlm::rvsdg::result *>(user))
+    if (dynamic_cast<jlm::rvsdg::result *>(user))
     {
       JLM_UNREACHABLE("THIS SHOULD NOT HAPPEN");
       // end of region reached
@@ -375,7 +375,7 @@ separate_load_edge(
       {
         mem_edge = sn->output(1);
       }
-      else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(op))
+      else if (dynamic_cast<const jlm::llvm::CallOperation *>(op))
       {
         // TODO: verify this is the right type of function call
         //                if(decouple_nodes.end() != std::find(decouple_nodes.begin(),
@@ -388,7 +388,7 @@ separate_load_edge(
         //                }
         throw jlm::util::error("not implemented yet");
       }
-      else if (auto co = dynamic_cast<const jlm::llvm::MemStateMergeOperator *>(op))
+      else if (dynamic_cast<const jlm::llvm::MemStateMergeOperator *>(op))
       {
         auto si_load_user = dynamic_cast<jlm::rvsdg::simple_input *>(addr_edge_user);
         if (si_load_user && si->node() == sn)
@@ -420,7 +420,7 @@ process_loops(jlm::rvsdg::output * state_edge)
     // each iteration should update state_edge
     assert(state_edge->nusers() == 1);
     auto user = *state_edge->begin();
-    if (auto res = dynamic_cast<jlm::rvsdg::result *>(user))
+    if (dynamic_cast<jlm::rvsdg::result *>(user))
     {
       // end of region reached
       JLM_UNREACHABLE("This should never happen");

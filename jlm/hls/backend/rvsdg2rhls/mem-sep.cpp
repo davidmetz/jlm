@@ -248,7 +248,7 @@ trace_edge(
           common_edge = sn->output(1);
         }
       }
-      else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(op))
+      else if (dynamic_cast<const jlm::llvm::CallOperation *>(op))
       {
         // TODO: verify this is the right type of function call
         //                if(decouple_nodes.end() != std::find(decouple_nodes.begin(),

@@ -55,7 +55,7 @@ private:
         {
           load_nodes.push_back(simplenode);
         }
-        else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
+        else if (dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
         {
           // TODO: verify this is the right type of function call
           throw jlm::util::error("encountered a call for an alloca");

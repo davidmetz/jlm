@@ -15,15 +15,15 @@ eliminate_buf(jlm::rvsdg::output * o)
   if (auto so = dynamic_cast<jlm::rvsdg::simple_output *>(o))
   {
     auto node = so->node();
-    if (auto branch = dynamic_cast<const jlm::hls::branch_op *>(&node->operation()))
+    if (dynamic_cast<const jlm::hls::branch_op *>(&node->operation()))
     {
       return eliminate_buf(node->input(1)->origin());
     }
-    else if (auto local_load = dynamic_cast<const jlm::hls::local_load_op *>(&node->operation()))
+    else if (dynamic_cast<const jlm::hls::local_load_op *>(&node->operation()))
     {
       return true;
     }
-    else if (auto local_store = dynamic_cast<const jlm::hls::local_store_op *>(&node->operation()))
+    else if (dynamic_cast<const jlm::hls::local_store_op *>(&node->operation()))
     {
       return true;
     }
@@ -43,7 +43,7 @@ jlm::hls::remove_redundant_buf(jlm::rvsdg::region * region)
         remove_redundant_buf(structnode->subregion(n));
       }
     }
-    else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node *>(node))
+    else if (dynamic_cast<jlm::rvsdg::simple_node *>(node))
     {
       if (auto buf = dynamic_cast<const jlm::hls::buffer_op *>(&node->operation()))
       {

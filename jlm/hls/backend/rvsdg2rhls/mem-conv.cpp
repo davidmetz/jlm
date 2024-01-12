@@ -127,7 +127,7 @@ trace_call(const jlm::rvsdg::output * output)
     {
       return argument;
     }
-    else if (auto ba = dynamic_cast<const jlm::hls::backedge_argument *>(argument))
+    else if (dynamic_cast<const jlm::hls::backedge_argument *>(argument))
     {
       // don't follow backedges to avoid cycles
       return nullptr;
@@ -195,7 +195,7 @@ trace_function_calls(
     if (auto si = dynamic_cast<jlm::rvsdg::simple_input *>(user))
     {
       auto simplenode = si->node();
-      if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
+      if (dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
       {
         // TODO: verify this is the right type of function call
         calls.push_back(simplenode);
@@ -359,7 +359,7 @@ gather_mem_nodes(
       {
         load_nodes.push_back(simplenode);
       }
-      else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
+      else if (dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
       {
         // TODO: verify this is the right type of function call
         decouple_nodes.push_back(simplenode);
@@ -401,7 +401,7 @@ trace_pointer_argument(
       {
         load_nodes.push_back(simplenode);
       }
-      else if (auto co = dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
+      else if (dynamic_cast<const jlm::llvm::CallOperation *>(&simplenode->operation()))
       {
         // TODO: verify this is the right type of function call
         decouple_nodes.push_back(simplenode);
@@ -472,7 +472,7 @@ IsDecoupledFunctionPointer(
     if (auto simpleInput = dynamic_cast<jlm::rvsdg::simple_input *>(user))
     {
       auto simpleNode = simpleInput->node();
-      if (auto callOp = dynamic_cast<const jlm::llvm::CallOperation *>(&simpleNode->operation()))
+      if (dynamic_cast<const jlm::llvm::CallOperation *>(&simpleNode->operation()))
       {
         if (simpleNode->input(0)->origin() == output)
         {
@@ -720,7 +720,7 @@ jlm::hls::MemoryConverter(jlm::llvm::RvsdgModule & rm)
   for (int i = newLambda->ncvarguments() - 1; i >= 0; --i)
   {
     auto cvarg = newLambda->cvargument(i);
-    if (auto pointerType = dynamic_cast<const jlm::llvm::PointerType *>(&cvarg->type()))
+    if (dynamic_cast<const jlm::llvm::PointerType *>(&cvarg->type()))
     {
       // The only functions at this time is decoupled loads that are encoded as functions by the
       // user

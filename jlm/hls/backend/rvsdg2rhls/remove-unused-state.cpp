@@ -43,7 +43,7 @@ jlm::hls::remove_unused_state(jlm::rvsdg::region * region, bool can_remove_argum
   {
     if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node *>(node))
     {
-      if (auto lex = dynamic_cast<const llvm::aa::LambdaExitMemStateOperator *>(&node->operation()))
+      if (dynamic_cast<const llvm::aa::LambdaExitMemStateOperator *>(&node->operation()))
       {
         std::vector<jlm::rvsdg::output *> nv;
         for (size_t i = 0; i < simplenode->ninputs(); ++i)
@@ -77,9 +77,7 @@ jlm::hls::remove_unused_state(jlm::rvsdg::region * region, bool can_remove_argum
           remove(simplenode);
         }
       }
-      else if (
-          auto len =
-              dynamic_cast<const llvm::aa::LambdaEntryMemStateOperator *>(&node->operation()))
+      else if (dynamic_cast<const llvm::aa::LambdaEntryMemStateOperator *>(&node->operation()))
       {
         std::vector<jlm::rvsdg::output *> nv;
         for (size_t i = 0; i < simplenode->noutputs(); ++i)

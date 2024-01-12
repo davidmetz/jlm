@@ -396,7 +396,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
   {
     if (auto ip = dynamic_cast<const llvm::impport *>(&root->argument(i)->port()))
     {
-      if (auto t = dynamic_cast<const jlm::llvm::PointerType *>(&ip->type()))
+      if (dynamic_cast<const jlm::llvm::PointerType *>(&ip->type()))
       {
         cpp << "extern " << convert_to_c_type(&root->argument(i)->port().type()) << " "
             << ip->name() << ";\n";
