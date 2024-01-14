@@ -7,10 +7,10 @@
 #include <jlm/hls/backend/rhls2firrtl/mlirgen.hpp>
 #include <jlm/llvm/opt/alias-analyses/Operators.hpp>
 #include <jlm/util/strfmt.hpp>
-
 #include <llvm/ADT/SmallPtrSet.h>
 
-// #ifdef CIRCT
+namespace jlm::hls
+{
 
 // Handles nodes with 2 inputs and 1 output
 circt::firrtl::FModuleOp
@@ -3440,8 +3440,8 @@ jlm::hls::MLIRGenImpl::AddWhenOp(mlir::Block * body, mlir::Value condition, bool
 void
 check_may_not_depend_on(
     mlir::Value value,
-    llvm::SmallPtrSet<mlir::Value, 16> & forbiddenDependencies,
-    llvm::SmallPtrSet<mlir::Value, 16> & visited)
+    ::llvm::SmallPtrSet<mlir::Value, 16> & forbiddenDependencies,
+    ::llvm::SmallPtrSet<mlir::Value, 16> & visited)
 {
   if (visited.contains(value))
   {
@@ -3495,10 +3495,10 @@ check_oValids(
     ::llvm::SmallVector<mlir::Value> & oReadys,
     ::llvm::SmallVector<mlir::Value> & oValids)
 {
-  llvm::SmallPtrSet<mlir::Value, 16> forbiddenDependencies(oReadys.begin(), oReadys.end());
+  ::llvm::SmallPtrSet<mlir::Value, 16> forbiddenDependencies(oReadys.begin(), oReadys.end());
   for (auto oValid : oValids)
   {
-    llvm::SmallPtrSet<mlir::Value, 16> visited;
+    ::llvm::SmallPtrSet<mlir::Value, 16> visited;
     check_may_not_depend_on(oValid, forbiddenDependencies, visited);
   }
 }
@@ -4019,4 +4019,4 @@ jlm::hls::MLIRGenImpl::toString(const circt::firrtl::CircuitOp circuit)
   return outputString;
 }
 
-// #endif //CIRCT
+}

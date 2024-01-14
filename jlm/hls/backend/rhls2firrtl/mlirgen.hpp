@@ -6,8 +6,6 @@
 #ifndef JLM_HLS_BACKEND_RHLS2FIRRTL_MLIRGEN_HPP
 #define JLM_HLS_BACKEND_RHLS2FIRRTL_MLIRGEN_HPP
 
-#ifdef CIRCT
-
 #include <jlm/hls/backend/rhls2firrtl/base-hls.hpp>
 #include <jlm/hls/ir/hls.hpp>
 #include <jlm/llvm/ir/operators/GetElementPtr.hpp>
@@ -317,7 +315,5 @@ private:
 };
 } // namespace hls
 } // namespace jlm
-
-#endif // CIRCT
 
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_MLIRGEN_HPP
