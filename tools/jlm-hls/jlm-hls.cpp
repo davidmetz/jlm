@@ -13,8 +13,8 @@
 #include <jlm/llvm/frontend/InterProceduralGraphConversion.hpp>
 #include <jlm/llvm/frontend/LlvmModuleConversion.hpp>
 #include <jlm/tooling/CommandLine.hpp>
+#include <jlm/hls/backend/rhls2firrtl/json-hls.hpp>
 
-#include "jlm/hls/backend/rhls2firrtl/json-hls.hpp"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IRReader/IRReader.h>
@@ -50,7 +50,7 @@ main(int argc, char ** argv)
   llvm::LLVMContext ctx;
   llvm::SMDiagnostic err;
   auto llvmModule = llvm::parseIRFile(commandLineOptions.InputFile_.to_str(), err, ctx);
-  llvmModule->setSourceFileName(commandLineOptions.OutputFolder_.path() + "/jlm_hls");
+  llvmModule->setSourceFileName(commandLineOptions.OutputFiles_.path() + "/jlm_hls");
   if (!llvmModule)
   {
     err.print(argv[0], llvm::errs());
@@ -66,15 +66,15 @@ main(int argc, char ** argv)
   {
     auto hlsFunction = jlm::hls::split_hls_function(*rvsdgModule, commandLineOptions.HlsFunction_);
 
-    llvmToFile(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_rest.ll");
-    llvmToFile(*hlsFunction, commandLineOptions.OutputFolder_.path() + "/jlm_hls_function.ll");
+    llvmToFile(*rvsdgModule, commandLineOptions.OutputFiles_.to_str() + ".rest.ll");
+    llvmToFile(*hlsFunction, commandLineOptions.OutputFiles_.to_str() + ".function.ll");
     return 0;
   }
 
   if (commandLineOptions.OutputFormat_
       == jlm::tooling::JlmHlsCommandLineOptions::OutputFormat::Firrtl)
   {
-    jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
+    jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFiles_.to_str() + ".ref.ll");
     jlm::hls::rvsdg2rhls(*rvsdgModule);
 
     std::string output;
@@ -88,15 +88,14 @@ main(int argc, char ** argv)
       jlm::hls::FirrtlHLS hls;
       output = hls.run(*rvsdgModule);
     }
-    stringToFile(output, commandLineOptions.OutputFolder_.path() + "/jlm_hls.fir");
+    stringToFile(output, commandLineOptions.OutputFiles_.to_str() + ".fir");
 
     jlm::hls::VerilatorHarnessHLS vhls;
-    stringToFile(
-        vhls.run(*rvsdgModule),
-        commandLineOptions.OutputFolder_.path() + "/jlm_hls_harness.cpp");
+    stringToFile(vhls.run(*rvsdgModule), commandLineOptions.OutputFiles_.to_str() + ".harness.cpp");
+
     // TODO: hide behind flag
     jlm::hls::JsonHLS jhls;
-    stringToFile(jhls.run(*rvsdgModule), commandLineOptions.OutputFolder_.path() + "/jlm_hls.json");
+    stringToFile(jhls.run(*rvsdgModule), commandLineOptions.OutputFiles_.to_str() + ".json");
   }
   else if (
       commandLineOptions.OutputFormat_ == jlm::tooling::JlmHlsCommandLineOptions::OutputFormat::Dot)
@@ -104,7 +103,7 @@ main(int argc, char ** argv)
     jlm::hls::rvsdg2rhls(*rvsdgModule);
 
     jlm::hls::DotHLS dhls;
-    stringToFile(dhls.run(*rvsdgModule), commandLineOptions.OutputFolder_.path() + "/jlm_hls.dot");
+    stringToFile(dhls.run(*rvsdgModule), commandLineOptions.OutputFiles_.path() + "/jlm_hls.dot");
   }
   else
   {
