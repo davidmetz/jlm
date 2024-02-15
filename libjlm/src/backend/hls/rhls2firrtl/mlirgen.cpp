@@ -205,6 +205,9 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto sInt1 = AddAsSIntOp(body, input1);
 		auto op = AddLtOp(body, sInt0, sInt1);
 		Connect(body, outData, op);
+	}  else if (dynamic_cast<const jlm::bitcast_op *>(&(node->operation()))) {
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		Connect(body, outData, input0);
 	} else if (auto op = dynamic_cast<const jive::match_op *>(&(node->operation()))) {
 		auto inData = GetSubfield(body, inBundles[0], "data");
 		auto outData = GetSubfield(body, outBundle, "data");
