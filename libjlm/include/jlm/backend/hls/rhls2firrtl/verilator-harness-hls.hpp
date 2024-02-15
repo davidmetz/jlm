@@ -27,7 +27,11 @@ namespace jlm {
 
 			std::string
 			convert_to_c_type_postfix(const jive::type* type);
-		};
+
+            void get_function_header(std::ostringstream &cpp, const lambda::node *ln, const std::string &function_name);
+
+            void call_function(std::ostringstream &cpp, const lambda::node *ln, const std::string &function_name);
+        };
 	}
 }
 

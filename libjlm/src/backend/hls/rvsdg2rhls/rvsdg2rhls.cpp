@@ -110,7 +110,7 @@ namespace jlm {
     const jive::output *hls::trace_call(jive::input *input) {
         JLM_ASSERT(is_fct_ptr(input));
 
-		auto graph = input->region()->graph();
+        auto graph = input->region()->graph();
 
         auto argument = dynamic_cast<const jive::argument *>(input->origin());
         const jive::output * result;
@@ -127,7 +127,7 @@ namespace jlm {
         return result;
     }
 
-	void
+    void
 	inline_calls(jive::region *region) {
 		for (auto &node : jive::topdown_traverser(region)) {
 			if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
@@ -333,14 +333,18 @@ jlm::hls::split_hls_function(jlm::RvsdgModule &rm, const std::string &function_n
 }
 
 void
+jlm::hls::rvsdg2ref(jlm::RvsdgModule &rhls, std::string path) {
+    dump_ref(rhls, path);
+}
+
+void
 jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	pre_opt(rhls);
 
 //	jlm::hls::add_prints(rhls);
-//	dump_ref(rhls);
+//    dump_xml(rhls, "post_opt.rvsdg");
 
-	// run conversion on copy
-	jlm::hls::remove_unused_state(rhls);
+//    jlm::hls::mem_sep(rhls);
     jlm::hls::mem_sep_argument(rhls);
     // run conversion on copy
     jlm::hls::remove_unused_state(rhls);
@@ -364,11 +368,12 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 }
 
 void
-jlm::hls::dump_ref(jlm::RvsdgModule &rhls) {
+jlm::hls::dump_ref(jlm::RvsdgModule &rhls, std::string &path) {
 	auto reference = RvsdgModule::Create(rhls.SourceFileName(), rhls.TargetTriple(), rhls.DataLayout());
-	jive::substitution_map smap;
-	rhls.Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
-	convert_prints(*reference);
+    jive::substitution_map smap;
+    rhls.Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
+    pre_opt(*reference);
+    instrument_ref(*reference);
 	for (size_t i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
 		auto arg = reference->Rvsdg().root()->argument(i);
 		auto imp = dynamic_cast<const impport *>(&arg->port());
@@ -379,6 +384,6 @@ jlm::hls::dump_ref(jlm::RvsdgModule &rhls) {
 	auto jm2 = rvsdg2jlm::rvsdg2jlm(*reference, sd);
 	auto lm2 = jlm2llvm::convert(*jm2, ctx);
 	std::error_code EC;
-	llvm::raw_fd_ostream os(reference->SourceFileName().base() + ".ref.ll", EC);
+	llvm::raw_fd_ostream os(path, EC);
 	lm2->print(os, nullptr);
 }

@@ -377,12 +377,27 @@ JhlsCommandGraphGenerator::GenerateCommandGraph(const JhlsCommandLineOptions & c
       : LlcCommand::RelocationModel::Static);
     hls.AddEdge(asmnode);
 
+    filepath refAssemblyFile(tmp_folder.to_str() + "ref.o");
+    auto refInputFile = dynamic_cast<JlmHlsCommand *>(&hls.GetCommand())->RefFile();
+    auto & refAsmnode = LlcCommand::Create(
+      *commandGraph,
+      commandLineOptions.Hls_
+      ? refInputFile
+      : tmp_folder.to_str() + CreateJlmOptCommandOutputFile(refInputFile).to_str(),
+      refAssemblyFile,
+      ConvertOptimizationLevel(commandLineOptions.OptimizationLevel_),
+      commandLineOptions.Hls_
+      ? LlcCommand::RelocationModel::Pic
+      : LlcCommand::RelocationModel::Static);
+    hls.AddEdge(refAsmnode);
+
     std::vector<jlm::filepath> lnkifiles;
     for (const auto & compilation : commandLineOptions.Compilations_) {
       if (compilation.RequiresLinking() && !compilation.RequiresParsing())
         lnkifiles.push_back(compilation.OutputFile());
     }
     lnkifiles.push_back(assemblyFile);
+    lnkifiles.push_back(refAssemblyFile);
     auto & verilatorCommandNode = VerilatorCommand::Create(
       *commandGraph,
       verilogfile,

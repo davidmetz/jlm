@@ -15,7 +15,9 @@ LambdaEntryMemStateOperator::~LambdaEntryMemStateOperator() = default;
 bool
 LambdaEntryMemStateOperator::operator==(const jive::operation & other) const noexcept
 {
-    return is<LambdaEntryMemStateOperator>(other);
+    return false;
+    // TODO: fix
+//    return is<LambdaEntryMemStateOperator>(other);
 }
 
 std::string

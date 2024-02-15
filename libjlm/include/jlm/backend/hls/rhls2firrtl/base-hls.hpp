@@ -27,6 +27,9 @@ namespace jlm {
 				return get_text(rm);
 			}
 
+            static int
+            JlmSize(const jive::type *type);
+
         private:
 			virtual std::string
 			extension() = 0;
@@ -46,9 +49,6 @@ namespace jlm {
 
 			const jlm::lambda::node *
 			get_hls_lambda(jlm::RvsdgModule &rm);
-
-			int
-			JlmSize(const jive::type *type);
 
             void
 			create_node_names(jive::region *r);

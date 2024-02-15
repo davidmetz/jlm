@@ -85,7 +85,8 @@ main(int argc, char ** argv)
 	}
 
 	if (commandLineOptions.OutputFormat_ == jlm::JlmHlsCommandLineOptions::OutputFormat::Firrtl) {
-		jlm::hls::rvsdg2rhls(*rvsdgModule);
+        jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
+        jlm::hls::rvsdg2rhls(*rvsdgModule);
 
 		std::string output;
 		if (commandLineOptions.UseCirct_) {

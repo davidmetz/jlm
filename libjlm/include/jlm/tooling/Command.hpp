@@ -575,6 +575,12 @@ public:
   }
 
   [[nodiscard]] filepath
+  RefFile() const noexcept
+  {
+    return OutputFolder_.to_str() + "/jlm_hls_ref.ll";
+  }
+
+  [[nodiscard]] filepath
   HarnessFile() const noexcept
   {
     return OutputFolder_.to_str() + "/jlm_hls_harness.cpp";

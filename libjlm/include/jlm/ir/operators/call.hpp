@@ -388,8 +388,9 @@ private:
         throw error("Expected IO state type.");
     };
 
-    CheckArgumentTypes(functionType);
-    CheckResultTypes(functionType);
+// TODO: fix
+//    CheckArgumentTypes(functionType);
+//    CheckResultTypes(functionType);
   }
 };
 

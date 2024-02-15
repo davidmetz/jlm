@@ -16,6 +16,7 @@ LIBJLM_SRC = \
     libjlm/src/backend/hls/rvsdg2rhls/remove-redundant-buf.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/rvsdg2rhls.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/add-prints.cpp \
+	libjlm/src/backend/hls/rvsdg2rhls/instrument-ref.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/add-buffers.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/mem-conv.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/dae-conv.cpp \

@@ -23,7 +23,10 @@ namespace jlm{
 		rvsdg2rhls(jlm::RvsdgModule &rm);
 
 		void
-		dump_ref(jlm::RvsdgModule &rhls);
+		rvsdg2ref(jlm::RvsdgModule &rm, std::string path);
+
+		void
+		dump_ref(jlm::RvsdgModule &rhls, std::string &path);
 
         const jive::output *
         trace_call(jive::input *input);
