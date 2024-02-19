@@ -742,8 +742,9 @@ namespace jlm {
 
             addr_queue_op(
                     const PointerType & pointerType,
-                    size_t capacity)
-                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), capacity(capacity) {}
+                    size_t capacity,
+                    bool combinatorial)
+                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), capacity(capacity), combinatorial(combinatorial) {}
 
             bool
             operator==(const jive::operation &other) const noexcept override {
@@ -772,6 +773,9 @@ namespace jlm {
 
             std::string
             debug_string() const override {
+                if(combinatorial){
+                    return "HLS_ADDR_QUEUE_COMB_"+ argument(narguments()-1).type().debug_string();
+                }
                 return "HLS_ADDR_QUEUE_"+ argument(narguments()-1).type().debug_string();
             }
 
@@ -785,15 +789,17 @@ namespace jlm {
                     jive::output &check,
                     jive::output &enq,
                     jive::output &deq,
+                    bool combinatorial,
                     size_t capacity = 10
             ) {
                 auto region = check.region();
                 auto pointerType = dynamic_cast<const PointerType*>(&check.type());
-                addr_queue_op op(*pointerType, capacity);
+                addr_queue_op op(*pointerType, capacity, combinatorial);
                 return jive::simple_node::create_normalized(region, op, {&check, &enq, &deq})[0];
             }
 
 
+            bool combinatorial;
             size_t capacity;
         };
 

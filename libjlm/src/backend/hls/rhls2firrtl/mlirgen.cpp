@@ -1851,6 +1851,10 @@ jlm::hls::MLIRGenImpl::MlirGenAddrQueue(const jive::simple_node *node) {
 
         addr_in_queue = AddOrOp(body, addr_in_queue, AddAndOp(body, validRegs[i], AddEqOp(body, dataRegs[i], checkData)));
 	}
+    if(op->combinatorial){
+        // may not be the same as addr enqueued in same cycle
+        addr_in_queue = AddOrOp(body, addr_in_queue, AddAndOp(body, enqValid, AddEqOp(body, enqData, checkData)));
+    }
     Connect(body, addr_in_queue_wire, addr_in_queue);
 
 	return module;

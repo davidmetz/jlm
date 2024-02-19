@@ -144,7 +144,9 @@ jive::output * separate_load_edge(
         jive::simple_node ** load,
         jive::output ** new_mem_edge,
         std::vector<jive::output*> &store_addresses,
-        std::vector<jive::output*> &store_dequeues
+        std::vector<jive::output*> &store_dequeues,
+        std::vector<bool> &store_precedes,
+        bool *load_encountered
 //        jive::substitution_map & smap
         ){
     // follows along mem edge and routes addr edge through the same regions
@@ -178,7 +180,7 @@ jive::output * separate_load_edge(
             auto si = dynamic_cast<jive::simple_input*>(user);
             assert(dynamic_cast<const jlm::hls::mux_op*>(&si->node()->operation()));
             assert(buffer->nusers()==1);
-            separate_load_edge(si->node()->output(0), buffer, load, nullptr, store_addresses, store_dequeues);
+            separate_load_edge(si->node()->output(0), buffer, load, nullptr, store_addresses, store_dequeues, store_precedes, load_encountered);
         } else if (auto si = dynamic_cast<jive::simple_input*>(user)){
             auto sn = si->node();
             auto op = &si->node()->operation();
@@ -192,7 +194,7 @@ jive::output * separate_load_edge(
                         jlm::hls::sink_op::create(*load_branch_out[i])[0];
                         auto dummy_user = dynamic_cast<jive::simple_input*>(*load_branch_out[i]->begin())->node();
                         // need both load and common edge here
-                        load_branch_out[i] = separate_load_edge(sn->output(i), load_branch_out[i], load, &mem_edge, store_addresses, store_dequeues);
+                        load_branch_out[i] = separate_load_edge(sn->output(i), load_branch_out[i], load, &mem_edge, store_addresses, store_dequeues, store_precedes, load_encountered);
                         assert(load_branch_out[i]->nusers() == 1);
                         assert(dummy_user->input(0)->origin() == load_branch_out[i]);
                         remove(dummy_user);
@@ -227,6 +229,7 @@ jive::output * separate_load_edge(
                 addr_edge = sg_out[1];
                 addr_edge_user->divert_to(addr_edge);
                 store_addresses.push_back(route_to_region((*load)->region(), sg_out[0]));
+                store_precedes.push_back(!*load_encountered);
                 mem_edge = sn->output(0);
                 assert(mem_edge->nusers() == 1);
                 user = *mem_edge->begin();
@@ -268,6 +271,7 @@ jive::output * separate_load_edge(
                     sn->output(1)->divert_users(mem_edge);
                     remove(sn);
                     *load = dynamic_cast<jive::simple_output*>(new_load_outputs[0])->node();
+                    *load_encountered = true;
                 } else {
                     mem_edge = sn->output(1);
                 }
@@ -365,14 +369,17 @@ jive::output * process_loops(jive::output * state_edge){
                 auto addr_edge = split_states[1 + i];
                 std::vector<jive::output*> store_addresses;
                 std::vector<jive::output*> store_dequeues;
-                separate_load_edge(mem_edge, addr_edge, &load, nullptr, store_addresses, store_dequeues);
+                std::vector<bool> store_precedes;
+                bool load_encountered = false;
+                separate_load_edge(mem_edge, addr_edge, &load, nullptr, store_addresses, store_dequeues, store_precedes, &load_encountered);
+                assert(load_encountered);
                 assert(store_nodes.size() == store_addresses.size());
                 assert(store_nodes.size() == store_dequeues.size());
                 auto state_gate_addr_in = dynamic_cast<jive::simple_output*>(load->input(0)->origin())->node()->input(0);
                 for (size_t j = 0; j < store_nodes.size(); ++j) {
                     assert(state_gate_addr_in->origin()->region() == store_addresses[j]->region());
                     assert(store_dequeues[j]->region() == store_addresses[j]->region());
-                    state_gate_addr_in->divert_to(jlm::hls::addr_queue_op::create(*state_gate_addr_in->origin(), *store_addresses[j], *store_dequeues[j]));
+                    state_gate_addr_in->divert_to(jlm::hls::addr_queue_op::create(*state_gate_addr_in->origin(), *store_addresses[j], *store_dequeues[j], store_precedes[j]));
                 }
             }
         } else {
