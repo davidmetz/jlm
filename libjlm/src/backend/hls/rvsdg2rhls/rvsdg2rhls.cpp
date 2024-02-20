@@ -47,6 +47,8 @@
 #include "jlm/backend/hls/rvsdg2rhls/mem-queue.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
 
+#include <jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp>
+
 void
 split_opt(jlm::RvsdgModule &rm) {
 	// TODO: figure out which optimizations to use here
