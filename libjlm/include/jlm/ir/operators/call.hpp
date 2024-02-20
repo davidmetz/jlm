@@ -350,6 +350,7 @@ private:
   static void
   CheckFunctionType(const FunctionType & functionType)
   {
+/*
     auto CheckArgumentTypes = [](const FunctionType & functionType)
     {
       if (functionType.NumArguments() < 3)
@@ -387,6 +388,7 @@ private:
       if (!is<iostatetype>(functionType.ResultType(iOStateResultIndex)))
         throw error("Expected IO state type.");
     };
+*/
 
 // TODO: fix
 //    CheckArgumentTypes(functionType);

@@ -744,7 +744,7 @@ namespace jlm {
                     const PointerType & pointerType,
                     size_t capacity,
                     bool combinatorial)
-                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), capacity(capacity), combinatorial(combinatorial) {}
+                    : simple_op(CreateInPorts(pointerType), CreateOutPorts(pointerType)), combinatorial(combinatorial), capacity(capacity) {}
 
             bool
             operator==(const jive::operation &other) const noexcept override {
@@ -1162,7 +1162,7 @@ namespace jlm {
             bool
             operator==(const jive::operation &other) const noexcept override {
                 // TODO:
-                auto ot = dynamic_cast<const local_mem_op *>(&other);
+                // auto ot = dynamic_cast<const local_mem_op *>(&other);
                 // check predicate and value
                 return false;
             }

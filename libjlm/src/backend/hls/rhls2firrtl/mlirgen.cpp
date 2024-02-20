@@ -922,12 +922,6 @@ jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
     auto outValidMemAddr = GetSubfield(body, outBundleMemAddr, "valid");
     auto outDataMemAddr  = GetSubfield(body, outBundleMemAddr, "data");
 
-    auto clock = GetClockSignal(module);
-    auto reset = GetResetSignal(module);
-    auto zeroBitValue = GetConstant(body, 1, 0);
-    auto oneBitValue = GetConstant(body, 1, 1);
-
-
     // Block until all inputs and no outputs are valid
     Connect(body, outValidMemAddr, inValidAddr);
     Connect(body, outDataMemAddr, inDataAddr);
@@ -938,7 +932,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
 
     Connect(body, outValidData, inValidMemData);
     Connect(body, outDataData, inDataMemData);
-    auto andOp = AddAndOp(body, outReadyData, outValidData);
+    AddAndOp(body, outReadyData, outValidData);
 
     return module;
 }
@@ -2577,7 +2571,6 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 
 	// Need to know the number of inputs so we can calculate the
 	// correct index for outputs
-	auto numInputs = subRegion->narguments();
 	llvm::SmallVector<circt::firrtl::RegResetOp> outputValidRegs;
 	llvm::SmallVector<circt::firrtl::RegResetOp> outputDataRegs;
 

@@ -88,6 +88,7 @@ is_slice_exclusive_input_(jive::input *source, jive::node *destination, std::uno
     } else {
         JLM_UNREACHABLE("THIS SHOULDNT HAPPEN");
     }
+    return true;
 }
 
 void trace_to_loop_results(jive::output *out, std::vector<jive::result *> &results){

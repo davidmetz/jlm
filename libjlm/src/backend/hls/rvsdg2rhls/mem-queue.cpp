@@ -390,7 +390,6 @@ jive::output * process_loops(jive::output * state_edge){
 
 void jlm::hls::mem_queue(jive::region *region) {
     auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.first());
-    auto lambda_region = lambda->subregion();
     auto state_arg = GetMemoryStateArgument(*lambda);
     if(!state_arg){
         //no memstate - i.e. no memory used

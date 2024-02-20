@@ -109,7 +109,6 @@ void jlm::hls::mem_sep_independent(jive::region *region) {
     std::vector<jive::simple_node *> mem_nodes;
     gather_mem_nodes(lambda_region, mem_nodes);
     auto entry_states = jlm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+mem_nodes.size());
-    auto entry_node = dynamic_cast<const jive::node_output*>(entry_states[0])->node();
     auto state_result = GetMemoryStateResult(*lambda);
     // handle existing state edge - TODO: remove entirely?
     state_user->divert_to(entry_states.back());
@@ -229,7 +228,6 @@ void jlm::hls::mem_sep_argument(jive::region *region) {
     port_load_store_decouple port_nodes;
     trace_pointer_arguments(lambda, port_nodes);
     auto entry_states = jlm::aa::LambdaEntryMemStateOperator::Create(state_arg, 1+port_nodes.size());
-    auto entry_node = dynamic_cast<const jive::node_output*>(entry_states[0])->node();
     auto state_result = GetMemoryStateResult(*lambda);
     // handle existing state edge - TODO: remove entirely?
     auto common_edge = entry_states.back();
