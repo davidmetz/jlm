@@ -73,7 +73,6 @@ pre_opt(jlm::RvsdgModule &rm) {
 	jlm::cne cne;
 	jlm::InvariantValueRedirection ivr;
 	jlm::tginversion tgi;
-    jlm::aa::SteensgaardBasic aa;
 	jlm::StatisticsCollector statisticsCollector;
 	tgi.run(rm, statisticsCollector);
 	dne.run(rm, statisticsCollector);
