@@ -14,7 +14,7 @@ namespace jlm{
 		instrument_ref(jlm::RvsdgModule &rm);
 
 		void
-		instrument_ref(jive::region *region, jive::output * load_func, jive::output * store_func);
+		instrument_ref(jive::region *region, jive::output * load_func, jive::output * store_func, jive::output *alloca_func);
 	}
 }
 
