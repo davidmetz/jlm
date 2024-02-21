@@ -70,18 +70,25 @@ namespace jlm::hls {
                              {MemoryStateType::Create().get(), loopstatetype::create().get()}));
         impport store_imp(store_func_ptr, "reference_store", linkage::external_linkage);
         auto reference_store = graph.add_import(store_imp);
-        instrument_ref(root, reference_load, reference_store);
+        // addr, size, memstate
+        jlm::PointerType alloca_func_ptr(
+                FunctionType({&void_ptr, &jive::bit64, MemoryStateType::Create().get()},
+                             {MemoryStateType::Create().get(), loopstatetype::create().get()}));
+        impport alloca_imp(alloca_func_ptr, "reference_alloca", linkage::external_linkage);
+        auto reference_alloca = graph.add_import(alloca_imp);
+        instrument_ref(root, reference_load, reference_store, reference_alloca);
     }
 
     void
-    instrument_ref(jive::region *region, jive::output *load_func, jive::output *store_func) {
+    instrument_ref(jive::region *region, jive::output *load_func, jive::output *store_func, jive::output *alloca_func) {
         load_func = route_to_region(load_func, region);
         store_func = route_to_region(store_func, region);
+        alloca_func = route_to_region(alloca_func, region);
         jlm::PointerType void_ptr(jive::bit8);
         for (auto &node: jive::topdown_traverser(region)) {
             if (auto structnode = dynamic_cast<jive::structural_node *>(node)) {
                 for (size_t n = 0; n < structnode->nsubregions(); n++) {
-                    instrument_ref(structnode->subregion(n), load_func, store_func);
+                    instrument_ref(structnode->subregion(n), load_func, store_func, alloca_func);
                 }
             } else if (auto lo = dynamic_cast<const jlm::LoadOperation *>(&(node->operation()))) {
                 jive::output *addr = node->input(0)->origin();
@@ -96,6 +103,29 @@ namespace jlm::hls {
                 auto memstate = node->input(1)->origin();
                 auto new_memstate = jlm::CallNode::Create(load_func, {addr, width, memstate})[0];
                 node->input(1)->divert_to(new_memstate);
+            }  else if (auto ao = dynamic_cast<const jlm::alloca_op *>(&(node->operation()))) {
+                // ensure that the size is one
+                JLM_ASSERT(node->ninputs() == 1);
+                auto constant_output = dynamic_cast<jive::node_output*>(node->input(0)->origin());
+                JLM_ASSERT(constant_output);
+                auto constant_operation = dynamic_cast<const jive::bitconstant_op*>(&constant_output->node()->operation());
+                JLM_ASSERT(constant_operation);
+                JLM_ASSERT(constant_operation->value().to_uint() == 1);
+                jive::output *addr = node->output(0);
+                // ensure that the alloca is an array type
+                auto pt = dynamic_cast<const jlm::PointerType*>(&addr->type());
+                auto at = dynamic_cast<const jlm::arraytype*>(&pt->GetElementType());
+                JLM_ASSERT(at);
+                auto size = jive::create_bitconstant(region, 64, BaseHLS::JlmSize(at)/8);
+                if (addr->type() != void_ptr) {
+                    addr = jlm::bitcast_op::create(addr, void_ptr);
+                }
+                std::vector<jive::input*> old_users(node->output(1)->begin(), node->output(1)->end());
+                auto memstate = node->output(1);
+                auto new_memstate = jlm::CallNode::Create(alloca_func, {addr, size, memstate})[0];
+                for (auto ou: old_users) {
+                    ou->divert_to(new_memstate);
+                }
             } else if (auto so = dynamic_cast<const jlm::StoreOperation *>(&(node->operation()))) {
                 jive::output *addr = node->input(0)->origin();
                 auto pt = dynamic_cast<const jlm::PointerType *>(&addr->type());
