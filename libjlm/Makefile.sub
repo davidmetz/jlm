@@ -6,6 +6,7 @@ LIBJLM_SRC = \
     \
     libjlm/src/backend/hls/rvsdg2rhls/add-triggers.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/gamma-conv.cpp \
+    libjlm/src/backend/hls/rvsdg2rhls/merge-gamma.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/theta-conv.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/alloca-conv.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/add-sinks.cpp \
