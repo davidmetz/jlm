@@ -45,6 +45,8 @@
 #include "jlm/backend/hls/rvsdg2rhls/remove-redundant-buf.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/add-buffers.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/mem-queue.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
 
 #include <jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp>
@@ -78,6 +80,8 @@ pre_opt(jlm::RvsdgModule &rm) {
 	dne.run(rm, statisticsCollector);
 	cne.run(rm, statisticsCollector);
 	ivr.run(rm, statisticsCollector);
+    dne.run(rm, statisticsCollector);
+    cne.run(rm, statisticsCollector);
     dne.run(rm, statisticsCollector);
 //    aa.run(rm, sd);
 }
@@ -341,6 +345,7 @@ jlm::hls::rvsdg2ref(jlm::RvsdgModule &rhls, std::string path) {
 void
 jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	pre_opt(rhls);
+    merge_gamma(rhls);
 
 //	jlm::hls::add_prints(rhls);
 //    dump_xml(rhls, "post_opt.rvsdg");
