@@ -61,7 +61,7 @@ jlm::hls::loop_node *jlm::hls::loop_node::copy(jive::region *region, jive::subst
     }
 
     subregion()->copy(loop->subregion(), rmap, false, false);
-    loop->_predicate_buffer = rmap.lookup(_predicate_buffer);
+    loop->_predicate_buffer = dynamic_cast<jive::node_output*>(rmap.lookup(_predicate_buffer));
     // redirect backedges
     for (size_t i = 0; i < subregion()->narguments(); ++i) {
         auto arg = subregion()->argument(i);
@@ -96,7 +96,7 @@ jlm::hls::loop_node *jlm::hls::loop_node::create(jive::region *parent, bool init
         pred_arg->result()->divert_to(predicate);
         // we need a buffer without pass-through behavior to avoid a combinatorial cycle of ready signals
         auto pre_buffer = hls::buffer_op::create(*pred_arg, 2)[0];
-        ln->_predicate_buffer = hls::predicate_buffer_op::create(*pre_buffer)[0];
+        ln->_predicate_buffer = dynamic_cast<jive::node_output*>(hls::predicate_buffer_op::create(*pre_buffer)[0]);
     }
     return ln;
 }

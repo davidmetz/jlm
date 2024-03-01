@@ -564,7 +564,7 @@ namespace jlm {
 					: structural_node(loop_op(), parent, 1) {
 			}
 
-			jive::output *_predicate_buffer;
+			jive::node_output *_predicate_buffer;
 
 		public:
 			static loop_node *
@@ -582,7 +582,7 @@ namespace jlm {
 				return result;
 			}
 
-			inline jive::output *
+			inline jive::node_output *
 			predicate_buffer() const noexcept {
 				return _predicate_buffer;
 			}
