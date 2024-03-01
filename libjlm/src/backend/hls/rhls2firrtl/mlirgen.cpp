@@ -320,9 +320,6 @@ jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jive::simple_node *node) {
 	auto body = module.getBody();
 
     auto clock = GetClockSignal(module);
-    auto reset = GetResetSignal(module);
-    auto zeroBitValue = GetConstant(body, 1, 0);
-    auto oneBitValue = GetConstant(body, 1, 1);
 
     // Input signals
     auto predBundle = GetInPort(module, 0);
@@ -341,38 +338,26 @@ jlm::hls::MLIRGenImpl::MlirGenLoopConstBuffer(const jive::simple_node *node) {
     auto outValid = GetSubfield(body, outBundle, "valid");
     auto outData = GetSubfield(body, outBundle, "data");
 
-    auto validReg = builder.create<circt::firrtl::RegResetOp>(
-            location,
-            GetIntType(1),
-            clock,
-            reset,
-            zeroBitValue,
-            builder.getStringAttr("valid_reg"));
-    body->push_back(validReg);
     auto dataReg = builder.create<circt::firrtl::RegOp>(
             location,
             GetIntType(&node->input(1)->type()),
             clock,
             builder.getStringAttr("data_reg"));
     body->push_back(dataReg);
-    // in ready when buffer empty and output ready
-    Connect(body, inReady, AddAndOp(body, outReady, AddNotOp(body, validReg)));
-    Connect(body, outData, dataReg);
+    // predicate 0 updates register, passes through and consumes input
+    // we always start with predicate 0 due to pred_buf
+    // predicate 1 uses data in register
+    Connect(body, predReady, AddAndOp(body, outReady, outValid));
+    Connect(body, inReady, AddAndOp(body, AddAndOp(body, outReady, AddNotOp(body, predData)), predValid));
 
-    // out valid when buffer valid and getting positive predicate, or when buffer empty and input valid
-    auto dataPassThrough = AddAndOp(body, inValid, AddNotOp(body, validReg));
-    Connect(body, outValid, AddOrOp(body, AddAndOp(body, validReg, AddAndOp(body, predValid, predData)), dataPassThrough));
+    Connect(body, outValid, AddAndOp(body, AddOrOp(body, predData, inValid), predValid));
+    Connect(body, outData, dataReg);
+    auto dataPassThrough = AddAndOp(body, inValid, AddNotOp(body, predData));
     auto dataPassThroughBody = AddWhenOp(body, dataPassThrough, false).getThenBodyBuilder().getBlock();
     Connect(dataPassThroughBody, outData, inData);
 
-    auto clearBuffer = AddAndOp(body, predValid, AddNotOp(body, predData));
-    auto clearBufferBody = AddWhenOp(body, clearBuffer, false).getThenBodyBuilder().getBlock();
-    Connect(clearBufferBody, validReg, zeroBitValue);
-    Connect(body, predReady, AddOrOp(body, clearBuffer, AddAndOp(body, outReady, outValid)));
-
     auto inFire = AddAndOp(body, inReady, inValid);
     auto inFireBody = AddWhenOp(body, inFire, false).getThenBodyBuilder().getBlock();
-    Connect(inFireBody, validReg, oneBitValue);
     Connect(inFireBody, dataReg, inData);
 
 	return module;
