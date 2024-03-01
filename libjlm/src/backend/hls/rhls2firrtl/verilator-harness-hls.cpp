@@ -233,7 +233,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
     cpp <<
         "    top->eval();\n"
         "    // dump before trying to access memory\n"
-        "    tfp->dump(main_time * 2);\n";
+        "    tfp->dump(main_time * 2);\n"
+        "#ifdef VCD_FLUSH\n"
+        "    tfp->flush();\n"
+        "#endif\n";
     for (size_t i = 0; i < mem_reqs.size(); ++i) {
         cpp <<
         "    if (top->mem_" << i << "_res_valid && top->mem_" << i << "_res_ready) {\n"
@@ -316,7 +319,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    top->clk = 0;\n"
 		"    top->eval();\n"
 		"    tfp->dump(main_time * 2 + 1);\n"
-		"//    tfp->flush();\n"
+        "#ifdef VCD_FLUSH\n"
+		"    tfp->flush();\n"
+        "#endif\n"
 		"    main_time++;\n"
 		"}\n"
         "\n"
