@@ -131,14 +131,22 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		"    top = NULL;\n"
 		"}\n"
         "\n"
-        "#define MEM_LATENCY 10\n"
         "typedef struct mem_resp_struct {\n"
         "    bool valid = false;\n"
         "    uint64_t data = 0xDEADBEEF;\n"
         "    uint8_t id = 0;\n"
         "} mem_resp_struct;\n"
         "\n"
-        "std::queue<mem_resp_struct>* mem_resp[" << mem_resps.size() << "];"
+        "std::queue<mem_resp_struct>* mem_resp[" << mem_resps.size() << "];\n"
+        "const uint64_t mem_latency[" << mem_resps.size() << "] = {";
+    for (size_t i = 0; i < mem_resps.size(); ++i) {
+        if(i!=0){
+            cpp << ", ";
+        }
+        cpp << "10";
+    }
+    cpp << "};\n";
+    cpp <<
 		"\n"
 		"void verilator_init(int argc, char **argv) {\n"
 		"    // set up signaling so we can kill the program and still get waveforms\n"
@@ -153,12 +161,12 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         cpp <<
             "    mem_resp["<< i <<"] = new std::queue<mem_resp_struct>();\n";
     }
-    cpp << "    for (size_t i = 0; i < MEM_LATENCY; ++i) {\n";
     for (size_t i = 0; i < mem_resps.size(); ++i) {
         cpp <<
-            "    mem_resp["<< i <<"]->emplace();\n";
+            "    for (size_t i = 0; i < mem_latency["<< i <<"]; ++i) {\n"
+            "       mem_resp["<< i <<"]->emplace();\n"
+            "    }\n";
     }
-    cpp << "    }\n";
     cpp <<
 		"\n"
 		"	atexit(verilator_finish);\n"
@@ -310,7 +318,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "            mem_resp["<<i<<"]->back().data = data;\n"
         "            access_mem_load({addr, data, size, mem_access_ctr++});\n"
         "        }\n"
-        "    } else if (mem_resp["<<i<<"]->size()<MEM_LATENCY){\n"
+        "    } else if (mem_resp["<<i<<"]->size()<mem_latency["<< i <<"]){\n"
         "        mem_resp["<<i<<"]->emplace();\n"
         "    }\n";
         }
