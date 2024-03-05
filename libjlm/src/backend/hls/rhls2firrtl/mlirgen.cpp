@@ -1863,91 +1863,80 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 	auto inReady0 = GetSubfield(body, inBundle0, "ready");
 	auto inValid0 = GetSubfield(body, inBundle0, "valid");
 	auto inData0  = GetSubfield(body, inBundle0, "data");
-	Connect(body, inReady0, zeroBitValue);
 
 	// Add discard registers
 	auto clock = GetClockSignal(module);
 	auto reset = GetResetSignal(module);
-	llvm::SmallVector<circt::firrtl::RegResetOp> discardRegs;
+
+    int ctr_bits = 4;
+    auto ctr_zero = GetConstant(body, ctr_bits, 0);
+    auto ctr_one = GetConstant(body, ctr_bits, 1);
+    auto ctr_max = GetConstant(body, ctr_bits, (1<<ctr_bits)-1);
+
+	llvm::SmallVector<mlir::Value> discard_queueds;
 	llvm::SmallVector<circt::firrtl::WireOp> discardWires;
-	mlir::Value anyDiscardReg = GetConstant(body, 1, 0);
+	mlir::Value any_discard_full = GetConstant(body, 1, 0);
+    // each input has a counter that tracks how many tokens to discard
+    // the discardWires are used to increase these counters
 	for (size_t i=1; i<inputs; i++) {
+        auto inBundle = GetInPort(module, i);
+        auto inReady = GetSubfield(body, inBundle, "ready");
+        auto inValid = GetSubfield(body, inBundle, "valid");
+        auto inData  = GetSubfield(body, inBundle, "data");
+
 		std::string regName("i");
 		regName.append(std::to_string(i));
-		regName.append("_discard_reg");
-		auto reg = builder.create<circt::firrtl::RegResetOp>(
+		regName.append("_discard_ctr");
+		auto discard_ctr_reg = builder.create<circt::firrtl::RegResetOp>(
 				location,
-				GetIntType(1),
+				GetIntType(ctr_bits),
 				clock,
 				reset,
-				zeroBitValue,
+                ctr_zero,
 				builder.getStringAttr(regName));
-		body->push_back(reg);
-		discardRegs.push_back(reg);
-		anyDiscardReg = AddOrOp(body, anyDiscardReg, reg);
+		body->push_back(discard_ctr_reg);
 
 		std::string wireName("i");
 		wireName.append(std::to_string(i));
 		wireName.append("_discard");
-		auto wire = AddWireOp(body, wireName, 1);
-	        discardWires.push_back(wire);
-		Connect(body, wire, reg);
-		Connect(body, reg, wire);
+		auto discard_wire = AddWireOp(body, wireName, 1);
+	        discardWires.push_back(discard_wire);
+        Connect(body, discard_wire, zeroBitValue);
+        auto discard_queued = AddNeqOp(body, discard_ctr_reg, ctr_zero);
+        discard_queueds.push_back(discard_queued);
+        auto discard_full = AddEqOp(body, discard_ctr_reg, ctr_max);
+        any_discard_full = AddOrOp(body, any_discard_full, discard_full);
+        auto fire = AddAndOp(body, inReady, inValid);
+        Connect(body, inReady, AddOrOp(body, discard_queued, discard_wire));
+        auto whenOp = AddWhenOp(body, AddAndOp(body, AddAndOp(body, discard_queued, fire), AddNotOp(body, discard_wire)), true);
+        PartialConnect(&whenOp.getThenBlock(), discard_ctr_reg, AddSubOp(&whenOp.getThenBlock(), discard_ctr_reg, ctr_one));
+        auto elseWhenOp = AddWhenOp(&whenOp.getElseBlock(), AddAndOp(&whenOp.getElseBlock(), discard_wire, AddNotOp(&whenOp.getElseBlock(), fire)), false);
+        PartialConnect(&elseWhenOp.getThenBlock(), discard_ctr_reg, AddAddOp(&elseWhenOp.getThenBlock(), discard_ctr_reg, ctr_one));
 	}
-	auto notAnyDiscardReg = AddNotOp(body, anyDiscardReg);
 
-	auto processedReg = builder.create<circt::firrtl::RegResetOp>(
-				location,
-				GetIntType(1),
-				clock,
-				reset,
-				zeroBitValue,
-				builder.getStringAttr("processed_reg"));
-	body->push_back(processedReg);
-	auto notProcessedReg = AddNotOp(body, processedReg);
+    auto out_fire = AddAndOp(body, outReady, outValid);
+    Connect(body, inReady0, out_fire);
+
+    auto matchBlock = &AddWhenOp(body, AddAndOp(body, inValid0, AddNotOp(body, any_discard_full)), false).getThenBlock();
 
 	for (size_t i=1; i<inputs; i++) {
 		auto inBundle = GetInPort(module, i);
-		auto inReady = GetSubfield(body, inBundle, "ready");
-		auto inValid = GetSubfield(body, inBundle, "valid");
-		auto inData  = GetSubfield(body, inBundle, "data");
+		auto inReady = GetSubfield(matchBlock, inBundle, "ready");
+		auto inValid = GetSubfield(matchBlock, inBundle, "valid");
+		auto inData  = GetSubfield(matchBlock, inBundle, "data");
 
-		Connect(body, inReady, discardWires[i-1]);
-
-		// First when
-		auto andOp = AddAndOp(body, inReady, inValid);
-		auto whenOp = AddWhenOp(body, andOp, false);
-		auto thenBody = whenOp.getThenBodyBuilder().getBlock();
-		Connect(thenBody, discardRegs[i-1], zeroBitValue);
-
-		// Second when
-		auto constant = GetConstant(body, 64, i-1);
-		auto eqOp = AddEqOp(body, inData0, constant);
-		auto andOp0 = AddAndOp(body, inValid0, eqOp);
-		auto andOp1 = AddAndOp(body, notAnyDiscardReg, andOp0);
-		whenOp = AddWhenOp(body, andOp1, false);
-		thenBody = whenOp.getThenBodyBuilder().getBlock();
-		Connect(thenBody, outValid, inValid);
-		Connect(thenBody, outData, inData);
-		Connect(thenBody, inReady, outReady);
-		auto andOp2 = AddAndOp(thenBody, outReady, inValid);
-		Connect(thenBody, inReady0, andOp2);
-
-		// Nested when
-		whenOp = AddWhenOp(thenBody, notProcessedReg, false);
-		thenBody = whenOp.getThenBodyBuilder().getBlock();
-		Connect(thenBody, processedReg, oneBitValue);
-		for (size_t j = 1; j < inputs; ++j) {
-			if (i != j) {
-				Connect(thenBody, discardWires[j-1], oneBitValue);
-			}
-		}
+        auto whenBlock = &AddWhenOp(matchBlock, AddAndOp(matchBlock, AddEqOp(matchBlock, inData0, GetConstant(matchBlock, 64, i-1)),
+                                                         AddNotOp(matchBlock, discard_queueds[i-1])), false).getThenBlock();
+        Connect(whenBlock, outValid, inValid);
+        Connect(whenBlock, outData, inData);
+        Connect(whenBlock, inReady, outReady);
+        for (size_t j=1; j<inputs; j++) {
+            if(i == j){
+                continue;
+            }
+            Connect(whenBlock, discardWires[j-1], out_fire);
+        }
 	}
-
-	auto andOp = AddAndOp(body, outValid, outReady);
-	auto whenOp = AddWhenOp(body, andOp, false);
-	auto thenBody = whenOp.getThenBodyBuilder().getBlock();
-	Connect(thenBody, processedReg, zeroBitValue);
 
 	return module;
 }
