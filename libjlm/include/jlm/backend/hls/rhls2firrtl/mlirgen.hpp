@@ -205,6 +205,7 @@ namespace jlm {
 
             std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
             createInstances(jive::region *subRegion, mlir::Block *circuitBody, mlir::Block *body);
+            void check_module(circt::firrtl::FModuleOp &module);
         };
 
 		class MLIRGen : public BaseHLS {

@@ -3120,18 +3120,180 @@ jlm::hls::MLIRGenImpl::AddWhenOp(mlir::Block *body, mlir::Value condition, bool 
 	return op;
 }
 
+void check_may_not_depend_on(mlir::Value value, mlir::SmallPtrSet<mlir::Value, 16> &forbiddenDependencies, mlir::SmallPtrSet<mlir::Value, 16> &visited){
+    if(visited.contains(value)){
+        return;
+    }
+    visited.insert(value);
+    if(forbiddenDependencies.contains(value)){
+        throw jlm::error("forbidden dependency detected");
+    }
+    auto op = value.getDefiningOp();
+    // don't check anything for registers - connects don't count since they don't form combinatorial circuits
+    if(mlir::dyn_cast<circt::firrtl::RegResetOp>(op)){
+        return;
+    } else if(mlir::dyn_cast<circt::firrtl::RegOp>(op)){
+        return;
+    }
+    // check uses because of connects
+    for (auto &use: value.getUses()){
+        auto *user = use.getOwner();
+        if(auto connectOp = mlir::dyn_cast<circt::firrtl::ConnectOp>(user)){
+            if(connectOp.dest() == value){
+                check_may_not_depend_on(connectOp.src(), forbiddenDependencies, visited);
+            }
+        } else {
+        }
+    }
+    // stop at port level
+    if(mlir::dyn_cast<circt::firrtl::SubfieldOp>(op)){
+        return;
+    }
+    assert(op->getNumResults() == 1);
+    for (size_t i = 0; i < op->getNumOperands(); ++i) {
+        check_may_not_depend_on(op->getOperand(i), forbiddenDependencies, visited);
+    }
+}
+
+void check_oValids(llvm::SmallVector<mlir::Value> &oReadys, llvm::SmallVector<mlir::Value> &oValids){
+    mlir::SmallPtrSet<mlir::Value, 16> forbiddenDependencies(oReadys.begin(), oReadys.end());
+    for (auto oValid:oValids) {
+        mlir::SmallPtrSet<mlir::Value, 16> visited;
+        check_may_not_depend_on(oValid, forbiddenDependencies, visited);
+    }
+}
+
+void
+jlm::hls::MLIRGenImpl::check_module(circt::firrtl::FModuleOp &module){
+    // check if module/node obeys ready/valid semantics at the circuit level
+
+    // compile time: ovalid and odata may not depend on oready
+    llvm::SmallVector<mlir::Value> oReadys;
+    llvm::SmallVector<mlir::Value> oValids;
+    llvm::SmallVector<mlir::Value> oDatas;
+    for (size_t i = 0; i < module.getNumPorts(); ++i) {
+        auto portName = module.getPortName(i);
+        auto port = module.getArgument(i);
+        if(portName.startswith("o")){
+            // out port
+            for (auto &use: port.getUses()) {
+                auto *user = use.getOwner();
+                if(auto subfieldOp = mlir::dyn_cast<circt::firrtl::SubfieldOp>(user)){
+                    auto subfieldName = subfieldOp.input().getType().cast<circt::firrtl::BundleType>().getElementName(subfieldOp.fieldIndex());
+                    if(subfieldName == "ready") {
+                        oReadys.push_back(subfieldOp);
+                    } else if(subfieldName == "valid") {
+                        oValids.push_back(subfieldOp);
+                    } else if(subfieldName == "data") {
+                        oDatas.push_back(subfieldOp);
+                    }
+                } else {
+                    user->print(llvm::outs());
+                    llvm_unreachable("unexpected operation");
+                }
+            }
+        }
+    }
+    check_oValids(oReadys, oValids);
+    check_oValids(oReadys, oDatas);
+
+#ifdef FIRRTL_RUNTIME_ASSERTIONS
+    // run time: valid/ready may not go down without firing once they are up - insert assertions
+    auto body = &module.body().back();
+    auto clock = GetClockSignal(module);
+    auto reset = GetResetSignal(module);
+    auto zeroBitValue = GetConstant(body, 1, 0);
+    for (size_t i = 0; i < module.getNumPorts(); ++i) {
+        auto portName = module.getPortName(i);
+        auto port = module.getArgument(i);
+        if(portName.startswith("o")||portName.startswith("i")){
+            auto ready = GetSubfield(body, port, "ready");
+            auto valid = GetSubfield(body, port, "valid");
+            auto data = GetSubfield(body, port, "data");
+            if(data.getResult().getType().dyn_cast<circt::firrtl::BundleType>()){
+                // skip memory ports
+                continue;
+            }
+            auto fire = AddAndOp(body, ready, valid);
+            auto prev_ready_reg = builder.create<circt::firrtl::RegResetOp>(
+                    location,
+                    GetIntType(1),
+                    clock,
+                    reset,
+                    zeroBitValue,
+                    std::string(portName)+"_prev_ready_reg");
+            body->push_back(prev_ready_reg);
+            auto prev_valid_reg = builder.create<circt::firrtl::RegResetOp>(
+                    location,
+                    GetIntType(1),
+                    clock,
+                    reset,
+                    zeroBitValue,
+                    std::string(portName)+"_prev_valid_reg");
+            body->push_back(prev_valid_reg);
+            auto prev_data_reg = builder.create<circt::firrtl::RegOp>(
+                    location,
+                    data.getResult().getType(),
+                    clock,
+                    std::string(portName)+"_prev_data_reg");
+            body->push_back(prev_data_reg);
+            Connect(body, prev_ready_reg, ready);
+            Connect(body, prev_valid_reg, valid);
+            Connect(body, prev_data_reg, data);
+            auto fireBody = &AddWhenOp(body, fire, false).getThenBlock();
+            Connect(fireBody, prev_ready_reg, zeroBitValue);
+            Connect(fireBody, prev_valid_reg, zeroBitValue);
+
+            auto valid_assert = builder.create<circt::firrtl::AssertOp>(
+                    location,
+                    clock,
+            AddNotOp(body, AddAndOp(body, prev_valid_reg, AddNotOp(body, valid))),
+                    AddNotOp(body, reset),
+                    std::string(portName)+"_valid went down without firing",
+                    mlir::ValueRange(),
+                    std::string(portName)+"_valid_assert"
+                    );
+            body->push_back(valid_assert);
+
+            auto ready_assert = builder.create<circt::firrtl::AssertOp>(
+                    location,
+                    clock,
+                    AddNotOp(body, AddAndOp(body, prev_ready_reg, AddNotOp(body, ready))),
+                    AddNotOp(body, reset),
+                    std::string(portName)+"_ready went down without firing",
+                    mlir::ValueRange(),
+                    std::string(portName)+"_ready_assert"
+                    );
+            body->push_back(ready_assert);
+
+            auto data_assert = builder.create<circt::firrtl::AssertOp>(
+                    location,
+                    clock,
+                    AddNotOp(body, AddAndOp(body, prev_valid_reg, AddNeqOp(body, prev_data_reg, data))),
+                    AddNotOp(body, reset),
+                    std::string(portName)+"_data changed without firing",
+                    mlir::ValueRange(),
+                    std::string(portName)+"_data_assert"
+                    );
+            body->push_back(data_assert);
+        }
+    }
+#endif // FIRRTL_RUNTIME_ASSERTIONS
+}
+
 circt::firrtl::InstanceOp
 jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node) {
 	auto name = GetModuleName(node);
 	// Check if the module has already been instantiated else we need to generate it
 	if (!modules[name]) {
 		auto module = MlirGen(node);
+        check_module(module);
 		modules[name] = module;
 		body->push_back(module);
 	}
 	// We increment a counter for each node that is instantiated
 	// to assure the name is unique while still being relatively
-	// easy to ready (which helps when debugging).
+	// easy to read (which helps when debugging).
     auto node_name = get_node_name(node);
 	return builder.create<circt::firrtl::InstanceOp>(location, modules[name], node_name);
 }
