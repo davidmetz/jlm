@@ -384,7 +384,8 @@ jlm::hls::MLIRGenImpl::MlirGenFork(const jive::simple_node *node) {
 	llvm::SmallVector<circt::firrtl::AndPrimOp> whenConditions;
 	auto oneBitValue = GetConstant(body, 1, 1);
 	auto zeroBitValue = GetConstant(body, 1, 0);
-	mlir::Value allFired = oneBitValue;
+    // outputs can only fire if input is valid. This should not be necessary, unless other components misbehave
+	mlir::Value allFired = inValid;
 	for (size_t i = 0; i < node->noutputs(); ++i) {
 		std::string validName("out");
 		validName.append(std::to_string(i));
