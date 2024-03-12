@@ -12,7 +12,7 @@
 #include "jlm/ir/operators/store.hpp"
 #include "jlm/ir/operators/load.hpp"
 #include "jlm/ir/operators/call.hpp"
-#include "jlm/ir/operators/getelementptr.hpp"
+#include "jlm/ir/operators/GetElementPtr.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/mem-conv.hpp"
 #include "jlm/ir/operators/operators.hpp"
 
@@ -73,7 +73,7 @@ jive::output * gep_to_index(jive::output * o){
     // TODO: handle geps that are not direct predecessors
     auto no = dynamic_cast<jive::node_output*>(o);
     JLM_ASSERT(no);
-    auto gep = dynamic_cast<const jlm::getelementptr_op*>(&no->node()->operation());
+    auto gep = dynamic_cast<const jlm::GetElementPtrOperation *>(&no->node()->operation());
     JLM_ASSERT(gep);
     // pointer to array, i.e. first index is zero
     // TODO: check
