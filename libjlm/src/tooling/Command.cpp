@@ -470,7 +470,7 @@ VerilatorCommand::ToString() const
     " --trace",
 #endif
     " -Wno-WIDTH", //divisions otherwise cause errors
-    " -j",
+    " -j `nproc`",
     " -Mdir ", TempFolder_.to_str(), "verilator/",
     " -MAKEFLAGS CXX=g++",
     " -CFLAGS -g", // TODO: switch for this

@@ -36,44 +36,43 @@ jlm::hls::loop_node *jlm::hls::loop_node::copy(jive::region *region, jive::subst
     auto nf = graph()->node_normal_form(typeid(jive::operation));
     nf->set_mutable(false);
 
-    jive::substitution_map rmap;
     auto loop = create(region, false);
 
     for (size_t i = 0; i < ninputs(); ++i) {
         auto in_origin = smap.lookup(input(i)->origin());
         auto inp = jive::structural_input::create(loop, in_origin, in_origin->type());
-        rmap.insert(input(i), loop->input(i));
+        smap.insert(input(i), loop->input(i));
         auto oarg = input(i)->arguments.begin().ptr();
         auto narg = jive::argument::create(loop->subregion(), inp, oarg->port());
-        rmap.insert(oarg, narg);
+        smap.insert(oarg, narg);
     }
     for (size_t i = 0; i < noutputs(); ++i) {
         auto out = jive::structural_output::create(loop, output(i)->type());
-        rmap.insert(output(i), out);
+        smap.insert(output(i), out);
         smap.insert(output(i), out);
     }
     for (size_t i = 0; i < subregion()->narguments(); ++i) {
         auto arg = subregion()->argument(i);
         if (auto ba = dynamic_cast<jlm::hls::backedge_argument*>(arg)) {
             auto na = loop->add_backedge(arg->type());
-            rmap.insert(ba, na);
+            smap.insert(ba, na);
         }
     }
 
-    subregion()->copy(loop->subregion(), rmap, false, false);
-    loop->_predicate_buffer = rmap.lookup(_predicate_buffer);
+    subregion()->copy(loop->subregion(), smap, false, false);
+    loop->_predicate_buffer = smap.lookup(_predicate_buffer);
     // redirect backedges
     for (size_t i = 0; i < subregion()->narguments(); ++i) {
         auto arg = subregion()->argument(i);
         if (auto ba = dynamic_cast<jlm::hls::backedge_argument*>(arg)) {
-            auto na = dynamic_cast<jlm::hls::backedge_argument*>(rmap.lookup(ba));
-            na->result()->divert_to(rmap.lookup(ba->result()->origin()));
+            auto na = dynamic_cast<jlm::hls::backedge_argument*>(smap.lookup(ba));
+            na->result()->divert_to(smap.lookup(ba->result()->origin()));
         }
     }
     for (size_t i = 0; i < noutputs(); ++i) {
         auto outp = output(i);
         auto res = outp->results.begin().ptr();
-        auto origin = rmap.lookup(res->origin());
+        auto origin = smap.lookup(res->origin());
         jive::result::create(loop->subregion(), origin, loop->output(i), res->port());
     }
     nf->set_mutable(true);

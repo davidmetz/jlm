@@ -11,40 +11,39 @@
 #include <jlm/ir/hls/hls.hpp>
 #include "base-hls.hpp"
 
-namespace jlm {
-	namespace hls {
-		class DotHLS : public BaseHLS {
-			std::string
-			extension() override;
+namespace jlm::hls {
+	class DotHLS : public BaseHLS {
+	public:
+		std::string
+		extension() override;
 
-			std::string
-			get_text(jlm::RvsdgModule &rm) override;
+		std::string
+		get_text(jlm::RvsdgModule &rm) override;
 
-		private:
-			std::string
-			argument_to_dot(jive::argument *port);
+		std::string
+		subregion_to_dot(jive::region *sr);
 
-			std::string
-			result_to_dot(jive::result *port);
+	private:
+		std::string
+		argument_to_dot(jive::argument *port);
 
-			std::string
-			node_to_dot(const jive::node *node);
+		std::string
+		result_to_dot(jive::result *port);
 
-			std::string
-			edge(std::string src, std::string snk, const jive::type &type, bool back = false);
+		std::string
+		node_to_dot(const jive::node *node);
 
-			std::string
-			loop_to_dot(hls::loop_node *ln);
+		std::string
+		edge(std::string src, std::string snk, const jive::type &type, bool back = false);
 
-			void
-			prepare_loop_out_port(hls::loop_node *ln);
+		std::string
+		loop_to_dot(hls::loop_node *ln);
 
-			std::string
-			subregion_to_dot(jive::region *sr);
+		void
+		prepare_loop_out_port(hls::loop_node *ln);
 
-			int loop_ctr = 0;
-		};
-	}
+		int loop_ctr = 0;
+	};
 }
 
 #endif //JLM_BACKEND_HLS_RHLS2FIRRTL_DOT_HLS_HPP

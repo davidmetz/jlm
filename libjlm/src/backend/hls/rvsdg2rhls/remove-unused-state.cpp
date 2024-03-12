@@ -157,13 +157,7 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 		// copy over cvarguments
 		smap.insert(ln->cvargument(i), new_lambda->add_ctxvar(ln->cvargument(i)->input()->origin()));
 	}
-    // handle mem_resp - TODO: might be better to have as part of the function type...
-    for (size_t i = 0; i < ln->subregion()->narguments(); ++i) {
-        auto arg = ln->subregion()->argument(i);
-        if(dynamic_cast<const jlm::hls::bundletype*>(&arg->type())){
-            smap.insert(arg, jive::argument::create(new_lambda->subregion(), nullptr, arg->type()));
-        }
-    }
+
 	size_t new_i = 0;
 	for (size_t i = 0; i < ln->nfctarguments(); ++i) {
 		auto arg = ln->fctargument(i);
@@ -182,15 +176,6 @@ jlm::hls::remove_lambda_passthrough(jlm::lambda::node *ln) {
 		}
 	}
 	auto new_out = new_lambda->finalize(new_results);
-
-
-    //handle mem_req - TODO: might be better to have as part of the function type...
-    for (size_t i = 0; i < ln->subregion()->nresults(); ++i) {
-        auto res = ln->subregion()->result(i);
-        if(dynamic_cast<const jlm::hls::bundletype*>(&res->type())){
-            jive::result::create(new_lambda->subregion(), smap.lookup(res->origin()), nullptr, res->type());
-        }
-    }
 
 	// TODO handle functions at other levels?
 	assert(ln->region() == ln->region()->graph()->root());

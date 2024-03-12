@@ -372,14 +372,20 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
     cpp << "	if(!top){\n"
 		   "		verilator_init(0, NULL);\n"
 		   "	}\n";
+	size_t register_ix = 0;
 	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
 		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
+			register_ix++;
 			continue;
 		}
+        else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+        {
+            continue;
+        }
 		cpp << "    top->i_data_" << i << " = (uint64_t) a" << i << ";\n";
+		register_ix++;
 	}
 	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
-		size_t ix = ln->cvargument(i)->input()->argument()->index();
 		std::string name;
 		if(auto a = dynamic_cast<jive::argument *>(ln->input(i)->origin())){
 			if(auto ip = dynamic_cast<const impport*>(&a->port())){
@@ -388,7 +394,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		} else{
 			throw jlm::error("Unsupported cvarg origin type type");
 		}
-		cpp << "    top->i_data_" << ix << " = (uint64_t) &" << name << ";\n";
+		cpp << "    top->i_data_" << register_ix++ << " = (uint64_t) &" << name << ";\n";
 		cpp << "#ifdef HLS_MEM_DEBUG\n";
 		cpp << "    std::cout << \"" << name << ": \" << &" << name << " << \"\\n\";\n";
 		cpp << "#endif\n";
@@ -410,7 +416,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "    posedge();\n"
         "    top->i_valid = 0;\n";
 	for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
-		cpp << "    top->i_data_" << i << " = 0;\n";
+		if (!dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i))) {
+			cpp << "    top->i_data_" << i << " = 0;\n";
+		}
 	}
 	cpp <<
 		"    finish_clock_cycle();\n"
@@ -519,6 +527,10 @@ void jlm::hls::VerilatorHarnessHLS::call_function(std::ostringstream &cpp, const
         if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
             continue;
         }
+        else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+        {
+            continue;
+        }
         if(i!=0){
             cpp << " ,";
         }
@@ -536,15 +548,24 @@ void jlm::hls::VerilatorHarnessHLS::get_function_header(
         return_type = "void";
     } else {
         auto type = &ln->type().ResultType(0);
-        if (dynamic_cast<const jive::statetype *>(type)) {
+        if (dynamic_cast<const jive::statetype *>(type))
+        {
             return_type = "void";
-        } else {
+        } else if (dynamic_cast<const jlm::hls::bundletype *>(type))
+        {
+            return_type = "void";
+        }
+        else {
             return_type = convert_to_c_type(type);
         }
     }
     cpp << return_type << " " << function_name << "(\n";
     for (size_t i = 0; i < ln->type().NumArguments(); ++i) {
         if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
+            continue;
+        }
+        else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+        {
             continue;
         }
         if (i != 0) {
