@@ -261,7 +261,7 @@ jive::output * separate_load_edge(
                     addr_edge = addr_sg_out2[1];
                     addr_edge_user->divert_to(addr_edge);
                     // remove state edges from load
-                    auto new_load_outputs = jlm::LoadNode::Create(addr_sg_out2[0], {}, lo->GetAlignment());
+                    auto new_load_outputs = jlm::LoadNode::Create(addr_sg_out2[0], {}, lo->GetLoadedType(), lo->GetAlignment());
                     // create state gate for mem edge and load data
                     auto mem_sg_out = jlm::hls::state_gate_op::create(*new_load_outputs[0], {mem_edge});
                     mem_edge = mem_sg_out[1];
