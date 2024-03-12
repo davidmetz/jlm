@@ -1847,7 +1847,6 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
 	auto body = module.getBody();
 
 	auto zeroBitValue = GetConstant(body, 1, 0);
-	auto oneBitValue  = GetConstant(body, 1, 1);
 
 	auto inputs = node->ninputs();
 	auto outBundle = GetOutPort(module, 0);
@@ -1883,7 +1882,6 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
         auto inBundle = GetInPort(module, i);
         auto inReady = GetSubfield(body, inBundle, "ready");
         auto inValid = GetSubfield(body, inBundle, "valid");
-        auto inData  = GetSubfield(body, inBundle, "data");
 
 		std::string regName("i");
 		regName.append(std::to_string(i));
