@@ -82,19 +82,10 @@ const jive::bitconstant_op * trace_channel(const jive::output * dst){
     JLM_UNREACHABLE("Channel not found");
 }
 
-inline bool
-is_fct_ptr(const jive::input *input) {
-    auto pt = dynamic_cast<const jlm::PointerType *>(&input->type());
-    if (!pt)
-        return false;
-    return dynamic_cast<const jlm::FunctionType *>(&pt->GetElementType());
-}
-
 const jive::output *trace_call(const jive::output *output);
 
 const jive::output *trace_call(const jive::input *input) {
     // version of trace call for rhls
-    JLM_ASSERT(is_fct_ptr(input));
     return trace_call(input->origin());
 }
 
@@ -143,6 +134,7 @@ std::string get_impport_function_name(jive::input *input){
 // trace function ptr to its call
 void trace_function_calls(jive::output * op, std::vector<jive::simple_node*> &calls,
                              std::unordered_set<jive::output*> & visited) {
+/*
     if(auto pt = dynamic_cast<const jlm::PointerType*>(&op->type())){
         // only process fucntion pointer outputs
         if(!dynamic_cast<const jlm::FunctionType *>(&pt->GetElementType())){
@@ -151,7 +143,7 @@ void trace_function_calls(jive::output * op, std::vector<jive::simple_node*> &ca
     } else{
         return;
     }
-
+*/
     if(visited.count(op)){
         // skip already processed outputs
         return;
@@ -188,7 +180,7 @@ jive::simple_node *find_decouple_response(const jlm::lambda::node * lambda, cons
     jive::argument * response_function;
     for (size_t i = 0; i < lambda->ncvarguments(); ++i) {
         auto ip = lambda->cvargument(i)->input();
-        if(is_fct_ptr(ip) && get_impport_function_name(ip) == "decouple_response"){
+        if(dynamic_cast<const jlm::PointerType *>(ip) && get_impport_function_name(ip) == "decouple_response"){
             response_function = lambda->cvargument(i);
         }
     }
@@ -331,7 +323,7 @@ void jlm::hls::trace_pointer_arguments(const jlm::lambda::node * ln, port_load_s
     for (size_t i = 0; i < ln->subregion()->narguments(); ++i) {
         auto arg = ln->subregion()->argument(i);
         if(auto pt = dynamic_cast<const jlm::PointerType*>(&arg->type())){
-            if(dynamic_cast<const jlm::FunctionType *>(&pt->GetElementType())){
+            if(trace_call(arg->input()) != nullptr){
                 // skip function pointers
                 continue;
             }
@@ -373,8 +365,8 @@ jlm::hls::MemoryConverter(jlm::RvsdgModule &rm)
     trace_pointer_arguments(lambda, portNodes);
 
     auto responseTypePtr = get_mem_res_type(jive::bit64);
-    auto requestTypePtr = get_mem_req_type(jlm::PointerType(jive::bit64), false);
-    auto requestTypePtrWrite = get_mem_req_type(jlm::PointerType(jive::bit64), true);
+    auto requestTypePtr = get_mem_req_type(jive::bit64, false);
+    auto requestTypePtrWrite = get_mem_req_type(jive::bit64, true);
 
     std::unordered_set<jive::simple_node *> accountedNodes;
     for (auto & portNode : portNodes)
@@ -481,7 +473,7 @@ jlm::hls::MemoryConverter(jlm::RvsdgModule &rm)
         auto cvarg = newLambda->cvargument(i);
         if(auto pointerType = dynamic_cast<const jlm::PointerType*>(&cvarg->type()))
         {
-            if (dynamic_cast<const jlm::FunctionType *>(&pointerType->GetElementType()))
+            if (trace_call(cvarg->input()) != nullptr)
             {
                 JLM_ASSERT(cvarg->nusers() == 0);
                 auto cvip = cvarg->input();
@@ -538,8 +530,8 @@ jlm::hls::ConnectRequestResponseMemPorts(
     std::vector<const jive::type *> loadTypes;
     for (auto load: loadNodes)
     {
-        auto pointerType = dynamic_cast<const PointerType*>(&load->input(0)->type());
-        loadTypes.push_back(&pointerType->GetElementType());
+        JLM_ASSERT(dynamic_cast<const PointerType*>(&load->input(0)->type()));
+        loadTypes.push_back(&load->output(0)->type());
     }
     for (auto decoupled: decoupledNodes)
     {
@@ -579,7 +571,13 @@ jlm::hls::ConnectRequestResponseMemPorts(
         storeOperands.push_back(addr);
         storeOperands.push_back(data);
     }
-    return mem_req_op::create(loadAddresses, storeOperands, lambdaRegion)[0];
+
+    std::vector<const jive::valuetype *> loadValueTypes;
+    for (auto type : loadTypes)
+    {
+        loadValueTypes.push_back(dynamic_cast<const jive::valuetype *>(type));
+    }
+    return mem_req_op::create(loadAddresses, storeOperands, loadValueTypes, lambdaRegion)[0];
 }
 
 jive::simple_node *

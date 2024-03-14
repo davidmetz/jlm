@@ -97,13 +97,12 @@ jlm::hls::alloca_conv(jive::region *region) {
             JLM_ASSERT(constant_operation);
             JLM_ASSERT(constant_operation->value().to_uint() == 1);
             // ensure that the alloca is an array type
-            auto pt = dynamic_cast<const jlm::PointerType*>(&node->output(0)->type());
-            auto at = dynamic_cast<const jlm::arraytype*>(&pt->GetElementType());
+            auto at = dynamic_cast<const jlm::arraytype*>(&po->value_type());
             JLM_ASSERT(at);
             // detect loads and stores attached to alloca
             TraceAllocaUses ta(node->output(0));
             // create memory + response
-            auto mem_outs = jlm::hls::local_mem_op::create(*node->output(0));
+            auto mem_outs = jlm::hls::local_mem_op::create(*at, node->region());
             auto resp_outs = jlm::hls::local_mem_resp_op::create(*mem_outs[0], ta.load_nodes.size());
             std::cout << "alloca converted " << at->debug_string() << std::endl;
             // replace gep outputs (convert pointer to index calculation)

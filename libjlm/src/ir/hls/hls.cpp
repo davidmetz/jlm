@@ -107,13 +107,13 @@ void jlm::hls::loop_node::set_predicate(jive::output *p) {
         remove(node);
 }
 
-std::unique_ptr<jlm::hls::bundletype> jlm::hls::get_mem_req_type(const jlm::PointerType &pointerType, bool write) {
+std::unique_ptr<jlm::hls::bundletype> jlm::hls::get_mem_req_type(const jive::valuetype & elementType, bool write) {
     auto elements = new std::vector<std::pair<std::string, std::unique_ptr<jive::type>>>();
-    elements->emplace_back("addr", pointerType.copy());
+    elements->emplace_back("addr", PointerType::Create());
     elements->emplace_back("size", std::make_unique<jive::bittype>(4));
     elements->emplace_back("id", std::make_unique<jive::bittype>(8));
     if(write){
-        elements->emplace_back("data", pointerType.GetElementType().copy());
+        elements->emplace_back("data", elementType.copy());
         elements->emplace_back("write", std::make_unique<jive::bittype>(1));
     }
     return std::make_unique<bundletype>(elements);

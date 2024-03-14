@@ -601,13 +601,13 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         memReqWrite = GetSubfield(body, memReqBundle, "write");
     }
 
-    llvm::SmallVector<const jive::type*> loadAddrTypes;
+    auto loadTypes = op->GetLoadTypes();
     llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrReadys;
     llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrValids;
     llvm::SmallVector<circt::firrtl::SubfieldOp> loadAddrDatas;
     llvm::SmallVector<mlir::Value> loadIds;
 
-    llvm::SmallVector<const jive::type*> storeAddrTypes;
+    auto storeTypes = op->GetStoreTypes();
     llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrReadys;
     llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrValids;
     llvm::SmallVector<circt::firrtl::SubfieldOp> storeAddrDatas;
@@ -618,7 +618,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     // the ports for loads come first and consist only of addresses. Stores have both addresses and data
     size_t id = 0;
     for (size_t i = 0; i < op->get_nloads(); ++i) {
-        loadAddrTypes.push_back(&node->input(i)->type());
+//        loadAddrTypes.push_back(&node->input(i)->type());
         auto bundle = GetInPort(module, i);
         loadAddrReadys.push_back(GetSubfield(body, bundle, "ready"));
         loadAddrValids.push_back(GetSubfield(body, bundle, "valid"));
@@ -628,7 +628,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     }
     for (size_t i = op->get_nloads(); i < node->ninputs(); ++i) {
         // Store
-        storeAddrTypes.push_back(&node->input(i)->type());
+//        storeAddrTypes.push_back(&node->input(i)->type());
         auto addrBundle = GetInPort(module, i);
         storeAddrReadys.push_back(GetSubfield(body, addrBundle, "ready"));
         storeAddrValids.push_back(GetSubfield(body, addrBundle, "valid"));
@@ -648,7 +648,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     Connect(body, memReqValid, zeroBitValue);
     ConnectInvalid(body, memReqBundle);
     mlir::Value previousGranted = GetConstant(body, 1, 0);
-    for (size_t i = 0; i < loadAddrTypes.size(); ++i) {
+    for (size_t i = 0; i < loadTypes.size(); ++i) {
         Connect(body, loadAddrReadys[i], zeroBitValue);
         auto notOp = AddNotOp(body, previousGranted);
         auto condition = AddAndOp(body, notOp, loadAddrValids[i]);
@@ -659,11 +659,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         Connect(thenBody, memReqAddr, loadAddrDatas[i]);
         Connect(thenBody, memReqId, loadIds[i]);
         // no data or write
-        auto dataType = &dynamic_cast<const PointerType*>(loadAddrTypes[i])->GetElementType();
         int bitWidth;
-        if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
+        if (auto bitType = dynamic_cast<const jive::bittype *>(loadTypes[i])) {
             bitWidth = bitType->nbits();
-        } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
+        } else if (dynamic_cast<const jlm::PointerType *>(loadTypes[i])) {
             bitWidth = 64;
         } else{
             throw jlm::error("unknown width for mem request");
@@ -677,7 +676,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         previousGranted = AddOrOp(body, previousGranted, loadAddrValids[i]);
     }
     //stores
-    for (size_t i = 0; i < storeAddrTypes.size(); ++i) {
+    for (size_t i = 0; i < storeTypes.size(); ++i) {
         Connect(body, storeAddrReadys[i], zeroBitValue);
         Connect(body, storeDataReadys[i], zeroBitValue);
         auto notOp = AddNotOp(body, previousGranted);
@@ -693,11 +692,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         Connect(thenBody, memReqData, storeDataDatas[i]);
         Connect(thenBody, memReqId, storeIds[i]);
         // no data or write
-        auto dataType = &dynamic_cast<const PointerType*>(storeAddrTypes[i])->GetElementType();
         int bitWidth;
-        if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
+        if (auto bitType = dynamic_cast<const jive::bittype *>(storeTypes[i])) {
             bitWidth = bitType->nbits();
-        } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
+        } else if (dynamic_cast<const jlm::PointerType *>(storeTypes[i])) {
             bitWidth = 64;
         } else{
             throw jlm::error("unknown width for mem request");
@@ -3505,12 +3503,12 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
         }
     }
     if(auto op = dynamic_cast<const jlm::hls::mem_req_op *>(&node->operation())){
+		auto loadTypes = op->GetLoadTypes();
         for (size_t i = 0; i < op->get_nloads(); ++i) {
-            auto dataType = &dynamic_cast<const PointerType*>(&node->input(i)->type())->GetElementType();
             int bitWidth;
-            if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
+            if (auto bitType = dynamic_cast<const jive::bittype *>(loadTypes[i])) {
                 bitWidth = bitType->nbits();
-            } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
+            } else if (dynamic_cast<const jlm::PointerType *>(loadTypes[i])) {
                 bitWidth = 64;
             } else{
                 throw jlm::error("unknown width for mem request");
