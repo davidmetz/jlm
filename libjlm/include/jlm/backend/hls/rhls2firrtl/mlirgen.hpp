@@ -18,13 +18,13 @@
 
 #include "base-hls.hpp"
 
-#ifdef CIRCT
+//#ifdef CIRCT
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Verifier.h"
-#include "mlir/Translation.h"
+//#include "mlir/Tools/mlir-translate/Translation.h"
 
 #include "circt/Dialect/FIRRTL/FIREmitter.h"
 #include "circt/Dialect/FIRRTL/FIRRTLDialect.h"
@@ -90,7 +90,7 @@ namespace jlm {
 					llvm::SmallVector<circt::firrtl::PortInfo> *ports,
 					circt::firrtl::Direction direction,
 					std::string name,
-					circt::firrtl::FIRRTLType type);
+					circt::firrtl::FIRRTLBaseType type);
 			circt::firrtl::SubfieldOp GetSubfield(
 					mlir::Block *body,
 					mlir::Value value,
@@ -104,7 +104,6 @@ namespace jlm {
 			mlir::BlockArgument GetInPort(circt::firrtl::FModuleOp &module, size_t portNr);
 			mlir::BlockArgument GetOutPort(circt::firrtl::FModuleOp &module, size_t portNr);
 			void Connect(mlir::Block *body, mlir::Value sink, mlir::Value source);
-			void PartialConnect(mlir::Block *body, mlir::Value sink, mlir::Value source);
 			// Primary operations
 			circt::firrtl::BitsPrimOp AddBitsOp(mlir::Block *body,
 							mlir::Value value,
@@ -199,7 +198,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp nodeToModule(const jive::simple_node *node, bool mem=false);
 			circt::firrtl::IntType GetIntType(int size);
 			circt::firrtl::IntType GetIntType(const jive::type *type, int extend = 0);
-            circt::firrtl::FIRRTLType GetFirrtlType(const jive::type *type);
+            circt::firrtl::FIRRTLBaseType GetFirrtlType(const jive::type *type);
 			std::string GetModuleName(const jive::node *node);
 			bool IsIdentityMapping(const jive::match_op &op);
 
@@ -255,6 +254,6 @@ namespace jlm {
         } // namespace hls
 } // namespace jlm
  
-#endif //CIRCT
+//#endif //CIRCT
 
 #endif // JLM_BACKEND_HLS_RHLS2FIRRTL_MLIRGEN_HPP

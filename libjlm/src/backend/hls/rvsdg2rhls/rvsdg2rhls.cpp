@@ -131,7 +131,7 @@ namespace jlm {
 					inline_calls(structnode->subregion(n));
 				}
 			} else if (dynamic_cast<const jlm::CallOperation *>(&(node->operation()))) {
-				auto traced = jlm::hls::trace_call(node->input(0));
+				auto traced = trace_call(node->input(0));
                 auto so = dynamic_cast<const jive::structural_output *>(traced);
                 if(!so){
                     auto arg = dynamic_cast<const jive::argument *>(traced);

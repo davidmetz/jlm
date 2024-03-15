@@ -323,7 +323,7 @@ void jlm::hls::trace_pointer_arguments(const jlm::lambda::node * ln, port_load_s
     for (size_t i = 0; i < ln->subregion()->narguments(); ++i) {
         auto arg = ln->subregion()->argument(i);
         if(auto pt = dynamic_cast<const jlm::PointerType*>(&arg->type())){
-            if(trace_call(arg->input()) != nullptr){
+            if(::trace_call(arg->input()) != nullptr){
                 // skip function pointers
                 continue;
             }
@@ -473,7 +473,7 @@ jlm::hls::MemoryConverter(jlm::RvsdgModule &rm)
         auto cvarg = newLambda->cvargument(i);
         if(auto pointerType = dynamic_cast<const jlm::PointerType*>(&cvarg->type()))
         {
-            if (trace_call(cvarg->input()) != nullptr)
+            if (::trace_call(cvarg->input()) != nullptr)
             {
                 JLM_ASSERT(cvarg->nusers() == 0);
                 auto cvip = cvarg->input();

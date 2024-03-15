@@ -12,6 +12,7 @@ ifdef CIRCT_PATH
 
   LDFLAGS += \
         -I$(CIRCT_LIB) \
+        -L$(CIRCT_PATH)/lib \
         -lMLIR \
         -lCIRCTAnalysisTestPasses \
         -lCIRCTDependenceAnalysis \
@@ -20,7 +21,7 @@ ifdef CIRCT_PATH
         -lCIRCTFIRRTLTransforms \
         -lCIRCTScheduling \
         -lCIRCTSchedulingAnalysis \
-        -lCIRCTSchedulingTestPasses \
+	-lCIRCTSeq \
         -lCIRCTSupport \
         -lCIRCTTransforms \
         -lCIRCTHW

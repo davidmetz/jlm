@@ -3,6 +3,8 @@
  * See COPYING for terms of redistribution.
  */
 
+#include <math.h>
+
 #include <jlm/ir/hls/hls.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include <jlm/ir/operators/load.hpp>

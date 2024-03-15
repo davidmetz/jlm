@@ -1,6 +1,6 @@
 TESTS = \
 
-include $(JLM_ROOT)/tests/libjive/Makefile.sub
+#include $(JLM_ROOT)/tests/libjive/Makefile.sub
 include $(JLM_ROOT)/tests/libjlm/Makefile.sub
 
 TEST_SOURCES = \

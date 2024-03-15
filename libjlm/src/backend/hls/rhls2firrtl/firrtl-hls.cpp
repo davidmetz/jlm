@@ -3,6 +3,8 @@
  * See COPYING for terms of redistribution.
  */
 
+#include <math.h>
+
 #include "jlm/backend/hls/rhls2firrtl/firrtl-hls.hpp"
 
 bool

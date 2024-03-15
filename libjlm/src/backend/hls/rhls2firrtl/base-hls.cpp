@@ -4,6 +4,7 @@
  */
 
 #include <algorithm>
+#include <math.h>
 #include <jlm/ir/hls/hls.hpp>
 #include <jlm/ir/operators/lambda.hpp>
 #include "jlm/backend/hls/rhls2firrtl/base-hls.hpp"

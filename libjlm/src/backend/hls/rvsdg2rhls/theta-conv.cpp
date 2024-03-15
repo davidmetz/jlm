@@ -21,6 +21,7 @@ jlm::hls::theta_conv(jive::theta_node *theta) {
             // value is constant in loop
             smap.insert(theta->input(i)->argument(), loop->add_loopconst(theta->input(i)->origin()));
             branches.push_back(nullptr);
+			theta->output(i)->divert_users(theta->input(i)->origin());
         } else{
             jive::output *buffer;
             loop->add_loopvar(theta->input(i)->origin(), &buffer);
