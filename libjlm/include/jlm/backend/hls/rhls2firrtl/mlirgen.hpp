@@ -187,6 +187,10 @@ namespace jlm {
 			circt::firrtl::InvalidValueOp GetInvalid(mlir::Block *body, int size);
             void ConnectInvalid(mlir::Block *body, mlir::Value value);
 
+			circt::firrtl::BitsPrimOp DropMSBs(mlir::Block *body,
+							mlir::Value value,
+							int amount);
+
 			jive::output *TraceArgument(jive::argument *arg);
 			jive::simple_output *TraceStructuralOutput(jive::structural_output *out);
 

@@ -45,49 +45,37 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAddOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitsub_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddSubOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitand_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAndOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddXorOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddOrOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddMulOp(body, input0, input1);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, op, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, op, 32));
 	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
@@ -96,9 +84,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto divOp = AddDivOp(body, sIntOp0, sIntOp1);
 		auto uIntOp = AddAsUIntOp(body, divOp);
 		// Connect the op to the output data
-		int outSize = JlmSize(&node->output(0)->type());
-		auto slice = AddBitsOp(body, uIntOp, outSize - 1, 0);
-		Connect(body, outData, slice);
+		Connect(body, outData, DropMSBs(body, uIntOp, 1));
 	} else if (dynamic_cast<const jive::bitshr_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
@@ -1922,13 +1908,11 @@ jlm::hls::MLIRGenImpl::MlirGenDMux(const jive::simple_node *node) {
         auto fire = AddAndOp(body, inReady, inValid);
         Connect(body, inReady, AddOrOp(body, discard_queued, discard_wire.getResult()));
         auto whenOp = AddWhenOp(body, AddAndOp(body, AddAndOp(body, discard_queued, fire), AddNotOp(body, discard_wire.getResult())), true);
-		// FIXME
 		// This connect was a partial connect and is likely to not work
-        Connect(&whenOp.getThenBlock(), discard_ctr_reg.getResult(), AddSubOp(&whenOp.getThenBlock(), discard_ctr_reg.getResult(), ctr_one));
+        Connect(&whenOp.getThenBlock(), discard_ctr_reg.getResult(), DropMSBs(&whenOp.getThenBlock(), AddSubOp(&whenOp.getThenBlock(), discard_ctr_reg.getResult(), ctr_one), 1));
         auto elseWhenOp = AddWhenOp(&whenOp.getElseBlock(), AddAndOp(&whenOp.getElseBlock(), discard_wire.getResult(), AddNotOp(&whenOp.getElseBlock(), fire)), false);
-		// FIXME
 		// This connect was a partial connect and is likely to not work
-        Connect(&elseWhenOp.getThenBlock(), discard_ctr_reg.getResult(), AddAddOp(&elseWhenOp.getThenBlock(), discard_ctr_reg.getResult(), ctr_one));
+        Connect(&elseWhenOp.getThenBlock(), discard_ctr_reg.getResult(), DropMSBs(&elseWhenOp.getThenBlock(), AddAddOp(&elseWhenOp.getThenBlock(), discard_ctr_reg.getResult(), ctr_one), 1));
 	}
 
     auto out_fire = AddAndOp(body, outReady, outValid);
@@ -2110,6 +2094,17 @@ jlm::hls::MLIRGenImpl::MlirGen(hls::loop_node *loopNode, mlir::Block *body, mlir
 	auto subRegion = loopNode->subregion();
 	return createInstances(subRegion, circuitBody, body);
 }
+
+
+circt::firrtl::BitsPrimOp
+jlm::hls::MLIRGenImpl::DropMSBs(mlir::Block *body, mlir::Value value, int amount)
+{
+	auto type = value.getType().cast<circt::firrtl::UIntType>();
+	auto width = type.getWidth();
+	auto result = AddBitsOp(body, value, width.value() - 1 - amount, 0);
+	return result;
+}
+
 
 // Trace the argument back to the "node" generating the value
 // Returns the output of a node or the argument of a region that has
@@ -3296,8 +3291,6 @@ jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node)
 	if (!modules[name]) {
 		auto module = MlirGen(node);
 
-		WriteModuleToFile(module, node);
-
         check_module(module);
 		modules[name] = module;
 		body->push_back(module);
@@ -3585,7 +3578,7 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 	// Verify the module
 	if (failed(mlir::verify(module))) {
 		module.emitError("module verification error");
-//        throw std::logic_error("Verification of firrtl failed");
+		throw std::logic_error("Verification of firrtl failed");
 	}
 
 	// Print the FIRRTL IR
