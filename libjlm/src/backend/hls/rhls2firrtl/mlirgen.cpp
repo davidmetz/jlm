@@ -2425,7 +2425,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		builder.getStringAttr("i"),
 		inputType,
 		circt::firrtl::Direction::In,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports.push_back(iBundle);
@@ -2448,7 +2448,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
 		builder.getStringAttr("o"),
 		outputType,
 		circt::firrtl::Direction::Out,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports.push_back(oBundle);
@@ -2479,7 +2479,7 @@ jlm::hls::MLIRGenImpl::MlirGen(const jlm::lambda::node *lambdaNode) {
                 builder.getStringAttr("mem_"+std::to_string(i)),
                 memType,
                 circt::firrtl::Direction::Out,
-                {builder.getStringAttr("")},
+                {},
                 location,
         };
         ports.push_back(memBundle);
@@ -2703,7 +2703,7 @@ jlm::hls::MLIRGenImpl::AddClockPort(llvm::SmallVector<circt::firrtl::PortInfo> *
 		builder.getStringAttr("clk"),
 		circt::firrtl::ClockType::get(builder.getContext()),
 		circt::firrtl::Direction::In,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports->push_back(port);
@@ -2716,7 +2716,7 @@ jlm::hls::MLIRGenImpl::AddResetPort(llvm::SmallVector<circt::firrtl::PortInfo> *
 		builder.getStringAttr("reset"),
 		circt::firrtl::IntType::get(builder.getContext(), false, 1),
 		circt::firrtl::Direction::In,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports->push_back(port);
@@ -2759,7 +2759,7 @@ jlm::hls::MLIRGenImpl::AddMemReqPort(llvm::SmallVector<circt::firrtl::PortInfo> 
 		builder.getStringAttr("mem_req"),
 		memType,
 		circt::firrtl::Direction::Out,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports->push_back(memBundle);
@@ -2783,7 +2783,7 @@ jlm::hls::MLIRGenImpl::AddMemResPort(llvm::SmallVector<circt::firrtl::PortInfo> 
 		builder.getStringAttr("mem_res"),
 		memResType,
 		circt::firrtl::Direction::In,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports->push_back(memResBundle);
@@ -2810,7 +2810,7 @@ jlm::hls::MLIRGenImpl::AddBundlePort(
 		builder.getStringAttr(name),
 		bundleType,
 		direction,
-		{builder.getStringAttr("")},
+		{},
 		location,
 	};
 	ports->push_back(bundle);
