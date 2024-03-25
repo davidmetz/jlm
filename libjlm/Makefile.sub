@@ -24,6 +24,7 @@ LIBJLM_SRC = \
 	libjlm/src/backend/hls/rvsdg2rhls/memstate-conv.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/mem-queue.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/mem-sep.cpp \
+	libjlm/src/backend/hls/util/view.cpp \
     \
     libjlm/src/backend/hls/rvsdg2rhls/instrument-ref.cpp \
     \
