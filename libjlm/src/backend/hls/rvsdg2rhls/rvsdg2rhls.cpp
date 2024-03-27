@@ -338,9 +338,6 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	pre_opt(rhls);
     merge_gamma(rhls);
 
-//	jlm::hls::add_prints(rhls);
-//    dump_xml(rhls, "post_opt.rvsdg");
-
 //    jlm::hls::mem_sep(rhls);
     jlm::hls::mem_sep_argument(rhls);
     // run conversion on copy

@@ -673,9 +673,9 @@ namespace jlm {
             ~load_op() {}
 
             load_op(
-                    const PointerType & pointerType,
+                    const jive::valuetype & pointeeType,
                     size_t numStates)
-                    : simple_op(CreateInPorts(pointerType, numStates), CreateOutPorts(pointerType, numStates)) {}
+                    : simple_op(CreateInPorts(pointeeType, numStates), CreateOutPorts(pointeeType, numStates)) {}
 
             bool
             operator==(const jive::operation &other) const noexcept override {
@@ -690,7 +690,7 @@ namespace jlm {
             static std::vector<jive::port>
             CreateInPorts(const jive::valuetype & pointeeType, size_t numStates)
             {
-                std::vector<jive::port> ports(1, { pointeeType });
+                std::vector<jive::port> ports(1, { jlm::PointerType::Create() }); //add
                 std::vector<jive::port> states(numStates, {MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
                 ports.emplace_back(pointeeType); // result
@@ -703,7 +703,7 @@ namespace jlm {
                 std::vector<jive::port> ports(1, { pointeeType });
                 std::vector<jive::port> states(numStates, {MemoryStateType::Create()});
                 ports.insert(ports.end(), states.begin(), states.end());
-                ports.emplace_back(PointerType()); // addr
+                ports.emplace_back(jlm::PointerType::Create()); // addr
                 return ports;
             }
 
@@ -724,8 +724,10 @@ namespace jlm {
                     jive::output &load_result
             ) {
                 auto region = addr.region();
-                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
-                load_op op(*pointerType, states.size());
+//                auto pointeeType = dynamic_cast<const PointerType*>(&addr.type());
+//                load_op op(*pointeeType, states.size());
+                auto pointeeType = dynamic_cast<const jive::valuetype *>(&load_result.type());
+                load_op op(*pointeeType, states.size());
                 std::vector<jive::output*> inputs;
                 inputs.push_back(&addr);
                 inputs.insert(inputs.end(), states.begin(), states.end());
@@ -989,8 +991,8 @@ namespace jlm {
             ~mem_req_op() {}
 
             mem_req_op(
-                    const std::vector<const jive::valuetype *> &load_types,
-                    const std::vector<const jive::valuetype *> &store_types)
+                    const std::vector<const PointerType *> &load_types,
+                    const std::vector<const PointerType *> &store_types)
                     : simple_op(CreateInPorts(load_types, store_types), CreateOutPorts(load_types, store_types)), nloads(load_types.size()), LoadTypes_(load_types), StoreTypes_(store_types) {}
 
             bool
@@ -1006,8 +1008,8 @@ namespace jlm {
 
             static std::vector<jive::port>
             CreateInPorts(
-                    const std::vector<const jive::valuetype *> &load_types,
-                    const std::vector<const jive::valuetype *> &store_types)
+                    const std::vector<const PointerType *> &load_types,
+                    const std::vector<const PointerType *> &store_types)
             {
                 std::vector<jive::port> ports;
                 for (auto lt:load_types) {
@@ -1022,8 +1024,8 @@ namespace jlm {
 
             static std::vector<jive::port>
             CreateOutPorts(
-                    const std::vector<const jive::valuetype *> &load_types,
-                    const std::vector<const jive::valuetype *> &store_types)
+                    const std::vector<const PointerType *> &load_types,
+                    const std::vector<const PointerType *> &store_types)
             {
                 size_t max_width = 64;
                 //TODO: fix once JlmSize is moved
@@ -1055,15 +1057,29 @@ namespace jlm {
             create(
                     const std::vector<jive::output *> &load_operands,
                     const std::vector<jive::output *> &store_operands,
-                    std::vector<const jive::valuetype *> & load_types,
+                    std::vector<const jive::valuetype *> & loadTypes,
                     jive::region * region
             ) {
+                std::vector<const PointerType *> load_types;
+                for (auto load : load_operands) {
+                    auto pointerType = dynamic_cast<const PointerType *>(&load->type());
+                    JLM_ASSERT(pointerType);
+                    load_types.push_back(pointerType);
+                }
                 JLM_ASSERT(store_operands.size()%2==0);
+                std::vector<const PointerType *> store_types;
+                for (auto store : store_operands) {
+                    auto pointerType = dynamic_cast<const PointerType *>(&store->type());
+                    JLM_ASSERT(pointerType);
+                    store_types.push_back(pointerType);
+                }
+/*
                 std::vector<const jive::valuetype *> store_types;
                 for (size_t i = 0; i < store_operands.size(); i+=2) {
                     auto pt = dynamic_cast<const jive::valuetype *>(&store_operands[i]->type());
                     store_types.push_back(pt);
                 }
+ */
                 mem_req_op op(load_types, store_types);
                 std::vector<jive::output*> operands(load_operands);
                 operands.insert(operands.end(), store_operands.begin(), store_operands.end());
@@ -1074,13 +1090,13 @@ namespace jlm {
                 return nloads;
             }
 
-            std::vector<const jive::valuetype *>
+            std::vector<const PointerType *>
             GetLoadTypes() const
             {
                 return LoadTypes_;
             }
 
-            std::vector<const jive::valuetype *>
+            std::vector<const PointerType *>
             GetStoreTypes() const
             {
                 return StoreTypes_;
@@ -1088,8 +1104,8 @@ namespace jlm {
 
         private:
             size_t nloads;
-            std::vector<const jive::valuetype *> LoadTypes_;
-            std::vector<const jive::valuetype *> StoreTypes_;
+            std::vector<const PointerType *> LoadTypes_;
+            std::vector<const PointerType *> StoreTypes_;
         };
 
         class store_op final : public jive::simple_op {
