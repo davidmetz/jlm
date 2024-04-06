@@ -45,37 +45,40 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAddOp(body, input0, input1);
 		// Connect the op to the output data
+		// We drop the carry bit
 		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitsub_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddSubOp(body, input0, input1);
 		// Connect the op to the output data
+		// We drop the carry bit
 		Connect(body, outData, DropMSBs(body, op, 1));
 	} else if (dynamic_cast<const jive::bitand_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddAndOp(body, input0, input1);
 		// Connect the op to the output data
-		Connect(body, outData, DropMSBs(body, op, 1));
+		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitxor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddXorOp(body, input0, input1);
 		// Connect the op to the output data
-		Connect(body, outData, DropMSBs(body, op, 1));
+		Connect(body, outData, op);
 	} else if (dynamic_cast<const jive::bitor_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddOrOp(body, input0, input1);
 		// Connect the op to the output data
-		Connect(body, outData, DropMSBs(body, op, 1));
-	} else if (dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
+		Connect(body, outData, op);
+	} else if (auto bitmulOp = dynamic_cast<const jive::bitmul_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
 		auto op = AddMulOp(body, input0, input1);
 		// Connect the op to the output data
-		Connect(body, outData, DropMSBs(body, op, 32));
+		// Multiplication results are double the input width, so we drop the upper half of the result
+		Connect(body, outData, DropMSBs(body, op, bitmulOp->type().nbits()));
 	} else if (dynamic_cast<const jive::bitsdiv_op *>(&(node->operation()))) {
 		auto input0 = GetSubfield(body, inBundles[0], "data");
 		auto input1 = GetSubfield(body, inBundles[1], "data");
@@ -3584,7 +3587,6 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 		module.emitError("module verification error");
 		throw std::logic_error("Verification of firrtl failed");
 	}
-
 	// Print the FIRRTL IR
 	module.print(llvm::outs());
 
@@ -3593,8 +3595,12 @@ jlm::hls::MLIRGenImpl::WriteCircuitToFile(const circt::firrtl::CircuitOp circuit
 	std::error_code EC;
 	llvm::raw_fd_ostream output(fileName, EC);
 	auto status = circt::firrtl::exportFIRFile(module, output);
+
 	if (status.failed())
+	{
 		throw jlm::error("Exporting of FIRRTL failed");
+	}
+
 	output.close();
 	std::cout << "\nWritten firrtl to " << fileName << "\n";
 }
