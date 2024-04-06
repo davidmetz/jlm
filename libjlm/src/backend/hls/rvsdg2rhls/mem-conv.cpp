@@ -550,7 +550,10 @@ jlm::hls::MemoryConverter(jlm::RvsdgModule &rm)
         auto cvarg = newLambda->cvargument(i);
         if(auto pointerType = dynamic_cast<const jlm::PointerType*>(&cvarg->type()))
         {
-            if (::trace_call(cvarg->input()) != nullptr)
+            // The only functions at this time is decoupled loads that are encoded as functions by the user
+//            if (dynamic_cast<const jlm::FunctionType *>(&pointerType->GetElementType()))
+            auto visited = std::unordered_set<jive::output*>();
+            if (IsDecoupledFunctionPointer(cvarg->input()->origin(), visited))
             {
                 JLM_ASSERT(cvarg->nusers() == 0);
                 auto cvip = cvarg->input();
@@ -581,13 +584,14 @@ jlm::hls::ConnectRequestResponseMemPorts(
     // We have the memory operations from the original lambda and need to lookup the corresponding nodes in the new lambda
     //
     std::vector<jive::simple_node *> loadNodes;
-    std::vector<const jive::type *> loadTypes;
+    std::vector<const jive::valuetype *> loadTypes;
     for (auto loadNode : originalLoadNodes)
     {
         JLM_ASSERT(smap.contains(*loadNode->output(0)));
         auto loadOutput = dynamic_cast<jive::simple_output *>(smap.lookup(loadNode->output(0)));
         loadNodes.push_back(loadOutput->node());
-        loadTypes.push_back(&loadNode->output(0)->type());
+        auto loadOp = AssertedCast<const jlm::LoadOperation>(&loadOutput->node()->operation());
+        loadTypes.push_back(&loadOp->GetLoadedType());
     }
     std::vector<jive::simple_node *> storeNodes;
     for (auto storeNode : originalStoreNodes)
@@ -608,14 +612,32 @@ jlm::hls::ConnectRequestResponseMemPorts(
     auto lambdaRegion = lambda->subregion();
 
     auto loadResponses = mem_resp_op::create(*lambdaRegion->argument(argumentIndex), loadTypes);
+    // The (decoupled) load nodes are replaced so the pointer to the types will become invalid
+    loadTypes.clear();
     std::vector<jive::output *> loadAddresses;
     for (size_t i = 0; i < loadNodes.size(); ++i)
     {
         auto routed = route_response(loadNodes[i]->region(), loadResponses[i]);
         // The smap contains the nodes from the original lambda so we need to use the original load node when replacing the load since the smap must be updated
         auto replacement = ReplaceLoad(smap, originalLoadNodes[i], routed);
-        auto addr = route_request(lambdaRegion, replacement->output(replacement->noutputs()-1));
-        loadAddresses.push_back(addr);
+        auto address = route_request(lambdaRegion, replacement->output(replacement->noutputs()-1));
+        loadAddresses.push_back(address);
+        const jive::valuetype * type;
+        if (auto loadOperation = dynamic_cast<const jlm::hls::load_op *>(&replacement->operation()))
+        {
+            type = &loadOperation->GetLoadedType();
+
+        }
+        else if (auto loadOperation = dynamic_cast<const jlm::hls::decoupled_load_op *>(&replacement->operation()))
+        {
+            type = &loadOperation->GetLoadedType();
+        }
+        else
+        {
+            JLM_UNREACHABLE("Unknown load operation");
+        }
+        JLM_ASSERT(type);
+        loadTypes.push_back(type);
     }
     for (size_t i = 0; i < decoupledNodes.size(); ++i)
     {
@@ -628,6 +650,7 @@ jlm::hls::ConnectRequestResponseMemPorts(
         // TODO: routing is probably not necessary
         auto addr = route_request(lambdaRegion, replacement->output(1));
         loadAddresses.push_back(addr);
+        loadTypes.push_back(&dynamic_cast<const jlm::hls::decoupled_load_op *>(&replacement->operation())->GetLoadedType());
     }
     std::vector<jive::output *> storeOperands;
     for (size_t i = 0; i < storeNodes.size(); ++i)
@@ -640,12 +663,14 @@ jlm::hls::ConnectRequestResponseMemPorts(
         storeOperands.push_back(data);
     }
 
+/*
     std::vector<const jive::valuetype *> loadValueTypes;
     for (auto type : loadTypes)
     {
         loadValueTypes.push_back(dynamic_cast<const jive::valuetype *>(type));
     }
-    return mem_req_op::create(loadAddresses, storeOperands, loadValueTypes, lambdaRegion)[0];
+*/
+    return mem_req_op::create(loadAddresses, loadTypes, storeOperands, lambdaRegion)[0];
 }
 
 jive::simple_node *
@@ -696,6 +721,7 @@ jlm::hls::ReplaceStore(
     auto replacedStore = ((jive::simple_output *)smap.lookup(originalStore->output(0)))->node();
 
     auto addr = replacedStore->input(0)->origin();
+    JLM_ASSERT(dynamic_cast<const jlm::PointerType *>(&addr->type()));
     auto data = replacedStore->input(1)->origin();
     std::vector<jive::output *> states;
     for (size_t i = 2; i < replacedStore->ninputs(); ++i)

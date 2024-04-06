@@ -650,7 +650,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
     Connect(body, memReqValid, zeroBitValue);
     ConnectInvalid(body, memReqBundle);
     mlir::Value previousGranted = GetConstant(body, 1, 0);
-    for (size_t i = 0; i < loadTypes.size(); ++i) {
+    for (size_t i = 0; i < loadTypes->size(); ++i) {
         Connect(body, loadAddrReadys[i], zeroBitValue);
         auto notOp = AddNotOp(body, previousGranted);
         auto condition = AddAndOp(body, notOp, loadAddrValids[i]);
@@ -662,9 +662,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         Connect(thenBody, memReqId, loadIds[i]);
         // no data or write
         int bitWidth;
-        if (auto bitType = dynamic_cast<const jive::bittype *>(loadTypes[i])) {
+		auto loadType = loadTypes->at(i).get();
+        if (auto bitType = dynamic_cast<const jive::bittype *>(loadType)) {
             bitWidth = bitType->nbits();
-        } else if (dynamic_cast<const jlm::PointerType *>(loadTypes[i])) {
+        } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
             bitWidth = 64;
         } else{
             throw jlm::error("unknown width for mem request");
@@ -678,7 +679,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         previousGranted = AddOrOp(body, previousGranted, loadAddrValids[i]);
     }
     //stores
-    for (size_t i = 0; i < storeTypes.size(); ++i) {
+    for (size_t i = 0; i < storeTypes->size(); ++i) {
         Connect(body, storeAddrReadys[i], zeroBitValue);
         Connect(body, storeDataReadys[i], zeroBitValue);
         auto notOp = AddNotOp(body, previousGranted);
@@ -695,9 +696,10 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
         Connect(thenBody, memReqId, storeIds[i]);
         // no data or write
         int bitWidth;
-        if (auto bitType = dynamic_cast<const jive::bittype *>(storeTypes[i])) {
+		auto storeType = storeTypes->at(i).get();
+        if (auto bitType = dynamic_cast<const jive::bittype *>(storeType)) {
             bitWidth = bitType->nbits();
-        } else if (dynamic_cast<const jlm::PointerType *>(storeTypes[i])) {
+        } else if (dynamic_cast<const jlm::PointerType *>(storeType)) {
             bitWidth = 64;
         } else{
             throw jlm::error("unknown width for mem request");
@@ -3511,11 +3513,13 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
     }
     if(auto op = dynamic_cast<const jlm::hls::mem_req_op *>(&node->operation())){
 		auto loadTypes = op->GetLoadTypes();
-        for (size_t i = 0; i < op->get_nloads(); ++i) {
+        for (size_t i=0; i<loadTypes->size(); i++)
+		{
             int bitWidth;
-            if (auto bitType = dynamic_cast<const jive::bittype *>(loadTypes[i])) {
+			auto loadType = loadTypes->at(i).get();
+            if (auto bitType = dynamic_cast<const jive::bittype *>(loadType)) {
                 bitWidth = bitType->nbits();
-            } else if (dynamic_cast<const jlm::PointerType *>(loadTypes[i])) {
+            } else if (dynamic_cast<const jlm::PointerType *>(loadType)) {
                 bitWidth = 64;
             } else{
                 throw jlm::error("unknown width for mem request");
