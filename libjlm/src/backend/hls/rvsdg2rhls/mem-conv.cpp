@@ -134,16 +134,6 @@ std::string get_impport_function_name(jive::input *input){
 // trace function ptr to its call
 void trace_function_calls(jive::output * op, std::vector<jive::simple_node*> &calls,
                              std::unordered_set<jive::output*> & visited) {
-/*
-    if(auto pt = dynamic_cast<const jlm::PointerType*>(&op->type())){
-        // only process fucntion pointer outputs
-        if(!dynamic_cast<const jlm::FunctionType *>(&pt->GetElementType())){
-            return;
-        }
-    } else{
-        return;
-    }
-*/
     if(visited.count(op)){
         // skip already processed outputs
         return;
@@ -551,7 +541,6 @@ jlm::hls::MemoryConverter(jlm::RvsdgModule &rm)
         if(auto pointerType = dynamic_cast<const jlm::PointerType*>(&cvarg->type()))
         {
             // The only functions at this time is decoupled loads that are encoded as functions by the user
-//            if (dynamic_cast<const jlm::FunctionType *>(&pointerType->GetElementType()))
             auto visited = std::unordered_set<jive::output*>();
             if (IsDecoupledFunctionPointer(cvarg->input()->origin(), visited))
             {
@@ -663,13 +652,6 @@ jlm::hls::ConnectRequestResponseMemPorts(
         storeOperands.push_back(data);
     }
 
-/*
-    std::vector<const jive::valuetype *> loadValueTypes;
-    for (auto type : loadTypes)
-    {
-        loadValueTypes.push_back(dynamic_cast<const jive::valuetype *>(type));
-    }
-*/
     return mem_req_op::create(loadAddresses, loadTypes, storeOperands, lambdaRegion)[0];
 }
 

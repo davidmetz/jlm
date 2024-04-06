@@ -725,8 +725,6 @@ namespace jlm {
                     jive::output &load_result
             ) {
                 auto region = addr.region();
-//                auto pointeeType = dynamic_cast<const PointerType*>(&addr.type());
-//                load_op op(*pointeeType, states.size());
                 load_op op(* dynamic_cast<const jive::valuetype *>(&load_result.type()), states.size());
                 std::vector<jive::output*> inputs;
                 inputs.push_back(&addr);
@@ -860,7 +858,6 @@ namespace jlm {
                     const std::vector<jive::output *> &states
             ) {
                 auto region = addr.region();
-//                auto pointerType = dynamic_cast<const PointerType*>(&addr.type());
                 state_gate_op op(addr.type(), states.size());
                 std::vector<jive::output*> inputs;
                 inputs.push_back(&addr);
@@ -1117,37 +1114,13 @@ namespace jlm {
                     const std::vector<jive::output *> & store_operands,
                     jive::region * region
             ) {
-/*
-                std::vector<const PointerType *> load_types;
-                for (auto load : load_operands) {
-                    auto pointerType = dynamic_cast<const PointerType *>(&load->type());
-                    JLM_ASSERT(pointerType);
-                    load_types.push_back(pointerType);
-                }
-*/
                 // Stores have both addr and data operand
                 // But we are only interested in the data operand type
                 JLM_ASSERT(store_operands.size()%2==0);
                 std::vector<const jive::valuetype *> storeTypes;
                 for (size_t i=0; i<store_operands.size(); i+=2) {
                     storeTypes.push_back(dynamic_cast<const jive::valuetype *>(&store_operands[i+1]->type()));
-/*
-                    auto pointerType = dynamic_cast<const jlm::PointerType *>(&store_operands[2*i]->type());
-                    JLM_ASSERT(pointerType);
-                    storeTypes.push_back(pointerType);
-                    auto operand = dynamic_cast<jive::simple_output *>(store_operands[2*i+1]);
-                    auto storeOp = dynamic_cast<const jlm::StoreOperation *>(&operand->node()->operation());
-                    JLM_ASSERT(storeOp);
-                    storeTypes.push_back(&storeOp->GetStoredType());
-*/
                 }
-/*
-                std::vector<const jive::valuetype *> store_types;
-                for (size_t i = 0; i < store_operands.size(); i+=2) {
-                    auto pt = dynamic_cast<const jive::valuetype *>(&store_operands[i]->type());
-                    store_types.push_back(pt);
-                }
- */
                 mem_req_op op(loadTypes, storeTypes);
                 std::vector<jive::output*> operands(load_operands);
                 operands.insert(operands.end(), store_operands.begin(), store_operands.end());

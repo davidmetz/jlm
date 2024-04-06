@@ -337,34 +337,34 @@ jlm::hls::rvsdg2ref(jlm::RvsdgModule &rhls, std::string path) {
 void
 jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
 	pre_opt(rhls);
-    dump_dot(rhls, "post-opt.dot");
+//    dump_dot(rhls, "post-opt.dot");
     merge_gamma(rhls);
-    dump_dot(rhls, "merged-gamma.dot");
+//    dump_dot(rhls, "merged-gamma.dot");
 
 //    jlm::hls::mem_sep(rhls);
     jlm::hls::mem_sep_argument(rhls);
-    dump_dot(rhls, "mem-sep.dot");
+//    dump_dot(rhls, "mem-sep.dot");
     // run conversion on copy
     jlm::hls::remove_unused_state(rhls);
-    dump_dot(rhls, "removed-state.dot");
+//    dump_dot(rhls, "removed-state.dot");
 	// main conversion steps
 //	jlm::hls::add_triggers(rhls); // TODO: is this needed?
 	jlm::hls::gamma_conv(rhls, true);
-    dump_dot(rhls, "gamma-converted.dot");
+//    dump_dot(rhls, "gamma-converted.dot");
 	jlm::hls::theta_conv(rhls);
-    dump_dot(rhls, "theta-converted.dot");
+//    dump_dot(rhls, "theta-converted.dot");
 	// rhls optimization
 	jlm::hls::dne(rhls);
     jlm::hls::alloca_conv(rhls);
-    dump_dot(rhls, "alloca-converted.dot");
+//    dump_dot(rhls, "alloca-converted.dot");
     jlm::hls::mem_queue(rhls);
-    dump_dot(rhls, "memory-queue.dot");
+//    dump_dot(rhls, "memory-queue.dot");
     jlm::hls::MemoryConverter(rhls);
-    dump_dot(rhls, "memory-converted.dot");
+//    dump_dot(rhls, "memory-converted.dot");
     jlm::hls::memstate_conv(rhls);
-    dump_dot(rhls, "memory-state-converted.dot");
+//    dump_dot(rhls, "memory-state-converted.dot");
     jlm::hls::remove_redundant_buf(rhls);
-    dump_dot(rhls, "removed-redundant-buffers.dot");
+//    dump_dot(rhls, "removed-redundant-buffers.dot");
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(rhls);
 	jlm::hls::add_forks(rhls);
