@@ -7,14 +7,16 @@
 
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 
-namespace jlm{
-	namespace hls{
+namespace jlm
+{
+namespace hls
+{
 
-		void
-		memstate_conv(jlm::rvsdg::region *region);
+void
+memstate_conv(jlm::rvsdg::region * region);
 
-		void
-		memstate_conv(llvm::RvsdgModule &rm);
-	}
+void
+memstate_conv(llvm::RvsdgModule & rm);
 }
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEMSTATE_CONV_HPP
+}
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_MEMSTATE_CONV_HPP

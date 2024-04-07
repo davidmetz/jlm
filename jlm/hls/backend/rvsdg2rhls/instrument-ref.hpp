@@ -5,26 +5,26 @@
 
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP
-#include <jlm/rvsdg/region.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
+#include <jlm/rvsdg/region.hpp>
 
-namespace jlm{
-	namespace hls{
-		void
-		instrument_ref(llvm::RvsdgModule &rm);
+namespace jlm
+{
+namespace hls
+{
+void
+instrument_ref(llvm::RvsdgModule & rm);
 
-		void
-		instrument_ref
-		(
-			jlm::rvsdg::region * region,
-			jlm::rvsdg::output * load_func,
-			llvm::FunctionType & loadFunctionType,
-			jlm::rvsdg::output * store_func,
-			llvm::FunctionType & storeFunctionType,
-			jlm::rvsdg::output * alloca_func,
-			llvm::FunctionType & allocaFunctionType
-		);
-	}
+void
+instrument_ref(
+    jlm::rvsdg::region * region,
+    jlm::rvsdg::output * load_func,
+    llvm::FunctionType & loadFunctionType,
+    jlm::rvsdg::output * store_func,
+    llvm::FunctionType & storeFunctionType,
+    jlm::rvsdg::output * alloca_func,
+    llvm::FunctionType & allocaFunctionType);
+}
 }
 
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP

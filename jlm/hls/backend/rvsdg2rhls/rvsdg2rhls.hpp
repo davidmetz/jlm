@@ -11,28 +11,32 @@
 #include <jlm/rvsdg/bitstring/constant.hpp>
 #include <jlm/rvsdg/node.hpp>
 
-namespace jlm{
-	namespace hls{
-		static inline bool is_constant(const jlm::rvsdg::node *node) {
-			return jlm::rvsdg::is<jlm::rvsdg::bitconstant_op>(node) ||
-				   jlm::rvsdg::is<llvm::UndefValueOperation>(node) ||
-				   jlm::rvsdg::is<jlm::rvsdg::ctlconstant_op>(node);
-		}
-
-		void
-		rvsdg2rhls(llvm::RvsdgModule &rm);
-
-		void
-		rvsdg2ref(llvm::RvsdgModule &rm, std::string path);
-
-		void
-		dump_ref(llvm::RvsdgModule &rhls, std::string &path);
-
-        const jlm::rvsdg::output *
-        trace_call(jlm::rvsdg::input *input);
-
-        std::unique_ptr<llvm::RvsdgModule>
-        split_hls_function(llvm::RvsdgModule &rm, const std::string &function_name);
-    }
+namespace jlm
+{
+namespace hls
+{
+static inline bool
+is_constant(const jlm::rvsdg::node * node)
+{
+  return jlm::rvsdg::is<jlm::rvsdg::bitconstant_op>(node)
+      || jlm::rvsdg::is<llvm::UndefValueOperation>(node)
+      || jlm::rvsdg::is<jlm::rvsdg::ctlconstant_op>(node);
 }
-#endif //JLM_HLS_BACKEND_RVSDG2RHLS_RVSDG2RHLS_HPP
+
+void
+rvsdg2rhls(llvm::RvsdgModule & rm);
+
+void
+rvsdg2ref(llvm::RvsdgModule & rm, std::string path);
+
+void
+dump_ref(llvm::RvsdgModule & rhls, std::string & path);
+
+const jlm::rvsdg::output *
+trace_call(jlm::rvsdg::input * input);
+
+std::unique_ptr<llvm::RvsdgModule>
+split_hls_function(llvm::RvsdgModule & rm, const std::string & function_name);
+}
+}
+#endif // JLM_HLS_BACKEND_RVSDG2RHLS_RVSDG2RHLS_HPP

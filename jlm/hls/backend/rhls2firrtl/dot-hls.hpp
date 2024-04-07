@@ -3,46 +3,47 @@
  * See COPYING for terms of redistribution.
  */
 
-
 #ifndef JLM_HLS_BACKEND_RHLS2FIRRTL_DOT_HLS_HPP
 #define JLM_HLS_BACKEND_RHLS2FIRRTL_DOT_HLS_HPP
 
 #include <jlm/hls/backend/rhls2firrtl/base-hls.hpp>
 #include <jlm/hls/ir/hls.hpp>
 
-namespace jlm::hls {
-	class DotHLS : public BaseHLS {
-	public:
-		std::string
-		extension() override;
+namespace jlm::hls
+{
+class DotHLS : public BaseHLS
+{
+public:
+  std::string
+  extension() override;
 
-		std::string
-		get_text(llvm::RvsdgModule &rm) override;
+  std::string
+  get_text(llvm::RvsdgModule & rm) override;
 
-		std::string
-		subregion_to_dot(jlm::rvsdg::region *sr);
+  std::string
+  subregion_to_dot(jlm::rvsdg::region * sr);
 
-	private:
-		std::string
-		argument_to_dot(jlm::rvsdg::argument *port);
+private:
+  std::string
+  argument_to_dot(jlm::rvsdg::argument * port);
 
-		std::string
-		result_to_dot(jlm::rvsdg::result *port);
+  std::string
+  result_to_dot(jlm::rvsdg::result * port);
 
-		std::string
-		node_to_dot(const jlm::rvsdg::node *node);
+  std::string
+  node_to_dot(const jlm::rvsdg::node * node);
 
-		std::string
-		edge(std::string src, std::string snk, const jlm::rvsdg::type &type, bool back = false);
+  std::string
+  edge(std::string src, std::string snk, const jlm::rvsdg::type & type, bool back = false);
 
-		std::string
-		loop_to_dot(hls::loop_node *ln);
+  std::string
+  loop_to_dot(hls::loop_node * ln);
 
-		void
-		prepare_loop_out_port(hls::loop_node *ln);
+  void
+  prepare_loop_out_port(hls::loop_node * ln);
 
-		int loop_ctr = 0;
-	};
+  int loop_ctr = 0;
+};
 }
 
-#endif //JLM_HLS_BACKEND_RHLS2FIRRTL_DOT_HLS_HPP
+#endif // JLM_HLS_BACKEND_RHLS2FIRRTL_DOT_HLS_HPP

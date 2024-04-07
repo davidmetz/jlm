@@ -7,14 +7,16 @@
 
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 
-namespace jlm{
-	namespace hls{
+namespace jlm
+{
+namespace hls
+{
 
-		void
-		dae_conv(jlm::rvsdg::region *region);
+void
+dae_conv(jlm::rvsdg::region * region);
 
-		void
-		dae_conv(llvm::RvsdgModule &rm);
-	}
+void
+dae_conv(llvm::RvsdgModule & rm);
 }
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_DAE_CONV_HPP
+}
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_DAE_CONV_HPP

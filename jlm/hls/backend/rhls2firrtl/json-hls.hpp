@@ -6,24 +6,27 @@
 #ifndef JLM_BACKEND_HLS_RHLS2FIRRTL_JSON_HLS_HPP
 #define JLM_BACKEND_HLS_RHLS2FIRRTL_JSON_HLS_HPP
 
-
-#include <jlm/rvsdg/bitstring/type.hpp>
 #include <jlm/hls/backend/rhls2firrtl/base-hls.hpp>
+#include <jlm/rvsdg/bitstring/type.hpp>
 
-namespace jlm {
-	namespace hls {
-		class JsonHLS : public BaseHLS {
-			std::string
-			extension() override {
-				return ".json";
-			}
+namespace jlm
+{
+namespace hls
+{
+class JsonHLS : public BaseHLS
+{
+  std::string
+  extension() override
+  {
+    return ".json";
+  }
 
-			std::string
-			get_text(llvm::RvsdgModule &rm) override;
+  std::string
+  get_text(llvm::RvsdgModule & rm) override;
 
-		private:
-		};
-	}
+private:
+};
+}
 }
 
-#endif //JLM_BACKEND_HLS_RHLS2FIRRTL_JSON_HLS_HPP
+#endif // JLM_BACKEND_HLS_RHLS2FIRRTL_JSON_HLS_HPP

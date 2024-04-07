@@ -3,27 +3,26 @@
  * See COPYING for terms of redistribution.
  */
 
-
 #ifndef JLM_BACKEND_HLS_UTIL_VIEW_HPP
 #define JLM_BACKEND_HLS_UTIL_VIEW_HPP
 
-#include <string>
-#include <jlm/rvsdg/graph.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
+#include <jlm/rvsdg/graph.hpp>
+#include <string>
 
-namespace jlm::hls {
-    std::string
-    region_to_dot(jlm::rvsdg::region * region);
+namespace jlm::hls
+{
+std::string
+region_to_dot(jlm::rvsdg::region * region);
 
-    std::string
-    to_dot(jlm::rvsdg::region * region);
+std::string
+to_dot(jlm::rvsdg::region * region);
 
-    void
-    view_dot(jlm::rvsdg::region * region, FILE * out);
+void
+view_dot(jlm::rvsdg::region * region, FILE * out);
 
-    void
-    dump_dot(llvm::RvsdgModule &rvsdgModule, const std::string &file_name);
+void
+dump_dot(llvm::RvsdgModule & rvsdgModule, const std::string & file_name);
 }
 
-
-#endif //JLM_BACKEND_HLS_UTIL_VIEW_HPP
+#endif // JLM_BACKEND_HLS_UTIL_VIEW_HPP

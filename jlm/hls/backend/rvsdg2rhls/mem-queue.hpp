@@ -7,14 +7,16 @@
 
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 
-namespace jlm{
-	namespace hls{
+namespace jlm
+{
+namespace hls
+{
 
-		void
-		mem_queue(jlm::rvsdg::region *region);
+void
+mem_queue(jlm::rvsdg::region * region);
 
-		void
-		mem_queue(llvm::RvsdgModule &rm);
-	}
+void
+mem_queue(llvm::RvsdgModule & rm);
 }
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_MEM_QUEUE_HPP
+}
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_MEM_QUEUE_HPP

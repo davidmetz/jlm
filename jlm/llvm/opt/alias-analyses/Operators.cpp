@@ -8,7 +8,8 @@
 namespace jlm::llvm
 {
 
-namespace aa {
+namespace aa
+{
 
 /* LambdaEntryMemStateOperator class */
 
@@ -17,21 +18,21 @@ LambdaEntryMemStateOperator::~LambdaEntryMemStateOperator() = default;
 bool
 LambdaEntryMemStateOperator::operator==(const jlm::rvsdg::operation & other) const noexcept
 {
-    return false;
-    // TODO: fix
-//    return is<LambdaEntryMemStateOperator>(other);
+  return false;
+  // TODO: fix
+  //    return is<LambdaEntryMemStateOperator>(other);
 }
 
 std::string
 LambdaEntryMemStateOperator::debug_string() const
 {
-    return "LambdaEntryMemState";
+  return "LambdaEntryMemState";
 }
 
 std::unique_ptr<jlm::rvsdg::operation>
 LambdaEntryMemStateOperator::copy() const
 {
-    return std::unique_ptr<jlm::rvsdg::operation>(new LambdaEntryMemStateOperator(*this));
+  return std::unique_ptr<jlm::rvsdg::operation>(new LambdaEntryMemStateOperator(*this));
 }
 
 /* LambdaExitMemStateOperator class */
@@ -41,19 +42,19 @@ LambdaExitMemStateOperator::~LambdaExitMemStateOperator() = default;
 bool
 LambdaExitMemStateOperator::operator==(const jlm::rvsdg::operation & other) const noexcept
 {
-    return is<LambdaExitMemStateOperator>(other);
+  return is<LambdaExitMemStateOperator>(other);
 }
 
 std::string
 LambdaExitMemStateOperator::debug_string() const
 {
-    return "LambdaExitMemState";
+  return "LambdaExitMemState";
 }
 
 std::unique_ptr<jlm::rvsdg::operation>
 LambdaExitMemStateOperator::copy() const
 {
-    return std::unique_ptr<jlm::rvsdg::operation>(new LambdaExitMemStateOperator(*this));
+  return std::unique_ptr<jlm::rvsdg::operation>(new LambdaExitMemStateOperator(*this));
 }
 
 /* CallEntryMemStateOperator class */

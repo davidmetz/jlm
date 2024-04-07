@@ -6,16 +6,18 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP
 
-#include <jlm/rvsdg/theta.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
+#include <jlm/rvsdg/theta.hpp>
 
-namespace jlm{
-	namespace hls{
-		void
-		alloca_conv(jlm::rvsdg::region *region);
+namespace jlm
+{
+namespace hls
+{
+void
+alloca_conv(jlm::rvsdg::region * region);
 
-		void
-		alloca_conv(llvm::RvsdgModule &rm);
-	}
+void
+alloca_conv(llvm::RvsdgModule & rm);
 }
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP
+}
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP

@@ -6,18 +6,21 @@
 #ifndef JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
 #define JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
 
-#include <jlm/rvsdg/gamma.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
+#include <jlm/rvsdg/gamma.hpp>
 
-namespace jlm{
-	namespace hls{
-		void
-		merge_gamma(jlm::rvsdg::region *region);
+namespace jlm
+{
+namespace hls
+{
+void
+merge_gamma(jlm::rvsdg::region * region);
 
-		void
-		merge_gamma(llvm::RvsdgModule &rm);
+void
+merge_gamma(llvm::RvsdgModule & rm);
 
-        bool merge_gamma(jlm::rvsdg::gamma_node *gamma);
-    }
+bool
+merge_gamma(jlm::rvsdg::gamma_node * gamma);
 }
-#endif //JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
+}
+#endif // JLM_BACKEND_HLS_RVSDG2RHLS_MERGE_GAMMA_HPP
