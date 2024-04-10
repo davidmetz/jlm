@@ -44,7 +44,11 @@ test()
 
   /* setup graph */
 
-  auto lambda = jlm::llvm::lambda::node::create(rm.Rvsdg().root(), ft, "f", jlm::llvm::linkage::external_linkage);
+  auto lambda = jlm::llvm::lambda::node::create(
+      rm.Rvsdg().root(),
+      ft,
+      "f",
+      jlm::llvm::linkage::external_linkage);
 
   auto loop = hls::loop_node::create(lambda->subregion());
 

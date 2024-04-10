@@ -384,7 +384,7 @@ JhlsCommandGraphGenerator::GenerateCommandGraph(const JhlsCommandLineOptions & c
     auto & refAsmnode = LlcCommand::Create(
         *commandGraph,
         commandLineOptions.Hls_ ? refInputFile
-				: CreateJlmOptCommandOutputFile(tmp_folder, refInputFile).to_str(),
+                                : CreateJlmOptCommandOutputFile(tmp_folder, refInputFile).to_str(),
         refAssemblyFile,
         ConvertOptimizationLevel(commandLineOptions.OptimizationLevel_),
         commandLineOptions.Hls_ ? LlcCommand::RelocationModel::Pic
