@@ -9,10 +9,9 @@
 #include <jlm/hls/ir/hls.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 bool
 remove_unused_loop_outputs(hls::loop_node * ln);
 
@@ -30,6 +29,7 @@ dne(jlm::rvsdg::region * sr);
 
 void
 dne(llvm::RvsdgModule & rm);
+
 }
-}
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_RHLS_DNE_HPP

@@ -7,8 +7,11 @@
 #include <jlm/llvm/ir/operators/lambda.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 bool
-jlm::hls::remove_unused_loop_backedges(hls::loop_node * ln)
+remove_unused_loop_backedges(loop_node * ln)
 {
   bool any_changed = false;
   auto sr = ln->subregion();
@@ -16,10 +19,10 @@ jlm::hls::remove_unused_loop_backedges(hls::loop_node * ln)
   for (int i = sr->narguments() - 1; i >= 0; --i)
   {
     auto arg = sr->argument(i);
-    if (dynamic_cast<jlm::hls::backedge_argument *>(arg) && arg->nusers() == 1)
+    if (dynamic_cast<backedge_argument *>(arg) && arg->nusers() == 1)
     {
       auto user = *arg->begin();
-      if (auto result = dynamic_cast<jlm::hls::backedge_result *>(user))
+      if (auto result = dynamic_cast<backedge_result *>(user))
       {
         sr->RemoveResult(result->index());
         sr->RemoveArgument(arg->index());
@@ -31,7 +34,7 @@ jlm::hls::remove_unused_loop_backedges(hls::loop_node * ln)
 }
 
 bool
-jlm::hls::remove_unused_loop_outputs(jlm::hls::loop_node * ln)
+remove_unused_loop_outputs(loop_node * ln)
 {
   bool any_changed = false;
   auto sr = ln->subregion();
@@ -52,7 +55,7 @@ jlm::hls::remove_unused_loop_outputs(jlm::hls::loop_node * ln)
 }
 
 bool
-jlm::hls::remove_loop_passthrough(hls::loop_node * ln)
+remove_loop_passthrough(loop_node * ln)
 {
   bool any_changed = false;
   auto sr = ln->subregion();
@@ -81,7 +84,7 @@ jlm::hls::remove_loop_passthrough(hls::loop_node * ln)
 }
 
 bool
-jlm::hls::remove_unused_loop_inputs(hls::loop_node * ln)
+remove_unused_loop_inputs(loop_node * ln)
 {
   bool any_changed = false;
   auto sr = ln->subregion();
@@ -103,7 +106,7 @@ jlm::hls::remove_unused_loop_inputs(hls::loop_node * ln)
   for (int i = sr->narguments() - 1; i >= 0; --i)
   {
     auto arg = sr->argument(i);
-    if (auto ba = dynamic_cast<jlm::hls::backedge_argument *>(arg))
+    if (auto ba = dynamic_cast<backedge_argument *>(arg))
     {
       auto result = ba->result();
       assert(result->type() == arg->type());
@@ -160,7 +163,7 @@ dead_nonspec_gamma(jlm::rvsdg::node * ndmux_node)
   {
     if (auto no = dynamic_cast<jlm::rvsdg::node_output *>(ndmux_node->input(i)->origin()))
     {
-      if (dynamic_cast<const jlm::hls::branch_op *>(&no->node()->operation()) && no->nusers() == 1)
+      if (dynamic_cast<const branch_op *>(&no->node()->operation()) && no->nusers() == 1)
       {
         if (i == 1)
         {
@@ -194,7 +197,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
   JLM_ASSERT(mux_op);
   JLM_ASSERT(!mux_op->discarding);
   // origin is a backedege argument
-  auto backedge_arg = dynamic_cast<jlm::hls::backedge_argument *>(ndmux_node->input(2)->origin());
+  auto backedge_arg = dynamic_cast<backedge_argument *>(ndmux_node->input(2)->origin());
   if (!backedge_arg)
   {
     return false;
@@ -205,7 +208,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
     return false;
   }
   auto branch_in = dynamic_cast<jlm::rvsdg::node_input *>(*ndmux_node->output(0)->begin());
-  if (!branch_in || !dynamic_cast<const jlm::hls::branch_op *>(&branch_in->node()->operation()))
+  if (!branch_in || !dynamic_cast<const branch_op *>(&branch_in->node()->operation()))
   {
     return false;
   }
@@ -215,7 +218,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
     return false;
   }
   auto buf_in = dynamic_cast<jlm::rvsdg::node_input *>(*branch_in->node()->output(1)->begin());
-  if (!buf_in || !dynamic_cast<const jlm::hls::buffer_op *>(&buf_in->node()->operation()))
+  if (!buf_in || !dynamic_cast<const buffer_op *>(&buf_in->node()->operation()))
   {
     return false;
   }
@@ -229,7 +232,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
   auto branch_cond_origin = branch_in->node()->input(0)->origin();
   auto pred_buf_out = dynamic_cast<jlm::rvsdg::node_output *>(ndmux_node->input(0)->origin());
   if (!pred_buf_out
-      || !dynamic_cast<const jlm::hls::predicate_buffer_op *>(&pred_buf_out->node()->operation()))
+      || !dynamic_cast<const predicate_buffer_op *>(&pred_buf_out->node()->operation()))
   {
     return false;
   }
@@ -237,13 +240,13 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
   // TODO: remove this once predicate buffers decouple combinatorial loops
   auto extra_buf_out = dynamic_cast<jlm::rvsdg::node_output *>(pred_buf_cond_origin);
   if (!extra_buf_out
-      || !dynamic_cast<const jlm::hls::buffer_op *>(&extra_buf_out->node()->operation()))
+      || !dynamic_cast<const buffer_op *>(&extra_buf_out->node()->operation()))
   {
     return false;
   }
   auto extra_buf_cond_origin = extra_buf_out->node()->input(0)->origin();
 
-  if (auto pred_be = dynamic_cast<jlm::hls::backedge_argument *>(extra_buf_cond_origin))
+  if (auto pred_be = dynamic_cast<backedge_argument *>(extra_buf_cond_origin))
   {
     extra_buf_cond_origin = pred_be->result()->origin();
   }
@@ -263,7 +266,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
 }
 
 bool
-jlm::hls::dne(jlm::rvsdg::region * sr)
+dne(jlm::rvsdg::region * sr)
 {
   bool any_changed = false;
   bool changed;
@@ -274,16 +277,16 @@ jlm::hls::dne(jlm::rvsdg::region * sr)
     {
       if (!node->has_users())
       {
-        if (dynamic_cast<const jlm::hls::mem_req_op *>(&node->operation()))
+        if (dynamic_cast<const mem_req_op *>(&node->operation()))
         {
           // TODO: fix this once memory connections are explicit
           continue;
         }
-        else if (dynamic_cast<const jlm::hls::local_mem_req_op *>(&node->operation()))
+        else if (dynamic_cast<const local_mem_req_op *>(&node->operation()))
         {
           continue;
         }
-        else if (dynamic_cast<const jlm::hls::local_mem_resp_op *>(&node->operation()))
+        else if (dynamic_cast<const local_mem_resp_op *>(&node->operation()))
         {
           // TODO: fix - this scenario has only stores and should just be optimized away completely
           continue;
@@ -291,7 +294,7 @@ jlm::hls::dne(jlm::rvsdg::region * sr)
         remove(node);
         changed = true;
       }
-      else if (auto ln = dynamic_cast<hls::loop_node *>(node))
+      else if (auto ln = dynamic_cast<loop_node *>(node))
       {
         changed |= remove_unused_loop_outputs(ln);
         changed |= remove_unused_loop_inputs(ln);
@@ -317,7 +320,7 @@ jlm::hls::dne(jlm::rvsdg::region * sr)
 }
 
 void
-jlm::hls::dne(llvm::RvsdgModule & rm)
+dne(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -331,4 +334,6 @@ jlm::hls::dne(llvm::RvsdgModule & rm)
     throw util::error("Node needs to be a lambda");
   }
   dne(ln->subregion());
+}
+
 }
