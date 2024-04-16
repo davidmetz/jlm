@@ -239,8 +239,7 @@ dead_loop(jlm::rvsdg::node * ndmux_node)
   auto pred_buf_cond_origin = pred_buf_out->node()->input(0)->origin();
   // TODO: remove this once predicate buffers decouple combinatorial loops
   auto extra_buf_out = dynamic_cast<jlm::rvsdg::node_output *>(pred_buf_cond_origin);
-  if (!extra_buf_out
-      || !dynamic_cast<const buffer_op *>(&extra_buf_out->node()->operation()))
+  if (!extra_buf_out || !dynamic_cast<const buffer_op *>(&extra_buf_out->node()->operation()))
   {
     return false;
   }

@@ -2,20 +2,20 @@
 // Created by david on 7/2/21.
 //
 
-#include "jlm/backend/hls/rvsdg2rhls/dae-conv.hpp"
-#include "jlm/backend/hls/rvsdg2rhls/rhls-dne.hpp"
-#include "jlm/ir/operators/lambda.hpp"
-#include "jlm/ir/operators/load.hpp"
-#include "jlm/ir/operators/store.hpp"
-#include "jlm/rvsdg/view.hpp"
-#include <jlm/ir/hls/hls.hpp>
+#include <jlm/hls/backend/rvsdg2rhls/dae-conv.hpp>
+#include <jlm/hls/backend/rvsdg2rhls/rhls-dne.hpp>
+#include <jlm/hls/ir/hls.hpp>
+#include <jlm/llvm/ir/operators/lambda.hpp>
+#include <jlm/llvm/ir/operators/load.hpp>
+#include <jlm/llvm/ir/operators/store.hpp>
 #include <jlm/rvsdg/substitution.hpp>
 #include <jlm/rvsdg/theta.hpp>
 #include <jlm/rvsdg/traverser.hpp>
+#include <jlm/rvsdg/view.hpp>
 #include <queue>
 
 void
-jlm::hls::dae_conv(jlm::RvsdgModule & rm)
+jlm::hls::dae_conv(jlm::llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -66,7 +66,7 @@ find_data_slice_node(jlm::rvsdg::node * node, std::unordered_set<jlm::rvsdg::nod
 {
   for (size_t i = 0; i < node->ninputs(); ++i)
   {
-    if (jlm::rvsdg::is<jlm::MemoryStateType>(node->input(i)->type()))
+    if (jlm::rvsdg::is<jlm::llvm::MemoryStateType>(node->input(i)->type()))
     {
       continue;
     }
@@ -79,7 +79,7 @@ find_state_slice_node(jlm::rvsdg::node * node, std::unordered_set<jlm::rvsdg::no
 {
   for (size_t i = 0; i < node->ninputs(); ++i)
   {
-    if (!jlm::rvsdg::is<jlm::MemoryStateType>(node->input(i)->type()))
+    if (!jlm::rvsdg::is<jlm::llvm::MemoryStateType>(node->input(i)->type()))
     {
       continue;
     }
@@ -256,7 +256,7 @@ decouple_load(
   std::vector<std::vector<jlm::rvsdg::node *>> context(loopNode->subregion()->nnodes());
   for (auto & node : *loopNode->subregion())
   {
-    JIVE_DEBUG_ASSERT(node.depth() < context.size());
+    JLM_ASSERT(node.depth() < context.size());
     context[node.depth()].push_back(&node);
   }
   for (size_t n = 0; n < context.size(); n++)
@@ -338,8 +338,8 @@ decouple_load(
   dump_xml(new_loop->subregion(), "new_loop_before_remove.rvsdg");
   remove(new_load);
   JLM_ASSERT(mem_data_loop_arg->nusers() == 0);
-  new_loop->subregion()->remove_argument(mem_data_loop_arg->index());
-  new_loop->remove_input(mem_data_loop_in->index());
+  new_loop->subregion()->RemoveArgument(mem_data_loop_arg->index());
+  new_loop->RemoveInput(mem_data_loop_in->index());
   // create new decoupled load
   auto dload_out = jlm::hls::decoupled_load_op::create(*addr_output, *mem_data_resp);
 
@@ -349,8 +349,8 @@ decouple_load(
   auto old_mem_req_out = old_mem_req_res->output();
   auto mem_req_in = *old_mem_req_out->begin();
   mem_req_in->divert_to(dload_out[1]);
-  loopNode->subregion()->remove_result(old_mem_req_res->index());
-  loopNode->remove_output(old_mem_req_out->index());
+  loopNode->subregion()->RemoveResult(old_mem_req_res->index());
+  loopNode->RemoveOutput(old_mem_req_out->index());
   // redirect state outputs of loadNode so they become pass through
   for (size_t i = 1; i < loadNode->noutputs() - 1; ++i)
   {
@@ -466,7 +466,7 @@ process_loopnode(jlm::hls::loop_node * loopNode)
 void
 jlm::hls::dae_conv(jlm::rvsdg::region * region)
 {
-  auto lambda = dynamic_cast<const jlm::lambda::node *>(region->nodes.begin().ptr());
+  auto lambda = dynamic_cast<const jlm::llvm::lambda::node *>(region->nodes.begin().ptr());
   bool changed;
   do
   {

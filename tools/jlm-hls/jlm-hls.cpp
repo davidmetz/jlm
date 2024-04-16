@@ -5,6 +5,7 @@
 
 #include <jlm/hls/backend/rhls2firrtl/dot-hls.hpp>
 #include <jlm/hls/backend/rhls2firrtl/firrtl-hls.hpp>
+#include <jlm/hls/backend/rhls2firrtl/json-hls.hpp>
 #include <jlm/hls/backend/rhls2firrtl/mlirgen.hpp>
 #include <jlm/hls/backend/rhls2firrtl/verilator-harness-hls.hpp>
 #include <jlm/hls/backend/rvsdg2rhls/rvsdg2rhls.hpp>
@@ -13,7 +14,6 @@
 #include <jlm/llvm/frontend/InterProceduralGraphConversion.hpp>
 #include <jlm/llvm/frontend/LlvmModuleConversion.hpp>
 #include <jlm/tooling/CommandLine.hpp>
-#include <jlm/hls/backend/rhls2firrtl/json-hls.hpp>
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
