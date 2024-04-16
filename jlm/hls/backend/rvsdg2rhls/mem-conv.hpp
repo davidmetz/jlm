@@ -10,6 +10,7 @@
 
 namespace jlm::hls
 {
+
 typedef std::vector<std::tuple<
     std::vector<jlm::rvsdg::simple_node *>,
     std::vector<jlm::rvsdg::simple_node *>,
@@ -55,5 +56,7 @@ route_response(jlm::rvsdg::region * target, jlm::rvsdg::output * response);
 
 jlm::rvsdg::output *
 route_request(jlm::rvsdg::region * target, jlm::rvsdg::output * request);
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_BACKEND_HLS_RVSDG2RHLS_MEM_CONV_HPP

@@ -9,10 +9,9 @@
 #include <jlm/hls/backend/rhls2firrtl/base-hls.hpp>
 #include <jlm/rvsdg/bitstring/type.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 class JsonHLS : public BaseHLS
 {
   std::string
@@ -26,7 +25,7 @@ class JsonHLS : public BaseHLS
 
 private:
 };
-}
-}
+
+} // namespace jlm::hls
 
 #endif // JLM_BACKEND_HLS_RHLS2FIRRTL_JSON_HLS_HPP

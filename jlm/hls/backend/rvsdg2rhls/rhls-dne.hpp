@@ -30,6 +30,6 @@ dne(jlm::rvsdg::region * sr);
 void
 dne(llvm::RvsdgModule & rm);
 
-}
+} // namespace jlm::hls
 
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_RHLS_DNE_HPP

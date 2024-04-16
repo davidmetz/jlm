@@ -19,6 +19,7 @@
 
 namespace jlm::hls
 {
+
 llvm::lambda::node *
 change_function_name(llvm::lambda::node * ln, const std::string & name)
 {
@@ -145,7 +146,7 @@ instrument_ref(
       jlm::rvsdg::output * addr = node->input(0)->origin();
       auto pt = dynamic_cast<const jlm::llvm::PointerType *>(&addr->type());
       JLM_ASSERT(pt);
-      size_t bitWidth = jlm::hls::BaseHLS::JlmSize(&lo->GetLoadedType());
+      size_t bitWidth = BaseHLS::JlmSize(&lo->GetLoadedType());
       int log2Bytes = log2(bitWidth / 8);
       auto width = jlm::rvsdg::create_bitconstant(region, 64, log2Bytes);
 
@@ -223,4 +224,5 @@ instrument_ref(
     }
   }
 }
-}
+
+} // namespace jlm::hls

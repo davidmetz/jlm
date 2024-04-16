@@ -11,9 +11,7 @@
 #include <jlm/rvsdg/gamma.hpp>
 #include <jlm/rvsdg/region.hpp>
 
-namespace jlm
-{
-namespace hls
+namespace jlm::hls
 {
 
 bool
@@ -36,6 +34,7 @@ remove_unused_state(llvm::RvsdgModule & rm);
 
 void
 remove_unused_state(jlm::rvsdg::region * region, bool can_remove_arguments = true);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_REMOVE_UNUSED_STATE_HPP

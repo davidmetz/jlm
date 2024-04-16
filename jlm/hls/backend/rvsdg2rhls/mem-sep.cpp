@@ -14,8 +14,11 @@
 #include <jlm/rvsdg/traverser.hpp>
 #include <jlm/rvsdg/view.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::mem_sep_independent(llvm::RvsdgModule & rm)
+mem_sep_independent(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -23,7 +26,7 @@ jlm::hls::mem_sep_independent(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::mem_sep_argument(llvm::RvsdgModule & rm)
+mem_sep_argument(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -32,7 +35,7 @@ jlm::hls::mem_sep_argument(llvm::RvsdgModule & rm)
 
 // from MemoryStateEncoder.cpp
 jlm::rvsdg::argument *
-jlm::hls::GetMemoryStateArgument(const llvm::lambda::node & lambda)
+GetMemoryStateArgument(const llvm::lambda::node & lambda)
 {
   auto subregion = lambda.subregion();
   for (size_t n = 0; n < subregion->narguments(); n++)
@@ -45,7 +48,7 @@ jlm::hls::GetMemoryStateArgument(const llvm::lambda::node & lambda)
 }
 
 jlm::rvsdg::result *
-jlm::hls::GetMemoryStateResult(const llvm::lambda::node & lambda)
+GetMemoryStateResult(const llvm::lambda::node & lambda)
 {
   auto subregion = lambda.subregion();
   for (size_t n = 0; n < subregion->nresults(); n++)
@@ -123,7 +126,7 @@ route_through(jlm::rvsdg::region * target, jlm::rvsdg::output * response)
 
 /* assign each load and store its own state edge. */
 void
-jlm::hls::mem_sep_independent(jlm::rvsdg::region * region)
+mem_sep_independent(jlm::rvsdg::region * region)
 {
   auto lambda = dynamic_cast<const llvm::lambda::node *>(region->nodes.begin().ptr());
   auto lambda_region = lambda->subregion();
@@ -276,7 +279,7 @@ trace_edge(
 
 /* assign each pointer argument its own state edge. */
 void
-jlm::hls::mem_sep_argument(jlm::rvsdg::region * region)
+mem_sep_argument(jlm::rvsdg::region * region)
 {
   auto lambda = dynamic_cast<const llvm::lambda::node *>(region->nodes.begin().ptr());
   auto lambda_region = lambda->subregion();
@@ -308,3 +311,5 @@ jlm::hls::mem_sep_argument(jlm::rvsdg::region * region)
     trace_edge(common_edge, new_edge, std::get<0>(tp), std::get<1>(tp), std::get<2>(tp));
   }
 }
+
+} // namespace jlm::hls

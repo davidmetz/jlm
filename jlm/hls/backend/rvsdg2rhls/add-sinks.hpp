@@ -9,15 +9,15 @@
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 #include <jlm/rvsdg/region.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 void
 add_sinks(rvsdg::region * region);
 
 void
 add_sinks(jlm::llvm::RvsdgModule & rm);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_ADD_SINKS_HPP

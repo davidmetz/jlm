@@ -19,10 +19,9 @@
 
 #include <string>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 class FirrtlModule
 {
 public:
@@ -195,6 +194,6 @@ private:
   lambda_node_to_firrtl(const llvm::lambda::node * ln);
 };
 
-}
-}
+} // namespace jlm::hls
+
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_FIRRTL_HLS_HPP

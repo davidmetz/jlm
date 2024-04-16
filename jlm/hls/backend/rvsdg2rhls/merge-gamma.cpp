@@ -10,8 +10,11 @@
 #include <jlm/rvsdg/theta.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::merge_gamma(llvm::RvsdgModule & rm)
+merge_gamma(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -19,7 +22,7 @@ jlm::hls::merge_gamma(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::merge_gamma(jlm::rvsdg::region * region)
+merge_gamma(jlm::rvsdg::region * region)
 {
   bool changed = true;
   while (changed)
@@ -86,7 +89,7 @@ get_entryvar(jlm::rvsdg::output * origin, jlm::rvsdg::gamma_node * gamma)
 }
 
 bool
-jlm::hls::merge_gamma(jlm::rvsdg::gamma_node * gamma)
+merge_gamma(jlm::rvsdg::gamma_node * gamma)
 {
   for (auto user : *gamma->predicate()->origin())
   {
@@ -159,3 +162,5 @@ jlm::hls::merge_gamma(jlm::rvsdg::gamma_node * gamma)
   }
   return false;
 }
+
+} // namespace jlm::hls

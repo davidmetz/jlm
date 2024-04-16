@@ -31,6 +31,8 @@ libhls_SOURCES = \
     jlm/hls/backend/rvsdg2rhls/rhls-dne.cpp \
     jlm/hls/backend/rvsdg2rhls/rvsdg2rhls.cpp \
     jlm/hls/backend/rvsdg2rhls/ThetaConversion.cpp \
+    \
+    jlm/hls/util/view.cpp \
 
 libhls_HEADERS = \
 	jlm/hls/ir/hls.hpp \

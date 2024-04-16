@@ -11,6 +11,7 @@
 
 namespace jlm::hls
 {
+
 class DotHLS : public BaseHLS
 {
 public:
@@ -44,6 +45,7 @@ private:
 
   int loop_ctr = 0;
 };
-}
+
+} // namespace jlm::hls
 
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_DOT_HLS_HPP

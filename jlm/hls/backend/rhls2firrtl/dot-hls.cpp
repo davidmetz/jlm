@@ -10,20 +10,23 @@
 #include <algorithm>
 #include <set>
 
+namespace jlm::hls
+{
+
 std::string
-jlm::hls::DotHLS::extension()
+DotHLS::extension()
 {
   return ".dot";
 }
 
 std::string
-jlm::hls::DotHLS::get_text(llvm::RvsdgModule & rm)
+DotHLS::get_text(llvm::RvsdgModule & rm)
 {
   return subregion_to_dot(get_hls_lambda(rm)->subregion());
 }
 
 std::string
-jlm::hls::DotHLS::argument_to_dot(jlm::rvsdg::argument * port)
+DotHLS::argument_to_dot(jlm::rvsdg::argument * port)
 {
   auto name = get_port_name(port);
 
@@ -42,7 +45,7 @@ jlm::hls::DotHLS::argument_to_dot(jlm::rvsdg::argument * port)
 }
 
 std::string
-jlm::hls::DotHLS::result_to_dot(jlm::rvsdg::result * port)
+DotHLS::result_to_dot(jlm::rvsdg::result * port)
 {
   auto name = get_port_name(port);
 
@@ -61,7 +64,7 @@ jlm::hls::DotHLS::result_to_dot(jlm::rvsdg::result * port)
 }
 
 std::string
-jlm::hls::DotHLS::node_to_dot(const jlm::rvsdg::node * node)
+DotHLS::node_to_dot(const jlm::rvsdg::node * node)
 {
   auto SPACER = "                    <TD WIDTH=\"10\"></TD>\n";
   auto name = get_node_name(node);
@@ -164,7 +167,7 @@ jlm::hls::DotHLS::node_to_dot(const jlm::rvsdg::node * node)
 }
 
 std::string
-jlm::hls::DotHLS::edge(std::string src, std::string snk, const jlm::rvsdg::type & type, bool back)
+DotHLS::edge(std::string src, std::string snk, const jlm::rvsdg::type & type, bool back)
 {
   auto color = "black";
   JLM_ASSERT(src != "" && snk != "");
@@ -192,7 +195,7 @@ jlm::hls::DotHLS::edge(std::string src, std::string snk, const jlm::rvsdg::type 
 }
 
 std::string
-jlm::hls::DotHLS::loop_to_dot(hls::loop_node * ln)
+DotHLS::loop_to_dot(hls::loop_node * ln)
 {
   auto sr = ln->subregion();
   std::ostringstream dot;
@@ -257,7 +260,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node * ln)
     //            auto origin_out =
     //            dynamic_cast<jlm::rvsdg::node_output*>(node->input(0)->origin()); if(origin_out &&
     //            dynamic_cast<const
-    //            jlm::hls::predicate_buffer_op*>(&origin_out->node()->operation())){
+    //            predicate_buffer_op*>(&origin_out->node()->operation())){
     //                dot << get_node_name(node) << " ";
     //            }
     //        }
@@ -293,8 +296,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node * ln)
                  && (/*i==0||*/ i == 2); // back_outputs.count(node->input(i)->origin());
         auto origin_out = dynamic_cast<jlm::rvsdg::node_output *>(node->input(i)->origin());
         if (origin_out
-            && dynamic_cast<const jlm::hls::predicate_buffer_op *>(
-                &origin_out->node()->operation()))
+            && dynamic_cast<const predicate_buffer_op *>(&origin_out->node()->operation()))
         {
           //
           back = true;
@@ -307,7 +309,7 @@ jlm::hls::DotHLS::loop_to_dot(hls::loop_node * ln)
 }
 
 void
-jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node * ln)
+DotHLS::prepare_loop_out_port(hls::loop_node * ln)
 {
   // make sure all outputs are translated and available (necessary for argument/result cycles)
 
@@ -336,7 +338,7 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node * ln)
   for (size_t i = 0; i < sr->narguments(); ++i)
   {
     auto arg = sr->argument(i);
-    auto ba = dynamic_cast<jlm::hls::backedge_argument *>(arg);
+    auto ba = dynamic_cast<backedge_argument *>(arg);
     if (!ba)
     {
       assert(arg->input() != nullptr);
@@ -360,7 +362,7 @@ jlm::hls::DotHLS::prepare_loop_out_port(hls::loop_node * ln)
 }
 
 std::string
-jlm::hls::DotHLS::subregion_to_dot(jlm::rvsdg::region * sr)
+DotHLS::subregion_to_dot(jlm::rvsdg::region * sr)
 {
   std::ostringstream dot;
   dot << "digraph G {\n";
@@ -436,3 +438,5 @@ jlm::hls::DotHLS::subregion_to_dot(jlm::rvsdg::region * sr)
   dot << "}\n";
   return dot.str();
 }
+
+} // namespace jlm::hls

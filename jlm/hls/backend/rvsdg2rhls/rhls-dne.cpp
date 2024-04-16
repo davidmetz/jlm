@@ -335,4 +335,4 @@ dne(llvm::RvsdgModule & rm)
   dne(ln->subregion());
 }
 
-}
+} // namespace jlm::hls

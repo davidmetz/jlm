@@ -9,15 +9,15 @@
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 #include <jlm/rvsdg/theta.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 void
 alloca_conv(jlm::rvsdg::region * region);
 
 void
 alloca_conv(llvm::RvsdgModule & rm);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_BACKEND_HLS_RVSDG2RHLS_ALLOCA_CONV_HPP

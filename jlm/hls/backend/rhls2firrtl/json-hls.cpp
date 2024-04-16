@@ -6,8 +6,11 @@
 #include <jlm/hls/backend/rhls2firrtl/json-hls.hpp>
 #include <jlm/llvm/ir/operators/delta.hpp>
 
+namespace jlm::hls
+{
+
 std::string
-jlm::hls::JsonHLS::get_text(llvm::RvsdgModule & rm)
+JsonHLS::get_text(llvm::RvsdgModule & rm)
 {
   std::ostringstream json;
   auto ln = get_hls_lambda(rm);
@@ -72,8 +75,8 @@ jlm::hls::JsonHLS::get_text(llvm::RvsdgModule & rm)
     {
       json << ", ";
     }
-    auto req_bt = dynamic_cast<const jlm::hls::bundletype *>(&mem_reqs[i]->type());
-    auto resp_bt = dynamic_cast<const jlm::hls::bundletype *>(&mem_resps[i]->type());
+    auto req_bt = dynamic_cast<const bundletype *>(&mem_reqs[i]->type());
+    auto resp_bt = dynamic_cast<const bundletype *>(&mem_resps[i]->type());
     auto size = JlmSize(resp_bt->get_element_type("data"));
     auto has_write = req_bt->get_element_type("write") != nullptr;
     json << "{ \"size\": " << size << ", \"has_write\": " << has_write << "}";
@@ -82,3 +85,5 @@ jlm::hls::JsonHLS::get_text(llvm::RvsdgModule & rm)
   json << "}\n";
   return json.str();
 }
+
+} // namespace jlm::hls

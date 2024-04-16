@@ -9,10 +9,9 @@
 #include <jlm/hls/backend/rhls2firrtl/base-hls.hpp>
 #include <jlm/rvsdg/bitstring/type.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 class VerilatorHarnessHLS : public BaseHLS
 {
   std::string
@@ -43,7 +42,7 @@ private:
       const llvm::lambda::node * ln,
       const std::string & function_name);
 };
-}
-}
+
+} // namespace jlm::hls
 
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_VERILATOR_HARNESS_HLS_HPP

@@ -3,14 +3,15 @@
  * See COPYING for terms of redistribution.
  */
 
-#include <math.h>
-
 #include <jlm/hls/backend/rhls2firrtl/firrtl-hls.hpp>
 
 #include <math.h>
 
+namespace jlm::hls
+{
+
 bool
-jlm::hls::is_identity_mapping(const jlm::rvsdg::match_op & op)
+is_identity_mapping(const jlm::rvsdg::match_op & op)
 {
   for (const auto & pair : op)
   {
@@ -22,7 +23,7 @@ jlm::hls::is_identity_mapping(const jlm::rvsdg::match_op & op)
 }
 
 std::string
-jlm::hls::FirrtlHLS::get_text(llvm::RvsdgModule & rm)
+FirrtlHLS::get_text(llvm::RvsdgModule & rm)
 {
   std::ostringstream firrtl;
   auto module = lambda_node_to_firrtl(get_hls_lambda(rm));
@@ -35,13 +36,13 @@ jlm::hls::FirrtlHLS::get_text(llvm::RvsdgModule & rm)
 }
 
 std::string
-jlm::hls::FirrtlHLS::to_firrtl_type(const jlm::rvsdg::type * type)
+FirrtlHLS::to_firrtl_type(const jlm::rvsdg::type * type)
 {
   return util::strfmt("UInt<", jlm_sizeof(type), ">");
 }
 
 std::string
-jlm::hls::FirrtlHLS::mem_io()
+FirrtlHLS::mem_io()
 {
   std::ostringstream module;
   module << indent(2)
@@ -57,7 +58,7 @@ jlm::hls::FirrtlHLS::mem_io()
 }
 
 std::string
-jlm::hls::FirrtlHLS::mux_mem(const std::vector<std::string> & mem_nodes) const
+FirrtlHLS::mux_mem(const std::vector<std::string> & mem_nodes) const
 {
   std::ostringstream mem;
   std::string previous_granted = UInt(1, 0);
@@ -82,7 +83,7 @@ jlm::hls::FirrtlHLS::mux_mem(const std::vector<std::string> & mem_nodes) const
 }
 
 std::string
-jlm::hls::FirrtlHLS::module_header(const jlm::rvsdg::node * node, bool has_mem_io)
+FirrtlHLS::module_header(const jlm::rvsdg::node * node, bool has_mem_io)
 {
   std::ostringstream module;
 
@@ -109,8 +110,8 @@ jlm::hls::FirrtlHLS::module_header(const jlm::rvsdg::node * node, bool has_mem_i
   return module.str();
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::mem_node_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -210,8 +211,8 @@ jlm::hls::FirrtlHLS::mem_node_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::pred_buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -236,8 +237,8 @@ jlm::hls::FirrtlHLS::pred_buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -302,8 +303,8 @@ jlm::hls::FirrtlHLS::buffer_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::ndmux_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -331,8 +332,8 @@ jlm::hls::FirrtlHLS::ndmux_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::dmux_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::dmux_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -390,8 +391,8 @@ jlm::hls::FirrtlHLS::dmux_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::merge_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::merge_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -413,8 +414,8 @@ jlm::hls::FirrtlHLS::merge_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::fork_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::fork_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -454,8 +455,8 @@ jlm::hls::FirrtlHLS::fork_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::sink_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::sink_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -467,10 +468,10 @@ jlm::hls::FirrtlHLS::sink_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::print_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::print_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
-  auto pn = dynamic_cast<const jlm::hls::print_op *>(&n->operation());
+  auto pn = dynamic_cast<const print_op *>(&n->operation());
   std::string module_name = get_module_name(n);
   std::ostringstream module;
   module << module_header(n);
@@ -490,8 +491,8 @@ jlm::hls::FirrtlHLS::print_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::branch_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::branch_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -518,8 +519,8 @@ jlm::hls::FirrtlHLS::branch_to_firrtl(const jlm::rvsdg::simple_node * n)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::trigger_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::trigger_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -538,7 +539,7 @@ jlm::hls::FirrtlHLS::trigger_to_firrtl(const jlm::rvsdg::simple_node * n)
 }
 
 int
-jlm::hls::jlm_sizeof(const jlm::rvsdg::type * t)
+jlm_sizeof(const jlm::rvsdg::type * t)
 {
   if (auto bt = dynamic_cast<const jlm::rvsdg::bittype *>(t))
   {
@@ -567,7 +568,7 @@ jlm::hls::jlm_sizeof(const jlm::rvsdg::type * t)
 }
 
 std::string
-jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlHLS::gep_op_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   auto o = dynamic_cast<const llvm::GetElementPtrOperation *>(&(n->operation()));
   std::string result = "cvt(" + data(n->input(0)) + ")"; // start of with base pointer
@@ -597,7 +598,7 @@ jlm::hls::FirrtlHLS::gep_op_to_firrtl(const jlm::rvsdg::simple_node * n)
 }
 
 std::string
-jlm::hls::FirrtlHLS::match_op_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlHLS::match_op_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string result;
   auto o = dynamic_cast<const jlm::rvsdg::match_op *>(&(n->operation()));
@@ -620,7 +621,7 @@ jlm::hls::FirrtlHLS::match_op_to_firrtl(const jlm::rvsdg::simple_node * n)
 }
 
 std::string
-jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlHLS::simple_op_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   if (dynamic_cast<const jlm::rvsdg::match_op *>(&(n->operation())))
   {
@@ -745,8 +746,8 @@ jlm::hls::FirrtlHLS::simple_op_to_firrtl(const jlm::rvsdg::simple_node * n)
   }
 }
 
-jlm::hls::FirrtlModule &
-jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jlm::rvsdg::simple_node * n)
+FirrtlModule &
+FirrtlHLS::single_out_simple_node_to_firrtl(const jlm::rvsdg::simple_node * n)
 {
   std::string module_name = get_module_name(n);
   std::ostringstream module;
@@ -786,8 +787,8 @@ jlm::hls::FirrtlHLS::single_out_simple_node_to_firrtl(const jlm::rvsdg::simple_n
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule
-jlm::hls::FirrtlHLS::node_to_firrtl(const jlm::rvsdg::node * node, const int depth)
+FirrtlModule
+FirrtlHLS::node_to_firrtl(const jlm::rvsdg::node * node, const int depth)
 {
   // check if module for operation was already generated
   for (auto pair : modules)
@@ -859,7 +860,7 @@ jlm::hls::FirrtlHLS::node_to_firrtl(const jlm::rvsdg::node * node, const int dep
 }
 
 std::string
-jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node * ln)
+FirrtlHLS::create_loop_instances(loop_node * ln)
 {
   std::ostringstream firrtl;
   auto sr = ln->subregion();
@@ -892,7 +893,7 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node * ln)
   for (size_t i = 0; i < sr->narguments(); ++i)
   {
     auto arg = sr->argument(i);
-    auto ba = dynamic_cast<jlm::hls::backedge_argument *>(arg);
+    auto ba = dynamic_cast<backedge_argument *>(arg);
     if (!ba)
     {
       assert(arg->input() != nullptr);
@@ -917,7 +918,7 @@ jlm::hls::FirrtlHLS::create_loop_instances(jlm::hls::loop_node * ln)
 }
 
 std::string
-jlm::hls::FirrtlHLS::connect(jlm::rvsdg::region * sr)
+FirrtlHLS::connect(jlm::rvsdg::region * sr)
 {
   std::ostringstream firrtl;
   for (const auto & node : jlm::rvsdg::topdown_traverser(sr))
@@ -950,8 +951,8 @@ jlm::hls::FirrtlHLS::connect(jlm::rvsdg::region * sr)
   return firrtl.str();
 }
 
-jlm::hls::FirrtlModule
-jlm::hls::FirrtlHLS::subregion_to_firrtl(jlm::rvsdg::region * sr)
+FirrtlModule
+FirrtlHLS::subregion_to_firrtl(jlm::rvsdg::region * sr)
 {
   auto module_name = "subregion_mod" + util::strfmt(modules.size());
   std::ostringstream module;
@@ -1021,8 +1022,8 @@ jlm::hls::FirrtlHLS::subregion_to_firrtl(jlm::rvsdg::region * sr)
   return modules.back().second;
 }
 
-jlm::hls::FirrtlModule
-jlm::hls::FirrtlHLS::lambda_node_to_firrtl(const llvm::lambda::node * ln)
+FirrtlModule
+FirrtlHLS::lambda_node_to_firrtl(const llvm::lambda::node * ln)
 {
   auto module_name = ln->name() + "_lambda_mod";
   auto sr = ln->subregion();
@@ -1134,10 +1135,12 @@ jlm::hls::FirrtlHLS::lambda_node_to_firrtl(const llvm::lambda::node * ln)
 }
 
 std::string
-jlm::hls::FirrtlHLS::get_module_name(const jlm::rvsdg::node * node)
+FirrtlHLS::get_module_name(const jlm::rvsdg::node * node)
 {
   auto new_name = util::strfmt("op_", node->operation().debug_string(), "_", modules.size());
   // remove chars that are not valid in firrtl module names
   std::replace_if(new_name.begin(), new_name.end(), isForbiddenChar, '_');
   return new_name;
+}
+
 }

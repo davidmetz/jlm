@@ -11,8 +11,11 @@
 #include <jlm/rvsdg/traverser.hpp>
 #include <jlm/rvsdg/view.hpp>
 
+namespace jlm::hls
+{
+
 jlm::rvsdg::output *
-jlm::hls::get_trigger(jlm::rvsdg::region * region)
+get_trigger(jlm::rvsdg::region * region)
 {
   for (size_t i = 0; i < region->narguments(); ++i)
   {
@@ -25,7 +28,7 @@ jlm::hls::get_trigger(jlm::rvsdg::region * region)
 }
 
 jlm::llvm::lambda::node *
-jlm::hls::add_lambda_argument(llvm::lambda::node * ln, const jlm::rvsdg::type * type)
+add_lambda_argument(llvm::lambda::node * ln, const jlm::rvsdg::type * type)
 {
   auto old_fcttype = ln->type();
   std::vector<const jlm::rvsdg::type *> new_argument_types;
@@ -80,7 +83,7 @@ jlm::hls::add_lambda_argument(llvm::lambda::node * ln, const jlm::rvsdg::type * 
 }
 
 void
-jlm::hls::add_triggers(jlm::rvsdg::region * region)
+add_triggers(jlm::rvsdg::region * region)
 {
   auto trigger = get_trigger(region);
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
@@ -140,9 +143,11 @@ jlm::hls::add_triggers(jlm::rvsdg::region * region)
 }
 
 void
-jlm::hls::add_triggers(llvm::RvsdgModule & rm)
+add_triggers(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
   add_triggers(root);
 }
+
+} // namespace jlm::hls

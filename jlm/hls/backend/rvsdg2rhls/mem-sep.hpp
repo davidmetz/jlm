@@ -8,9 +8,7 @@
 #include <jlm/llvm/ir/operators/lambda.hpp>
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 
-namespace jlm
-{
-namespace hls
+namespace jlm::hls
 {
 
 void
@@ -30,6 +28,7 @@ GetMemoryStateArgument(const llvm::lambda::node & lambda);
 
 jlm::rvsdg::result *
 GetMemoryStateResult(const llvm::lambda::node & lambda);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_BACKEND_HLS_RVSDG2RHLS_MEM_SEP_HPP

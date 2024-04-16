@@ -16,6 +16,9 @@
 #include <jlm/rvsdg/substitution.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 class TraceAllocaUses
 {
 public:
@@ -77,7 +80,7 @@ private:
       }
       else if (auto r = dynamic_cast<jlm::rvsdg::result *>(user))
       {
-        if (auto ber = dynamic_cast<jlm::hls::backedge_result *>(r))
+        if (auto ber = dynamic_cast<backedge_result *>(r))
         {
           trace(ber->argument());
         }
@@ -111,7 +114,7 @@ gep_to_index(jlm::rvsdg::output * o)
 }
 
 void
-jlm::hls::alloca_conv(jlm::rvsdg::region * region)
+alloca_conv(jlm::rvsdg::region * region)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
   {
@@ -138,8 +141,8 @@ jlm::hls::alloca_conv(jlm::rvsdg::region * region)
       // detect loads and stores attached to alloca
       TraceAllocaUses ta(node->output(0));
       // create memory + response
-      auto mem_outs = jlm::hls::local_mem_op::create(*at, node->region());
-      auto resp_outs = jlm::hls::local_mem_resp_op::create(*mem_outs[0], ta.load_nodes.size());
+      auto mem_outs = local_mem_op::create(*at, node->region());
+      auto resp_outs = local_mem_resp_op::create(*mem_outs[0], ta.load_nodes.size());
       std::cout << "alloca converted " << at->debug_string() << std::endl;
       // replace gep outputs (convert pointer to index calculation)
       // replace loads and stores
@@ -147,14 +150,14 @@ jlm::hls::alloca_conv(jlm::rvsdg::region * region)
       for (auto l : ta.load_nodes)
       {
         auto index = gep_to_index(l->input(0)->origin());
-        auto response = jlm::hls::route_response(l->region(), resp_outs.front());
+        auto response = route_response(l->region(), resp_outs.front());
         resp_outs.erase(resp_outs.begin());
         std::vector<jlm::rvsdg::output *> states;
         for (size_t i = 1; i < l->ninputs(); ++i)
         {
           states.push_back(l->input(i)->origin());
         }
-        auto load_outs = jlm::hls::local_load_op::create(*index, states, *response);
+        auto load_outs = local_load_op::create(*index, states, *response);
         auto nn = dynamic_cast<jlm::rvsdg::node_output *>(load_outs[0])->node();
         for (size_t i = 0; i < l->noutputs(); ++i)
         {
@@ -173,7 +176,7 @@ jlm::hls::alloca_conv(jlm::rvsdg::region * region)
         {
           states.push_back(s->input(i)->origin());
         }
-        auto store_outs = jlm::hls::local_store_op::create(*index, *s->input(1)->origin(), states);
+        auto store_outs = local_store_op::create(*index, *s->input(1)->origin(), states);
         auto nn = dynamic_cast<jlm::rvsdg::node_output *>(store_outs[0])->node();
         for (size_t i = 0; i < s->noutputs(); ++i)
         {
@@ -220,9 +223,11 @@ jlm::hls::alloca_conv(jlm::rvsdg::region * region)
 }
 
 void
-jlm::hls::alloca_conv(jlm::llvm::RvsdgModule & rm)
+alloca_conv(jlm::llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
   alloca_conv(root);
 }
+
+} // namespace jlm::hls

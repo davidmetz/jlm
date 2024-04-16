@@ -17,10 +17,9 @@
 #include <memory>
 #include <utility>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 class branch_op final : public jlm::rvsdg::simple_op
 {
 private:
@@ -1610,6 +1609,6 @@ public:
   }
 };
 
-}
-}
+} // namespace jlm::hls
+
 #endif // JLM_HLS_IR_HLS_HPP

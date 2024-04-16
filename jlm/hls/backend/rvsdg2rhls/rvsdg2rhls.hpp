@@ -11,10 +11,9 @@
 #include <jlm/rvsdg/bitstring/constant.hpp>
 #include <jlm/rvsdg/node.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 static inline bool
 is_constant(const jlm::rvsdg::node * node)
 {
@@ -37,6 +36,7 @@ trace_call(jlm::rvsdg::input * input);
 
 std::unique_ptr<llvm::RvsdgModule>
 split_hls_function(llvm::RvsdgModule & rm, const std::string & function_name);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_RVSDG2RHLS_HPP

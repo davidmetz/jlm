@@ -6,8 +6,11 @@
 #include <jlm/hls/backend/rhls2firrtl/verilator-harness-hls.hpp>
 #include <jlm/llvm/ir/operators/delta.hpp>
 
+namespace jlm::hls
+{
+
 std::string
-jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
+VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
 {
   std::ostringstream cpp;
   auto ln = get_hls_lambda(rm);
@@ -298,7 +301,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
         << i
         << "_req_data_size;\n"
            "        uint64_t data;\n";
-    auto req_bt = dynamic_cast<const jlm::hls::bundletype *>(&mem_reqs[i]->type());
+    auto req_bt = dynamic_cast<const bundletype *>(&mem_reqs[i]->type());
     auto has_write = req_bt->get_element_type("write") != nullptr;
     if (has_write)
     {
@@ -469,7 +472,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
       register_ix++;
       continue;
     }
-    else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+    else if (dynamic_cast<const bundletype *>(&ln->type().ArgumentType(i)))
     {
       continue;
     }
@@ -512,7 +515,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
          "    top->i_valid = 0;\n";
   for (size_t i = 0; i < ln->type().NumArguments(); ++i)
   {
-    if (!dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+    if (!dynamic_cast<const bundletype *>(&ln->type().ArgumentType(i)))
     {
       cpp << "    top->i_data_" << i << " = 0;\n";
     }
@@ -624,7 +627,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::VerilatorHarnessHLS::call_function(
+VerilatorHarnessHLS::call_function(
     std::ostringstream & cpp,
     const jlm::llvm::lambda::node * ln,
     const std::string & function_name)
@@ -636,7 +639,7 @@ jlm::hls::VerilatorHarnessHLS::call_function(
     {
       continue;
     }
-    else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+    else if (dynamic_cast<const bundletype *>(&ln->type().ArgumentType(i)))
     {
       continue;
     }
@@ -650,7 +653,7 @@ jlm::hls::VerilatorHarnessHLS::call_function(
 }
 
 void
-jlm::hls::VerilatorHarnessHLS::get_function_header(
+VerilatorHarnessHLS::get_function_header(
     std::ostringstream & cpp,
     const jlm::llvm::lambda::node * ln,
     const std::string & function_name)
@@ -667,7 +670,7 @@ jlm::hls::VerilatorHarnessHLS::get_function_header(
     {
       return_type = "void";
     }
-    else if (dynamic_cast<const jlm::hls::bundletype *>(type))
+    else if (dynamic_cast<const bundletype *>(type))
     {
       return_type = "void";
     }
@@ -683,7 +686,7 @@ jlm::hls::VerilatorHarnessHLS::get_function_header(
     {
       continue;
     }
-    else if (dynamic_cast<const jlm::hls::bundletype *>(&ln->type().ArgumentType(i)))
+    else if (dynamic_cast<const bundletype *>(&ln->type().ArgumentType(i)))
     {
       continue;
     }
@@ -699,7 +702,7 @@ jlm::hls::VerilatorHarnessHLS::get_function_header(
 }
 
 std::string
-jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type * type)
+VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type * type)
 {
   if (auto t = dynamic_cast<const jlm::rvsdg::bittype *>(type))
   {
@@ -720,7 +723,7 @@ jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jlm::rvsdg::type * type)
 }
 
 std::string
-jlm::hls::VerilatorHarnessHLS::convert_to_c_type_postfix(const jlm::rvsdg::type * type)
+VerilatorHarnessHLS::convert_to_c_type_postfix(const jlm::rvsdg::type * type)
 {
   if (auto t = dynamic_cast<const llvm::arraytype *>(type))
   {
@@ -731,3 +734,5 @@ jlm::hls::VerilatorHarnessHLS::convert_to_c_type_postfix(const jlm::rvsdg::type 
     return "";
   }
 }
+
+} // namespace jlm::hls

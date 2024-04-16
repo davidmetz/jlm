@@ -46,6 +46,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/SourceMgr.h>
 
+#include <regex>
+
 void
 split_opt(jlm::llvm::RvsdgModule & rm)
 {
@@ -63,8 +65,6 @@ split_opt(jlm::llvm::RvsdgModule & rm)
   red.run(rm, statisticsCollector);
   dne.run(rm, statisticsCollector);
 }
-
-#include <regex>
 
 void
 pre_opt(jlm::llvm::RvsdgModule & rm)

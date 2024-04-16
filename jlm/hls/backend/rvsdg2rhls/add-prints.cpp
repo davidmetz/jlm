@@ -8,8 +8,11 @@
 #include <jlm/llvm/ir/operators.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::add_prints(jlm::rvsdg::region * region)
+add_prints(jlm::rvsdg::region * region)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
   {
@@ -42,7 +45,7 @@ jlm::hls::add_prints(jlm::rvsdg::region * region)
 }
 
 void
-jlm::hls::add_prints(llvm::RvsdgModule & rm)
+add_prints(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -50,7 +53,7 @@ jlm::hls::add_prints(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::convert_prints(llvm::RvsdgModule & rm)
+convert_prints(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -64,7 +67,7 @@ jlm::hls::convert_prints(llvm::RvsdgModule & rm)
 }
 
 jlm::rvsdg::output *
-jlm::hls::route_to_region(jlm::rvsdg::output * output, jlm::rvsdg::region * region)
+route_to_region(jlm::rvsdg::output * output, jlm::rvsdg::region * region)
 {
   JLM_ASSERT(region != nullptr);
 
@@ -95,7 +98,7 @@ jlm::hls::route_to_region(jlm::rvsdg::output * output, jlm::rvsdg::region * regi
 }
 
 void
-jlm::hls::convert_prints(
+convert_prints(
     jlm::rvsdg::region * region,
     jlm::rvsdg::output * printf,
     const llvm::FunctionType & functionType)
@@ -109,7 +112,7 @@ jlm::hls::convert_prints(
         convert_prints(structnode->subregion(n), printf, functionType);
       }
     }
-    else if (auto po = dynamic_cast<const jlm::hls::print_op *>(&(node->operation())))
+    else if (auto po = dynamic_cast<const print_op *>(&(node->operation())))
     {
       auto printf_local = route_to_region(printf, region); // TODO: prevent repetition?
       auto bc = jlm::rvsdg::create_bitconstant(region, 64, po->id());
@@ -127,3 +130,5 @@ jlm::hls::convert_prints(
     }
   }
 }
+
+} // namespace hls::hls

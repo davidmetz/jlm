@@ -8,10 +8,9 @@
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 #include <jlm/rvsdg/region.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 void
 instrument_ref(llvm::RvsdgModule & rm);
 
@@ -24,7 +23,7 @@ instrument_ref(
     llvm::FunctionType & storeFunctionType,
     jlm::rvsdg::output * alloca_func,
     llvm::FunctionType & allocaFunctionType);
-}
-}
+
+} // namespace jlm::hls
 
 #endif // JLM_BACKEND_HLS_RVSDG2RHLS_INSTRUMENT_REF_HPP

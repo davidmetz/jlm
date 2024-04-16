@@ -9,15 +9,15 @@
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 #include <jlm/rvsdg/region.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 void
 add_forks(rvsdg::region * region);
 
 void
 add_forks(llvm::RvsdgModule & rm);
-}
-}
+
+} // namespace hls::hls
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_ADD_FORKS_HPP

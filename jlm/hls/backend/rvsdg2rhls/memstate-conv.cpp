@@ -12,8 +12,11 @@
 #include <jlm/rvsdg/theta.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::memstate_conv(llvm::RvsdgModule & rm)
+memstate_conv(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -21,7 +24,7 @@ jlm::hls::memstate_conv(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::memstate_conv(jlm::rvsdg::region * region)
+memstate_conv(jlm::rvsdg::region * region)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
   {
@@ -47,3 +50,5 @@ jlm::hls::memstate_conv(jlm::rvsdg::region * region)
     }
   }
 }
+
+} // namespace jlm::hls

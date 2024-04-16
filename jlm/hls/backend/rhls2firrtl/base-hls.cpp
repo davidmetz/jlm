@@ -9,8 +9,11 @@
 #include <algorithm>
 #include <math.h>
 
+namespace jlm::hls
+{
+
 bool
-jlm::hls::isForbiddenChar(char c)
+isForbiddenChar(char c)
 {
   if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || ('0' <= c && c <= '9') || '_' == c)
   {
@@ -20,7 +23,7 @@ jlm::hls::isForbiddenChar(char c)
 }
 
 std::string
-jlm::hls::BaseHLS::get_node_name(const jlm::rvsdg::node * node)
+BaseHLS::get_node_name(const jlm::rvsdg::node * node)
 {
   auto found = node_map.find(node);
   if (found != node_map.end())
@@ -52,7 +55,7 @@ jlm::hls::BaseHLS::get_node_name(const jlm::rvsdg::node * node)
 }
 
 std::string
-jlm::hls::BaseHLS::get_port_name(jlm::rvsdg::input * port)
+BaseHLS::get_port_name(jlm::rvsdg::input * port)
 {
   std::string result;
   if (dynamic_cast<const jlm::rvsdg::node_input *>(port))
@@ -72,7 +75,7 @@ jlm::hls::BaseHLS::get_port_name(jlm::rvsdg::input * port)
 }
 
 std::string
-jlm::hls::BaseHLS::get_port_name(jlm::rvsdg::output * port)
+BaseHLS::get_port_name(jlm::rvsdg::output * port)
 {
   if (port == nullptr)
   {
@@ -100,7 +103,7 @@ jlm::hls::BaseHLS::get_port_name(jlm::rvsdg::output * port)
 }
 
 int
-jlm::hls::BaseHLS::JlmSize(const jlm::rvsdg::type * type)
+BaseHLS::JlmSize(const jlm::rvsdg::type * type)
 {
   if (auto bt = dynamic_cast<const jlm::rvsdg::bittype *>(type))
   {
@@ -122,7 +125,7 @@ jlm::hls::BaseHLS::JlmSize(const jlm::rvsdg::type * type)
   {
     return 1;
   }
-  else if (dynamic_cast<const jlm::hls::bundletype *>(type))
+  else if (dynamic_cast<const bundletype *>(type))
   {
     return 0; // TODO: fix this ugly hack needed for get_node_name
   }
@@ -133,7 +136,7 @@ jlm::hls::BaseHLS::JlmSize(const jlm::rvsdg::type * type)
 }
 
 void
-jlm::hls::BaseHLS::create_node_names(jlm::rvsdg::region * r)
+BaseHLS::create_node_names(jlm::rvsdg::region * r)
 {
   for (auto & node : r->nodes)
   {
@@ -141,7 +144,7 @@ jlm::hls::BaseHLS::create_node_names(jlm::rvsdg::region * r)
     {
       get_node_name(&node);
     }
-    else if (auto oln = dynamic_cast<jlm::hls::loop_node *>(&node))
+    else if (auto oln = dynamic_cast<loop_node *>(&node))
     {
       create_node_names(oln->subregion());
     }
@@ -154,7 +157,7 @@ jlm::hls::BaseHLS::create_node_names(jlm::rvsdg::region * r)
 }
 
 const jlm::llvm::lambda::node *
-jlm::hls::BaseHLS::get_hls_lambda(llvm::RvsdgModule & rm)
+BaseHLS::get_hls_lambda(llvm::RvsdgModule & rm)
 {
   auto region = rm.Rvsdg().root();
   auto ln = dynamic_cast<const llvm::lambda::node *>(region->nodes.begin().ptr());
@@ -169,9 +172,11 @@ jlm::hls::BaseHLS::get_hls_lambda(llvm::RvsdgModule & rm)
 }
 
 std::string
-jlm::hls::BaseHLS::get_base_file_name(const llvm::RvsdgModule & rm)
+BaseHLS::get_base_file_name(const llvm::RvsdgModule & rm)
 {
   auto source_file_name = rm.SourceFileName().name();
   auto base_file_name = source_file_name.substr(0, source_file_name.find_last_of('.'));
   return base_file_name;
 }
+
+} // namespace jlm::hls

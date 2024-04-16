@@ -14,10 +14,9 @@
 #include <fstream>
 #include <jlm/hls/ir/hls.hpp>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 bool
 isForbiddenChar(char c);
 
@@ -150,7 +149,7 @@ protected:
   //                return results;
   //            }
 };
-}
+
 }
 
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_BASE_HLS_HPP

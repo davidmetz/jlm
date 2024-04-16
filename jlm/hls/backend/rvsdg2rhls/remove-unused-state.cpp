@@ -9,8 +9,11 @@
 #include <jlm/rvsdg/traverser.hpp>
 #include <jlm/rvsdg/view.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::remove_unused_state(jlm::rvsdg::region * region, bool can_remove_arguments)
+remove_unused_state(jlm::rvsdg::region * region, bool can_remove_arguments)
 {
   // process children first so that unnecessary users get removed
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
@@ -116,7 +119,7 @@ jlm::hls::remove_unused_state(jlm::rvsdg::region * region, bool can_remove_argum
 }
 
 void
-jlm::hls::remove_unused_state(llvm::RvsdgModule & rm)
+remove_unused_state(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -124,7 +127,7 @@ jlm::hls::remove_unused_state(llvm::RvsdgModule & rm)
 }
 
 void
-jlm::hls::remove_gamma_passthrough(jlm::rvsdg::gamma_node * gn)
+remove_gamma_passthrough(jlm::rvsdg::gamma_node * gn)
 { // remove inputs in reverse
   for (int i = gn->nentryvars() - 1; i >= 0; --i)
   {
@@ -168,7 +171,7 @@ jlm::hls::remove_gamma_passthrough(jlm::rvsdg::gamma_node * gn)
 }
 
 jlm::llvm::lambda::node *
-jlm::hls::remove_lambda_passthrough(llvm::lambda::node * ln)
+remove_lambda_passthrough(llvm::lambda::node * ln)
 {
   auto old_fcttype = ln->type();
   std::vector<const jlm::rvsdg::type *> new_argument_types;
@@ -244,7 +247,7 @@ jlm::hls::remove_lambda_passthrough(llvm::lambda::node * ln)
 }
 
 void
-jlm::hls::remove_region_passthrough(const jlm::rvsdg::argument * arg)
+remove_region_passthrough(const jlm::rvsdg::argument * arg)
 {
   auto res = dynamic_cast<jlm::rvsdg::result *>(*arg->begin());
   auto origin = arg->input()->origin();
@@ -258,7 +261,7 @@ jlm::hls::remove_region_passthrough(const jlm::rvsdg::argument * arg)
 }
 
 bool
-jlm::hls::is_passthrough(const jlm::rvsdg::result * res)
+is_passthrough(const jlm::rvsdg::result * res)
 {
   auto arg = dynamic_cast<jlm::rvsdg::argument *>(res->origin());
   if (arg)
@@ -269,7 +272,7 @@ jlm::hls::is_passthrough(const jlm::rvsdg::result * res)
 }
 
 bool
-jlm::hls::is_passthrough(const jlm::rvsdg::argument * arg)
+is_passthrough(const jlm::rvsdg::argument * arg)
 {
   if (arg->nusers() == 1)
   {
@@ -282,3 +285,5 @@ jlm::hls::is_passthrough(const jlm::rvsdg::argument * arg)
   }
   return false;
 }
+
+} // namespace jlm::hls

@@ -8,8 +8,11 @@
 #include <jlm/hls/ir/hls.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::add_buffers(jlm::rvsdg::region * region, bool pass_through)
+add_buffers(jlm::rvsdg::region * region, bool pass_through)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(region))
   {
@@ -84,9 +87,11 @@ jlm::hls::add_buffers(jlm::rvsdg::region * region, bool pass_through)
 }
 
 void
-jlm::hls::add_buffers(llvm::RvsdgModule & rm, bool pass_through)
+add_buffers(llvm::RvsdgModule & rm, bool pass_through)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
   add_buffers(root, pass_through);
 }
+
+} // namespace hls::hls

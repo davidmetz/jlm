@@ -5,8 +5,11 @@
 
 #include <jlm/hls/ir/hls.hpp>
 
+namespace jlm::hls
+{
+
 jlm::rvsdg::structural_output *
-jlm::hls::loop_node::add_loopvar(jlm::rvsdg::output * origin, jlm::rvsdg::output ** buffer)
+loop_node::add_loopvar(jlm::rvsdg::output * origin, jlm::rvsdg::output ** buffer)
 {
   auto input = jlm::rvsdg::structural_input::create(this, origin, origin->type());
   auto output = jlm::rvsdg::structural_output::create(this, origin->type());
@@ -29,7 +32,7 @@ jlm::hls::loop_node::add_loopvar(jlm::rvsdg::output * origin, jlm::rvsdg::output
 }
 
 jlm::rvsdg::output *
-jlm::hls::loop_node::add_loopconst(jlm::rvsdg::output * origin)
+loop_node::add_loopconst(jlm::rvsdg::output * origin)
 {
   auto input = jlm::rvsdg::structural_input::create(this, origin, origin->type());
 
@@ -38,8 +41,8 @@ jlm::hls::loop_node::add_loopconst(jlm::rvsdg::output * origin)
   return buffer;
 }
 
-jlm::hls::loop_node *
-jlm::hls::loop_node::copy(jlm::rvsdg::region * region, jlm::rvsdg::substitution_map & smap) const
+loop_node *
+loop_node::copy(jlm::rvsdg::region * region, jlm::rvsdg::substitution_map & smap) const
 {
   auto nf = graph()->node_normal_form(typeid(jlm::rvsdg::operation));
   nf->set_mutable(false);
@@ -64,7 +67,7 @@ jlm::hls::loop_node::copy(jlm::rvsdg::region * region, jlm::rvsdg::substitution_
   for (size_t i = 0; i < subregion()->narguments(); ++i)
   {
     auto arg = subregion()->argument(i);
-    if (auto ba = dynamic_cast<jlm::hls::backedge_argument *>(arg))
+    if (auto ba = dynamic_cast<backedge_argument *>(arg))
     {
       auto na = loop->add_backedge(arg->type());
       smap.insert(ba, na);
@@ -77,9 +80,9 @@ jlm::hls::loop_node::copy(jlm::rvsdg::region * region, jlm::rvsdg::substitution_
   for (size_t i = 0; i < subregion()->narguments(); ++i)
   {
     auto arg = subregion()->argument(i);
-    if (auto ba = dynamic_cast<jlm::hls::backedge_argument *>(arg))
+    if (auto ba = dynamic_cast<backedge_argument *>(arg))
     {
-      auto na = dynamic_cast<jlm::hls::backedge_argument *>(smap.lookup(ba));
+      auto na = dynamic_cast<backedge_argument *>(smap.lookup(ba));
       na->result()->divert_to(smap.lookup(ba->result()->origin()));
     }
   }
@@ -94,8 +97,8 @@ jlm::hls::loop_node::copy(jlm::rvsdg::region * region, jlm::rvsdg::substitution_
   return loop;
 }
 
-jlm::hls::backedge_argument *
-jlm::hls::loop_node::add_backedge(const jlm::rvsdg::type & type)
+backedge_argument *
+loop_node::add_backedge(const jlm::rvsdg::type & type)
 {
   auto argument_loop = backedge_argument::create(subregion(), type);
   auto result_loop = backedge_result::create(argument_loop);
@@ -104,8 +107,8 @@ jlm::hls::loop_node::add_backedge(const jlm::rvsdg::type & type)
   return argument_loop;
 }
 
-jlm::hls::loop_node *
-jlm::hls::loop_node::create(jlm::rvsdg::region * parent, bool init)
+loop_node *
+loop_node::create(jlm::rvsdg::region * parent, bool init)
 {
   auto ln = new loop_node(parent);
   if (init)
@@ -123,7 +126,7 @@ jlm::hls::loop_node::create(jlm::rvsdg::region * parent, bool init)
 }
 
 void
-jlm::hls::loop_node::set_predicate(jlm::rvsdg::output * p)
+loop_node::set_predicate(jlm::rvsdg::output * p)
 {
   auto node = jlm::rvsdg::node_output::node(predicate()->origin());
   predicate()->origin()->divert_users(p);
@@ -131,8 +134,8 @@ jlm::hls::loop_node::set_predicate(jlm::rvsdg::output * p)
     remove(node);
 }
 
-std::unique_ptr<jlm::hls::bundletype>
-jlm::hls::get_mem_req_type(const jlm::rvsdg::valuetype & elementType, bool write)
+std::unique_ptr<bundletype>
+get_mem_req_type(const jlm::rvsdg::valuetype & elementType, bool write)
 {
   auto elements = new std::vector<std::pair<std::string, std::unique_ptr<jlm::rvsdg::type>>>();
   elements->emplace_back("addr", llvm::PointerType::Create());
@@ -146,11 +149,13 @@ jlm::hls::get_mem_req_type(const jlm::rvsdg::valuetype & elementType, bool write
   return std::make_unique<bundletype>(elements);
 }
 
-std::unique_ptr<jlm::hls::bundletype>
-jlm::hls::get_mem_res_type(const jlm::rvsdg::valuetype & dataType)
+std::unique_ptr<bundletype>
+get_mem_res_type(const jlm::rvsdg::valuetype & dataType)
 {
   auto elements = new std::vector<std::pair<std::string, std::unique_ptr<jlm::rvsdg::type>>>();
   elements->emplace_back("data", dataType.copy());
   elements->emplace_back("id", std::make_unique<jlm::rvsdg::bittype>(8));
   return std::make_unique<bundletype>(elements);
 }
+
+} // namespace jlm::hls

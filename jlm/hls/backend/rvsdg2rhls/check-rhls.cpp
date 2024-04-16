@@ -9,8 +9,11 @@
 #include <jlm/llvm/ir/operators/lambda.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::check_rhls(jlm::rvsdg::region * sr)
+check_rhls(jlm::rvsdg::region * sr)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(sr))
   {
@@ -50,7 +53,7 @@ jlm::hls::check_rhls(jlm::rvsdg::region * sr)
 }
 
 void
-jlm::hls::check_rhls(llvm::RvsdgModule & rm)
+check_rhls(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -65,3 +68,5 @@ jlm::hls::check_rhls(llvm::RvsdgModule & rm)
   }
   check_rhls(ln->subregion());
 }
+
+} // namespace jlm::hls

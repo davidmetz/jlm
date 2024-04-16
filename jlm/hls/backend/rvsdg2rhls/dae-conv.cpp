@@ -12,10 +12,14 @@
 #include <jlm/rvsdg/theta.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 #include <jlm/rvsdg/view.hpp>
+
 #include <queue>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::dae_conv(jlm::llvm::RvsdgModule & rm)
+dae_conv(jlm::llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
@@ -41,7 +45,7 @@ find_slice_output(jlm::rvsdg::output * output, std::unordered_set<jlm::rvsdg::no
   }
   else if (auto arg = dynamic_cast<jlm::rvsdg::argument *>(output))
   {
-    if (auto be = dynamic_cast<jlm::hls::backedge_argument *>(output))
+    if (auto be = dynamic_cast<backedge_argument *>(output))
     {
       find_slice_output(be->result()->origin(), slice);
     }
@@ -110,7 +114,7 @@ is_slice_exclusive_input_(
   }
   else if (auto arg = dynamic_cast<jlm::rvsdg::result *>(source))
   {
-    if (auto be = dynamic_cast<jlm::hls::backedge_result *>(source))
+    if (auto be = dynamic_cast<backedge_result *>(source))
     {
       for (auto user : *be->argument())
       {
@@ -214,14 +218,14 @@ dump_xml(const jlm::rvsdg::region * region, const std::string & file_name)
 
 void
 decouple_load(
-    jlm::hls::loop_node * loopNode,
+    loop_node * loopNode,
     jlm::rvsdg::simple_node * loadNode,
     std::unordered_set<jlm::rvsdg::node *> & loop_slice)
 {
   // loadNode is always a part of loop_slice due to state edges
-  auto new_loop = jlm::hls::loop_node::create(loopNode->region(), false);
+  auto new_loop = loop_node::create(loopNode->region(), false);
   jlm::rvsdg::substitution_map smap;
-  std::vector<jlm::hls::backedge_argument *> backedge_args;
+  std::vector<backedge_argument *> backedge_args;
   // create arguments
   for (size_t i = 0; i < loopNode->subregion()->narguments(); ++i)
   {
@@ -234,7 +238,7 @@ decouple_load(
         if (loop_slice.count(ni->node()))
         {
           jlm::rvsdg::argument * new_arg;
-          if (auto be = dynamic_cast<jlm::hls::backedge_argument *>(arg))
+          if (auto be = dynamic_cast<backedge_argument *>(arg))
           {
             new_arg = new_loop->add_backedge(arg->type());
             backedge_args.push_back(be);
@@ -273,7 +277,7 @@ decouple_load(
   for (auto be : backedge_args)
   {
     auto res = be->result();
-    auto new_res = dynamic_cast<jlm::hls::backedge_argument *>(smap.lookup(be))->result();
+    auto new_res = dynamic_cast<backedge_argument *>(smap.lookup(be))->result();
     new_res->divert_to(smap.lookup(res->origin()));
   }
 
@@ -285,7 +289,7 @@ decouple_load(
     JLM_ASSERT(results.size() <= 2);
     for (auto res : results)
     {
-      if (dynamic_cast<jlm::hls::backedge_result *>(res))
+      if (dynamic_cast<backedge_result *>(res))
       {
         // backedges should already have been copied
         continue;
@@ -316,7 +320,7 @@ decouple_load(
     }
   }
 
-  auto gate_out = jlm::hls::state_gate_op::create(*new_load->input(0)->origin(), in_states);
+  auto gate_out = state_gate_op::create(*new_load->input(0)->origin(), in_states);
   // divert state edges to state gate
   for (size_t i = 0; i < in_states.size(); ++i)
   {
@@ -341,7 +345,7 @@ decouple_load(
   new_loop->subregion()->RemoveArgument(mem_data_loop_arg->index());
   new_loop->RemoveInput(mem_data_loop_in->index());
   // create new decoupled load
-  auto dload_out = jlm::hls::decoupled_load_op::create(*addr_output, *mem_data_resp);
+  auto dload_out = decoupled_load_op::create(*addr_output, *mem_data_resp);
 
   // redirect mem_req_addr to dload_out[1]
   auto old_mem_req_res =
@@ -357,7 +361,7 @@ decouple_load(
     loadNode->output(i)->divert_users(loadNode->input(i)->origin());
   }
   // use a buffer here to make ready logic for response easy and consistent
-  auto buf = jlm::hls::buffer_op::create(*dload_out[0], 2, true)[0];
+  auto buf = buffer_op::create(*dload_out[0], 2, true)[0];
   // replace data output of loadNode
   auto old_data_in = jlm::rvsdg::structural_input::create(loopNode, buf, dload_out[0]->type());
   auto old_data_arg =
@@ -367,11 +371,11 @@ decouple_load(
 }
 
 bool
-process_loopnode(jlm::hls::loop_node * loopNode)
+process_loopnode(loop_node * loopNode)
 {
   for (auto & node : jlm::rvsdg::topdown_traverser(loopNode->subregion()))
   {
-    if (auto ln = dynamic_cast<jlm::hls::loop_node *>(node))
+    if (auto ln = dynamic_cast<loop_node *>(node))
     {
       if (process_loopnode(ln))
       {
@@ -380,7 +384,7 @@ process_loopnode(jlm::hls::loop_node * loopNode)
     }
     else if (auto simplenode = dynamic_cast<jlm::rvsdg::simple_node *>(node))
     {
-      if (dynamic_cast<const jlm::hls::load_op *>(&simplenode->operation()))
+      if (dynamic_cast<const load_op *>(&simplenode->operation()))
       {
         // can currently only generate dae one loop deep
         // find load slice within loop - three slices - complete, data and state-edge
@@ -399,14 +403,14 @@ process_loopnode(jlm::hls::loop_node * loopNode)
             break;
           }
           else if (
-              dynamic_cast<const jlm::hls::load_op *>(&sn->operation())
-              || dynamic_cast<const jlm::hls::store_op *>(&sn->operation()))
+              dynamic_cast<const load_op *>(&sn->operation())
+              || dynamic_cast<const store_op *>(&sn->operation()))
           {
             // data slice may not contain loads or stores - this includes node
             can_decouple = false;
             break;
           }
-          else if (dynamic_cast<const jlm::hls::decoupled_load_op *>(&sn->operation()))
+          else if (dynamic_cast<const decoupled_load_op *>(&sn->operation()))
           {
             // decoupled load has to be exclusive to load slice - e.g. not needed once load slice is
             // removed
@@ -427,8 +431,8 @@ process_loopnode(jlm::hls::loop_node * loopNode)
             break;
           }
           else if (
-              dynamic_cast<const jlm::hls::load_op *>(&sn->operation())
-              || dynamic_cast<const jlm::hls::store_op *>(&sn->operation()))
+              dynamic_cast<const load_op *>(&sn->operation())
+              || dynamic_cast<const store_op *>(&sn->operation()))
           {
             // state slice may not contain loads or stores except for node
             if (sn != dynamic_cast<jlm::rvsdg::node *>(simplenode))
@@ -437,7 +441,7 @@ process_loopnode(jlm::hls::loop_node * loopNode)
               break;
             }
           }
-          else if (dynamic_cast<const jlm::hls::decoupled_load_op *>(&sn->operation()))
+          else if (dynamic_cast<const decoupled_load_op *>(&sn->operation()))
           {
             // decoupled load has to be exclusive to load slice - e.g. not needed once load slice is
             // removed
@@ -452,8 +456,8 @@ process_loopnode(jlm::hls::loop_node * loopNode)
         {
           decouple_load(loopNode, simplenode, loop_slice);
           //                    dump_xml(loopNode->subregion(), "decoupled_before_dne.rvsdg");
-          //                    jlm::hls::dne(loopNode->subregion());
-          //                    jlm::hls::remove_unused_loop_inputs(loopNode);
+          //                    dne(loopNode->subregion());
+          //                    remove_unused_loop_inputs(loopNode);
           //                    dump_xml(loopNode->subregion(), "decoupled_after_dne.rvsdg");
           return true;
         }
@@ -464,7 +468,7 @@ process_loopnode(jlm::hls::loop_node * loopNode)
 }
 
 void
-jlm::hls::dae_conv(jlm::rvsdg::region * region)
+dae_conv(jlm::rvsdg::region * region)
 {
   auto lambda = dynamic_cast<const jlm::llvm::lambda::node *>(region->nodes.begin().ptr());
   bool changed;
@@ -473,7 +477,7 @@ jlm::hls::dae_conv(jlm::rvsdg::region * region)
     changed = false;
     for (auto & node : jlm::rvsdg::topdown_traverser(lambda->subregion()))
     {
-      if (auto loopnode = dynamic_cast<jlm::hls::loop_node *>(node))
+      if (auto loopnode = dynamic_cast<loop_node *>(node))
       {
         if (process_loopnode(loopnode))
         {
@@ -489,3 +493,5 @@ jlm::hls::dae_conv(jlm::rvsdg::region * region)
     }
   } while (changed);
 }
+
+} // namespace jlm::hls

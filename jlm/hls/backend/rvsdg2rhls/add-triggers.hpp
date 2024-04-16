@@ -10,9 +10,7 @@
 #include <jlm/llvm/ir/RvsdgModule.hpp>
 #include <jlm/rvsdg/region.hpp>
 
-namespace jlm
-{
-namespace hls
+namespace jlm::hls
 {
 
 rvsdg::output *
@@ -26,6 +24,7 @@ add_triggers(rvsdg::region * region);
 
 void
 add_triggers(llvm::RvsdgModule & rm);
-}
-}
+
+} // namespace jlm::hls
+
 #endif // JLM_HLS_BACKEND_RVSDG2RHLS_ADD_TRIGGERS_HPP

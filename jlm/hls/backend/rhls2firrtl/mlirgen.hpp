@@ -17,22 +17,21 @@
 #include <jlm/rvsdg/bitstring/type.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Verifier.h"
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/BuiltinTypes.h>
+#include <mlir/IR/Verifier.h>
 
-#include "circt/Dialect/FIRRTL/FIREmitter.h"
-#include "circt/Dialect/FIRRTL/FIRRTLDialect.h"
-#include "circt/Dialect/FIRRTL/FIRRTLOps.h"
-#include "circt/Dialect/FIRRTL/FIRRTLTypes.h"
-#include "circt/Dialect/FIRRTL/Namespace.h"
-#include "circt/Support/LLVM.h"
+#include <circt/Dialect/FIRRTL/FIREmitter.h>
+#include <circt/Dialect/FIRRTL/FIRRTLDialect.h>
+#include <circt/Dialect/FIRRTL/FIRRTLOps.h>
+#include <circt/Dialect/FIRRTL/FIRRTLTypes.h>
+#include <circt/Dialect/FIRRTL/Namespace.h>
+#include <circt/Support/LLVM.h>
 
-namespace jlm
+namespace jlm::hls
 {
-namespace hls
-{
+
 class MLIRGenImpl : public BaseHLS
 {
   std::string
@@ -280,40 +279,6 @@ public:
 private:
 };
 
-} // namespace hls
-} // namespace jlm
-
-#else
-
-namespace jlm
-{
-namespace hls
-{
-class MLIRGen : public BaseHLS
-{
-  std::string
-  extension() override
-  {
-    return ".fir";
-  }
-
-  std::string
-  get_text(llvm::RvsdgModule & rm) override
-  {
-    return "";
-  }
-
-public:
-  std::string
-  run(llvm::RvsdgModule & rvsdgModule)
-  {
-    throw util::error(
-        "This version of jlm-hls has not been compiled with support for the CIRCT backend\n");
-  }
-
-private:
-};
-} // namespace hls
-} // namespace jlm
+} // namespace jlm::hls
 
 #endif // JLM_HLS_BACKEND_RHLS2FIRRTL_MLIRGEN_HPP

@@ -7,8 +7,11 @@
 #include <jlm/hls/ir/hls.hpp>
 #include <jlm/rvsdg/traverser.hpp>
 
+namespace jlm::hls
+{
+
 void
-jlm::hls::add_forks(jlm::rvsdg::region * region)
+add_forks(jlm::rvsdg::region * region)
 {
   for (size_t i = 0; i < region->narguments(); ++i)
   {
@@ -51,9 +54,11 @@ jlm::hls::add_forks(jlm::rvsdg::region * region)
 }
 
 void
-jlm::hls::add_forks(llvm::RvsdgModule & rm)
+add_forks(llvm::RvsdgModule & rm)
 {
   auto & graph = rm.Rvsdg();
   auto root = graph.root();
   add_forks(root);
 }
+
+} // namespace hls::hls
