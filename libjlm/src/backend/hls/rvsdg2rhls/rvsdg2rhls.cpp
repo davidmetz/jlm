@@ -49,6 +49,7 @@
 #include "jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
+#include "jive/types/bitstring/comparison.hpp"
 
 void
 split_opt(jlm::RvsdgModule &rm) {
@@ -342,8 +343,63 @@ jlm::hls::rvsdg2ref(jlm::RvsdgModule &rhls, std::string path) {
     dump_ref(rhls, path);
 }
 
+void replace_intrinsic(jive::output * out, const std::string &name){
+    for(auto user: *out){
+        if (auto ni = dynamic_cast<jive::node_input*>(user)){
+            if (auto call_op = dynamic_cast<const jlm::CallOperation *>(&ni->node()->operation())) {
+                auto node = ni->node();
+                if(name == "llvm.smin.i32"){
+                    auto a = node->input(1)->origin();
+                    auto b = node->input(2)->origin();
+                    auto res_out = node->output(0);
+                    // divert state edges
+                    for (size_t i = 1; i <= 3; ++i) {
+                        node->output(node->noutputs()-i)->divert_users(node->input(node->ninputs()-i)->origin());
+                    }
+                    auto cmp = jive::bitslt_op::create(32, a, b);
+                    jive::match_op op(1, {{1,1}}, 0, 2);
+                    auto match = jive::simple_node::create_normalized(cmp->region(), op, {cmp})[0];
+                    auto gamma = jive::gamma_node::create(match, 2);
+                    auto ga = gamma->add_entryvar(a);
+                    auto gb = gamma->add_entryvar(a);
+                    auto gres = gamma->add_exitvar({gb->argument(0), ga->argument(1)});
+                    res_out->divert_users(gres);
+                } else {
+                    JLM_UNREACHABLE(("intrinsic "+name+" not implemented").c_str());
+                }
+            } else {
+                JLM_UNREACHABLE("not implemented");
+            }
+        } else {
+            JLM_UNREACHABLE("not implemented");
+        }
+    }
+}
+
+void replace_intrinsics(jlm::RvsdgModule &rhls){
+    auto root = rhls.Rvsdg().root();
+    auto lambda = dynamic_cast<const jlm::lambda::node *>(root->nodes.first());
+    JLM_ASSERT(lambda);
+    auto lambda_region = lambda->subregion();
+
+    for (size_t i = 0; i < rhls.Rvsdg().root()->narguments(); ++i) {
+        auto arg = root->argument(i);
+        auto imp = dynamic_cast<const jlm::impport *>(&arg->port());
+        std::cout << "impport " << imp->name() << ": " << imp->type().debug_string() << "\n";
+        if(imp->name().rfind("llvm.", 0)==0){
+            std::cout << "replacing intrinsic " << imp->name() << std::endl;
+            JLM_ASSERT(arg->nusers() == 1);
+            auto user = *arg->begin();
+            auto cvin = dynamic_cast<jlm::lambda::cvinput*>(user);
+            JLM_ASSERT(cvin);
+            replace_intrinsic(cvin->argument(), imp->name());
+        }
+    }
+}
+
 void
 jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
+    replace_intrinsics(rhls);
 	pre_opt(rhls);
     merge_gamma(rhls);
 
