@@ -948,6 +948,7 @@ namespace jlm {
 //                }
                 std::vector<jive::port> ports;
                 ports.emplace_back(get_mem_res_type(jive::bittype(max_width)));
+                ports.emplace_back(get_mem_res_type(jive::bittype(max_width)));
                 return ports;
             }
 
@@ -975,6 +976,7 @@ namespace jlm {
             static std::vector<jive::output *>
             create(
                     jive::output &result,
+                    jive::output &result2,
                     const std::vector<const jive::type *> &output_types
             ) {
                 auto region = result.region();
@@ -982,7 +984,7 @@ namespace jlm {
 //                auto result_type = dynamic_cast<const jive::bittype*>(&result.type());
 //                JLM_ASSERT(result_type && result_type->nbits()==64);
                 mem_resp_op op(output_types);
-                return jive::simple_node::create_normalized(region, op, {&result});
+                return jive::simple_node::create_normalized(region, op, {&result, &result2});
             }
         };
 
@@ -1040,6 +1042,7 @@ namespace jlm {
 //                    max_width = sz>max_width?sz:max_width;
 //                }
                 std::vector<jive::port> ports;
+                ports.emplace_back(get_mem_req_type(jlm::PointerType(jive::bittype(max_width)), !store_types.empty()));
                 ports.emplace_back(get_mem_req_type(jlm::PointerType(jive::bittype(max_width)), !store_types.empty()));
                 return ports;
             }

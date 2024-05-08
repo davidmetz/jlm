@@ -65,6 +65,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "std::vector<std::pair<void *, uint64_t>> ref_allocas;\n"
         "std::vector<mem_access> hls_loads;\n"
         "std::vector<mem_access> hls_stores;\n"
+        "std::vector<uint64_t> base_ptrs;\n"
         "std::map<void*, std::deque<mem_access>> load_map;\n"
         "std::map<void*, std::deque<mem_access>> store_map;\n"
         "\n"
@@ -143,7 +144,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         if(i!=0){
             cpp << ", ";
         }
-        cpp << "10";
+        cpp << "1";
     }
     cpp << "};\n";
     cpp <<
@@ -260,7 +261,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "        mem_resp[" << i << "]->emplace();\n"
 		"        mem_resp["<<i<<"]->back().valid = true;\n"
 		"        mem_resp["<<i<<"]->back().id = top->mem_" << i << "_req_data_id;\n"
-		"        void *addr = (void *) top->mem_" << i << "_req_data_addr;\n"
+		"        void *addr = (void *) (top->mem_" << i << "_req_data_addr+base_ptrs[" << (i/2) << "]);\n"
 		"        uint64_t size = top->mem_" << i << "_req_data_size;\n"
         "        uint64_t data;\n";
         auto req_bt = dynamic_cast<const jlm::hls::bundletype*>(&mem_reqs[i]->type());
@@ -411,6 +412,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {
 			continue;
 		}
+        if(dynamic_cast<const jlm::PointerType *>(&ln->type().ArgumentType(i))){
+            cpp << "    base_ptrs.push_back((uint64_t) a" << i << ");\n";
+            continue;
+        }
 		cpp << "    top->i_data_" << i << " = (uint64_t) a" << i << ";\n";
 	}
 	for (size_t i = 0; i < ln->ncvarguments(); ++i) {
@@ -423,6 +428,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 		} else{
 			throw jlm::error("Unsupported cvarg origin type type");
 		}
+        if(dynamic_cast<const jlm::PointerType *>(&ln->input(i)->type())){
+            cpp << "    base_ptrs.push_back((uint64_t) &" << name << ");\n";
+            continue;
+        }
 		cpp << "    top->i_data_" << ix << " = (uint64_t) &" << name << ";\n";
 		cpp << "#ifdef HLS_MEM_DEBUG\n";
 		cpp << "    std::cout << \"" << name << ": \" << &" << name << " << \"\\n\";\n";
@@ -471,6 +480,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "    ref_stores.erase(ref_stores.begin(), ref_stores.end());\n"
         "    hls_loads.erase(hls_loads.begin(), hls_loads.end());\n"
         "    hls_stores.erase(hls_stores.begin(), hls_stores.end());\n"
+        "    base_ptrs.erase(base_ptrs.begin(), base_ptrs.end());\n"
         "    mem_access_ctr = 0;\n";
 	if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
 		cpp << "    return top->o_data_0;\n";

@@ -48,6 +48,7 @@
 #include "jlm/backend/hls/rvsdg2rhls/distribute-constants.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/bram-pointers.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
 #include "jive/types/bitstring/comparison.hpp"
 
@@ -421,6 +422,7 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     jlm::hls::mem_queue(rhls);
     jlm::hls::mem_conv(rhls);
     jlm::hls::memstate_conv(rhls);
+    jlm::hls::bram_pointers(rhls);
     jlm::hls::remove_redundant_buf(rhls);
 	// enforce 1:1 input output relationship
 	jlm::hls::add_sinks(rhls);

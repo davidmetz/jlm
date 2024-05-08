@@ -484,7 +484,8 @@ void jlm::hls::generate_mem_port(const jlm::lambda::node * lambda,
     // TODO: change type
     auto mem_resp_type = get_mem_res_type(jive::bit64);
     auto mem_resp_argument = jive::argument::create(lambda_region, nullptr, *mem_resp_type);
-    auto load_responses = mem_resp_op::create(*mem_resp_argument, load_types);
+    auto mem_resp_argument2 = jive::argument::create(lambda_region, nullptr, *mem_resp_type);
+    auto load_responses = mem_resp_op::create(*mem_resp_argument, *mem_resp_argument2, load_types);
     std::vector<jive::output *> load_addrs;
     for (size_t i = 0; i < load_nodes.size(); ++i) {
         auto reponse = load_responses[i];
@@ -518,6 +519,7 @@ void jlm::hls::generate_mem_port(const jlm::lambda::node * lambda,
     }
     auto req = mem_req_op::create(load_addrs, store_operands, lambda_region);
     jive::result::create(lambda_region, req[0], nullptr, req[0]->type());
+    jive::result::create(lambda_region, req[1], nullptr, req[1]->type());
 }
 
 

@@ -19,6 +19,7 @@ LIBJLM_SRC = \
     libjlm/src/backend/hls/rvsdg2rhls/add-prints.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/instrument-ref.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/add-buffers.cpp \
+    libjlm/src/backend/hls/rvsdg2rhls/bram-pointers.cpp \
     libjlm/src/backend/hls/rvsdg2rhls/mem-conv.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/dae-conv.cpp \
 	libjlm/src/backend/hls/rvsdg2rhls/memstate-conv.cpp \
