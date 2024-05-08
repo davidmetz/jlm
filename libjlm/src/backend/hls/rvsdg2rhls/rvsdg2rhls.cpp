@@ -45,6 +45,7 @@
 #include "jlm/backend/hls/rvsdg2rhls/remove-redundant-buf.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/add-buffers.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/mem-queue.hpp"
+#include "jlm/backend/hls/rvsdg2rhls/distribute-constants.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/instrument-ref.hpp"
 #include "jlm/backend/hls/rvsdg2rhls/merge-gamma.hpp"
 #include <jlm/opt/alias-analyses/Optimization.hpp>
@@ -355,6 +356,7 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     jlm::hls::remove_unused_state(rhls);
 	// main conversion steps
 //	jlm::hls::add_triggers(rhls); // TODO: is this needed?
+    jlm::hls::distribute_constants(rhls);
 	jlm::hls::gamma_conv(rhls, true);
 	jlm::hls::theta_conv(rhls);
 	// rhls optimization
