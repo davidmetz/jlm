@@ -158,11 +158,11 @@ jlm::hls::DotHLS::edge(std::string src, std::string snk, const jive::type &type,
 	}
 	if (!back) {
 		return src + " -> " + snk + " [style=\"\", arrowhead=\"normal\", color=" + color +
-			   ", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black];\n";
+			   ", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black, penwidth=3];\n";
 	}
 	// implement back edges by setting constraint to false
 	return src + " -> " + snk + " [style=\"\", arrowhead=\"normal\", color=" + color +
-		   ", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black, constraint=false];\n";
+		   ", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black, penwidth=3, constraint=false];\n";
 //	return snk + " -> " + src + " [style=\"\", arrowhead=\"normal\", color=" + color +
 //		   ", headlabel=<>, fontsize=10, labelangle=45, labeldistance=2.0, labelfontcolor=black, dir=back];\n";
 }
