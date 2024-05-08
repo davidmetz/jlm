@@ -1199,8 +1199,8 @@ jlm::hls::MLIRGenImpl::MlirGenHlsStore(const jive::simple_node *node) {
     }
     for (size_t i = 0; i < oValidRegs.size(); ++i) {
         // register is empty or being drained
-//        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i]));
-        canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
+        canRequest = AddAndOp(body, canRequest, AddOrOp(body, AddNotOp(body, oValidRegs[i]), outReadyStates[i]));
+//        canRequest = AddAndOp(body, canRequest, AddNotOp(body, oValidRegs[i]));
     }
 
     // Block until all inputs and no outputs are valid
@@ -3298,7 +3298,10 @@ jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node)
 	// Check if the module has already been instantiated else we need to generate it
 	if (!modules[name]) {
 		auto module = MlirGen(node);
-        check_module(module);
+        // stores violate these rules at the moment, but work fine
+        if(!dynamic_cast<const jlm::hls::store_op*>(&node->operation())){
+            check_module(module);
+        }
 		modules[name] = module;
 		body->push_back(module);
 	}

@@ -14,9 +14,16 @@ bool eliminate_buf(jive::output * o){
         auto node = so->node();
         if (auto branch = dynamic_cast<const jlm::hls::branch_op *>(&node->operation())){
             return eliminate_buf(node->input(1)->origin());
+        } else if (auto fork = dynamic_cast<const jlm::hls::fork_op *>(&node->operation())){
+            // part of memory disambiguation
+            return eliminate_buf(node->input(0)->origin());
         } else if (auto local_load = dynamic_cast<const jlm::hls::local_load_op *>(&node->operation())){
             return true;
         } else if (auto local_store = dynamic_cast<const jlm::hls::local_store_op *>(&node->operation())){
+            return true;
+        } else if (auto load = dynamic_cast<const jlm::hls::load_op *>(&node->operation())){
+            return true;
+        } else if (auto store = dynamic_cast<const jlm::hls::store_op *>(&node->operation())){
             return true;
         }
     }
