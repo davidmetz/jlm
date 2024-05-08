@@ -30,7 +30,8 @@ namespace jlm {
 			operator==(const jive::operation &other) const noexcept override {
 				auto ot = dynamic_cast<const branch_op *>(&other);
 				// check predicate and value
-				return ot
+				return ot &&
+                       ot->loop ==loop
 					   && ot->argument(0).type() == argument(0).type()
 					   && ot->result(0).type() == result(0).type();
 			}
@@ -792,7 +793,7 @@ namespace jlm {
                     jive::output &enq,
                     jive::output &deq,
                     bool combinatorial,
-                    size_t capacity = 10
+                    size_t capacity = 4
             ) {
                 auto region = check.region();
                 auto pointerType = dynamic_cast<const PointerType*>(&check.type());

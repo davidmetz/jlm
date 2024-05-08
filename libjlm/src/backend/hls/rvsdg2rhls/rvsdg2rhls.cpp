@@ -403,6 +403,9 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     replace_intrinsics(rhls);
 	pre_opt(rhls);
     merge_gamma(rhls);
+    jlm::StatisticsDescriptor sd;
+    jlm::DeadNodeElimination dne;
+    dne.run(rhls, sd);
 
 //	jlm::hls::add_prints(rhls);
 //    dump_xml(rhls, "post_opt.rvsdg");
@@ -416,6 +419,8 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     jlm::hls::distribute_constants(rhls);
 	jlm::hls::gamma_conv(rhls, true);
 	jlm::hls::theta_conv(rhls);
+    jlm::cne cne;
+    cne.run(rhls, sd);
 	// rhls optimization
 	jlm::hls::dne(rhls);
     jlm::hls::alloca_conv(rhls);
@@ -439,11 +444,6 @@ jlm::hls::dump_ref(jlm::RvsdgModule &rhls, std::string &path) {
     rhls.Rvsdg().root()->copy(reference->Rvsdg().root(), smap, true, true);
     pre_opt(*reference);
     instrument_ref(*reference);
-	for (size_t i = 0; i < reference->Rvsdg().root()->narguments(); ++i) {
-		auto arg = reference->Rvsdg().root()->argument(i);
-		auto imp = dynamic_cast<const impport *>(&arg->port());
-		std::cout << "impport " << imp->name() << ": " << imp->type().debug_string() << "\n";
-	}
 	llvm::LLVMContext ctx;
 	StatisticsDescriptor sd;
 	auto jm2 = rvsdg2jlm::rvsdg2jlm(*reference, sd);
