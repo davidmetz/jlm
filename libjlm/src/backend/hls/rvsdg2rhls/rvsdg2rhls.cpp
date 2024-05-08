@@ -403,9 +403,11 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     replace_intrinsics(rhls);
 	pre_opt(rhls);
     merge_gamma(rhls);
+    dump_dot(rhls, "merge_gamma.dot");
     jlm::StatisticsDescriptor sd;
     jlm::DeadNodeElimination dne;
     dne.run(rhls, sd);
+    dump_dot(rhls, "jlm_dne.dot");
 
 //	jlm::hls::add_prints(rhls);
 //    dump_xml(rhls, "post_opt.rvsdg");
@@ -419,8 +421,10 @@ jlm::hls::rvsdg2rhls(jlm::RvsdgModule &rhls) {
     jlm::hls::distribute_constants(rhls);
 	jlm::hls::gamma_conv(rhls, true);
 	jlm::hls::theta_conv(rhls);
+    dump_dot(rhls, "theta_conv.dot");
     jlm::cne cne;
     cne.run(rhls, sd);
+    dump_dot(rhls, "jlm_cne.dot");
 	// rhls optimization
 	jlm::hls::dne(rhls);
     jlm::hls::alloca_conv(rhls);
