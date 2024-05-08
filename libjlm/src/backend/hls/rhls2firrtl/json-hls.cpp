@@ -16,7 +16,7 @@ jlm::hls::JsonHLS::get_text(jlm::RvsdgModule &rm) {
 
     auto reg_args = get_reg_args(ln);
     auto reg_results = get_reg_results(ln);
-
+    json << "\"addr_width\": " << jlm::hls::pointer_bits << ",\n";
 	json << "\"arguments\": [";
 	for (size_t i = 0; i < reg_args.size(); ++i) {
 //		if (dynamic_cast<const jive::statetype *>(&ln->type().ArgumentType(i))) {

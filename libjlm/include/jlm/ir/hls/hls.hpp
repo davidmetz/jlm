@@ -1445,6 +1445,7 @@ namespace jlm {
                 return jive::simple_node::create_normalized(region, op, operands);
             }
         };
+        extern size_t pointer_bits;
 
     }
 }

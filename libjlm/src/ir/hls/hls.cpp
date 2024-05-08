@@ -5,6 +5,7 @@
 
 #include <jlm/ir/hls/hls.hpp>
 
+size_t jlm::hls::pointer_bits = 16;
 jive::structural_output *jlm::hls::loop_node::add_loopvar(jive::output *origin, jive::output **buffer) {
     auto input = jive::structural_input::create(this, origin, origin->type());
     auto output = jive::structural_output::create(this, origin->type());

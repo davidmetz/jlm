@@ -90,7 +90,7 @@ jlm::hls::BaseHLS::JlmSize(const jive::type *type) {
 	} else if (auto at = dynamic_cast<const jlm::arraytype *>(type)) {
 		return JlmSize(&at->element_type()) * at->nelements();
 	} else if (dynamic_cast<const jlm::PointerType *>(type)) {
-		return 64;
+		return jlm::hls::pointer_bits;
 	} else if (auto ct = dynamic_cast<const jive::ctltype *>(type)) {
 		return ceil(log2(ct->nalternatives()));
 	} else if (dynamic_cast<const jive::statetype *>(type)) {

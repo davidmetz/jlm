@@ -242,7 +242,7 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		for (size_t i = 1; i < node->ninputs(); i++) {
 			int bits = JlmSize(pointeeType);
 			if (dynamic_cast<const jive::bittype *>(pointeeType)) {
-				;
+				pointeeType = nullptr;
 			} else if (auto arrayType = dynamic_cast<const jlm::arraytype *>(pointeeType)) {
 				pointeeType = &arrayType->element_type();
 			} else {
@@ -252,13 +252,13 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 			auto input = GetSubfield(body, inBundles[i], "data");
 			auto asSInt = AddAsSIntOp(body, input);
 			int bytes = bits / 8;
-			auto constantOp = GetConstant(body, 64, bytes);
+			auto constantOp = GetConstant(body, jlm::hls::pointer_bits, bytes);
 			auto cvtOp = AddCvtOp(body, constantOp);
 			auto offset = AddMulOp(body, asSInt, cvtOp);
 			result = AddAddOp(body, result, offset);
 		}
 		auto asUInt = AddAsUIntOp(body, result);
-		Connect(body, outData, AddBitsOp(body, asUInt, 63, 0));
+		Connect(body, outData, AddBitsOp(body, asUInt, jlm::hls::pointer_bits-1, 0));
 	} else if (dynamic_cast<const jlm::UndefValueOperation *>(&(node->operation()))) {
 		Connect(body, outData, GetConstant(body, 1, 0));
 	} else {
@@ -1364,7 +1364,7 @@ jlm::hls::MLIRGenImpl::MlirGenMem(const jive::simple_node *node) {
 		if (auto bitType = dynamic_cast<const jive::bittype *>(&node->output(0)->type())) {
 			bitWidth = bitType->nbits();
 		} else if (dynamic_cast<const jlm::PointerType *>(&node->output(0)->type())) {
-			bitWidth = 64;
+			bitWidth = jlm::hls::pointer_bits;
 		} else {
 			throw jlm::error("unknown width for mem request");
 		}
@@ -2727,7 +2727,7 @@ jlm::hls::MLIRGenImpl::AddMemReqPort(llvm::SmallVector<circt::firrtl::PortInfo> 
 					builder.getStringAttr("addr"),
 					false,
 					circt::firrtl::IntType::get(builder.getContext(),
-								    false, 64))
+								    false, jlm::hls::pointer_bits))
 			       );
 	memReqElements.push_back(BundleElement(
 					builder.getStringAttr("data"),
@@ -3391,6 +3391,7 @@ jlm::hls::MLIRGenImpl::InitializeMemReq(circt::firrtl::FModuleOp module) {
 	auto zeroBitValue = GetConstant(body, 1, 0);
 	auto invalid1 = GetInvalid(body, 1);
 	auto invalid3 = GetInvalid(body, 3);
+	auto invalidPtr = GetInvalid(body, jlm::hls::pointer_bits);
 	auto invalid64 = GetInvalid(body, 64);
 
 	auto memValid = GetSubfield(body, mem, "valid");
@@ -3400,7 +3401,7 @@ jlm::hls::MLIRGenImpl::InitializeMemReq(circt::firrtl::FModuleOp module) {
 	auto memWidth = GetSubfield(body, mem, "width");
 
 	Connect(body, memValid, zeroBitValue);
-	Connect(body, memAddr,  invalid64);
+	Connect(body, memAddr,  invalidPtr);
 	Connect(body, memData,  invalid64);
 	Connect(body, memWrite, invalid1);
 	Connect(body, memWidth, invalid3);
@@ -3523,7 +3524,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
             if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
                 bitWidth = bitType->nbits();
             } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
-                bitWidth = 64;
+                bitWidth = jlm::hls::pointer_bits;
             } else{
                 throw jlm::error("unknown width for mem request");
             }
