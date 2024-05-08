@@ -425,6 +425,8 @@ class LlvmOptCommand final : public Command {
 public:
   enum class Optimization {
     Mem2Reg,
+    O3,
+    O3_adj,
   };
 
   ~LlvmOptCommand() noexcept override;

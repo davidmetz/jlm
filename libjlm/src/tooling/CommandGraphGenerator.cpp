@@ -346,7 +346,8 @@ JhlsCommandGraphGenerator::GenerateCommandGraph(const JhlsCommandLineOptions & c
     dynamic_cast<JlmHlsExtractCommand *>(&extract.GetCommand())->HlsFunctionFile(),
     ll_m2r2,
     true,
-    {LlvmOptCommand::Optimization::Mem2Reg});
+    {LlvmOptCommand::Optimization::O3_adj});
+//    {LlvmOptCommand::Optimization::Mem2Reg});
   extract.AddEdge(m2r2);
   // hls
   auto & hls = JlmHlsCommand::Create(
