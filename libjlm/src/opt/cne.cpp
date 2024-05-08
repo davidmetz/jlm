@@ -14,6 +14,7 @@
 #include <jive/rvsdg/simple-node.hpp>
 #include <jive/rvsdg/theta.hpp>
 #include <jive/rvsdg/traverser.hpp>
+#include "jlm/ir/hls/hls.hpp"
 
 namespace jlm {
 
@@ -218,6 +219,17 @@ congruent(
 		return congruent(r1->origin(), r2->origin(), vs, ctx);
 	}
 
+    auto a1 = dynamic_cast<jive::argument*>(o1);
+    auto a2 = dynamic_cast<jive::argument*>(o2);
+    if(a1 && is<hls::loop_op>(a1->region()->node()) && a2 && is<hls::loop_op>(a2->region()->node())){
+        JLM_ASSERT(o1->region()->node() == o2->region()->node());
+        if(a1->input() && a2->input()){
+            // input arguments
+            vs.insert(a1, a2);
+            return congruent(a1->input()->origin(), a2->input()->origin(), vs, ctx);
+        }
+    }
+
 	if (jive::is<jive::gamma_op>(n1) && n1 == n2) {
 		auto so1 = static_cast<jive::structural_output*>(o1);
 		auto so2 = static_cast<jive::structural_output*>(o2);
@@ -328,6 +340,25 @@ mark_theta(const jive::structural_node * node, cnectx & ctx)
 }
 
 static void
+mark_loop(const jive::structural_node * node, cnectx & ctx)
+{
+	JLM_ASSERT(jive::is<hls::loop_op>(node));
+	auto loop = static_cast<const jlm::hls::loop_node*>(node);
+
+	/* mark loop variables */
+	for (size_t i1 = 0; i1 < loop->ninputs(); i1++) {
+		for (size_t i2 = i1+1; i2 < loop->ninputs(); i2++) {
+			auto input1 = loop->input(i1);
+			auto input2 = loop->input(i2);
+			if (congruent(input1->arguments.first(), input2->arguments.first(), ctx)) {
+				ctx.mark(input1->arguments.first(), input2->arguments.first());
+			}
+		}
+	}
+	mark(node->subregion(0), ctx);
+}
+
+static void
 mark_lambda(const jive::structural_node * node, cnectx & ctx)
 {
 	JLM_ASSERT(jive::is<lambda::operation>(node));
@@ -378,6 +409,7 @@ mark(const jive::structural_node * node, cnectx & ctx)
 	> map({
 	  {std::type_index(typeid(jive::gamma_op)), mark_gamma}
 	, {std::type_index(typeid(jive::theta_op)), mark_theta}
+	, {std::type_index(typeid(jlm::hls::loop_op)), mark_loop}
 	, {typeid(lambda::operation), mark_lambda}
 	, {typeid(phi::operation), mark_phi}
 	, {typeid(delta::operation), mark_delta}
@@ -496,6 +528,16 @@ divert_theta(jive::structural_node * node, cnectx & ctx)
 }
 
 static void
+divert_loop(jive::structural_node * node, cnectx & ctx)
+{
+	JLM_ASSERT(jive::is<hls::loop_op>(node));
+	auto loop = static_cast<hls::loop_node*>(node);
+	auto subregion = node->subregion(0);
+
+	divert(subregion, ctx);
+}
+
+static void
 divert_lambda(jive::structural_node * node, cnectx & ctx)
 {
 	JLM_ASSERT(jive::is<lambda::operation>(node));
@@ -528,6 +570,7 @@ divert(jive::structural_node * node, cnectx & ctx)
 	> map({
 	  {std::type_index(typeid(jive::gamma_op)), divert_gamma}
 	, {std::type_index(typeid(jive::theta_op)), divert_theta}
+	, {std::type_index(typeid(hls::loop_op)), divert_loop}
 	, {typeid(lambda::operation), divert_lambda}
 	, {typeid(phi::operation),divert_phi}
 	, {typeid(delta::operation), divert_delta}
