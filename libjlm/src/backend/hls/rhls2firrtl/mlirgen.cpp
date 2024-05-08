@@ -934,18 +934,45 @@ jlm::hls::MLIRGenImpl::MlirGenHlsDLoad(const jive::simple_node *node) {
     auto zeroBitValue = GetConstant(body, 1, 0);
     auto oneBitValue = GetConstant(body, 1, 1);
 
+    auto validReg = builder.create<circt::firrtl::RegResetOp>(
+            location,
+            GetIntType(1),
+            clock,
+            reset,
+            zeroBitValue,
+            builder.getStringAttr("buffer_valid"));
+    body->push_back(validReg);
+
+    auto dataReg = builder.create<circt::firrtl::RegResetOp>(
+            location,
+            GetFirrtlType(&node->output(0)->type()),
+            clock,
+            reset,
+            GetConstant(body, JlmSize(&node->output(0)->type()), 0),
+            builder.getStringAttr("buffer_data"));
+    body->push_back(dataReg);
 
     // Block until all inputs and no outputs are valid
-    Connect(body, outValidMemAddr, inValidAddr);
+    Connect(body, outValidMemAddr, AddAndOp(body, AddAndOp(body, inValidAddr, outReadyData), AddNotOp(body, validReg)));
     Connect(body, outDataMemAddr, inDataAddr);
 
     // Handshaking
-    Connect(body, inReadyAddr, outReadyMemAddr);
-    Connect(body, inReadyMemData, outReadyData);
+    Connect(body, inReadyAddr, AddAndOp(body, outReadyData, AddAndOp(body, outReadyMemAddr, AddNotOp(body, validReg))));
+    Connect(body, inReadyMemData, oneBitValue);
 
-    Connect(body, outValidData, inValidMemData);
+    Connect(body, outValidData, AddOrOp(body, inValidMemData, validReg));
     Connect(body, outDataData, inDataMemData);
-    auto andOp = AddAndOp(body, outReadyData, outValidData);
+
+
+    auto whenBufferValid = AddWhenOp(body, validReg, false).getThenBodyBuilder().getBlock();
+    Connect(whenBufferValid, outDataData, dataReg);
+
+    auto whenBufferFlush = AddWhenOp(body, AddAndOp(body, outReadyData, outValidData), false).getThenBodyBuilder().getBlock();
+    Connect(whenBufferFlush, validReg, zeroBitValue);
+
+    auto whenBufferFill = AddWhenOp(body, AddAndOp(body, inValidMemData, AddNotOp(body, outReadyData)), false).getThenBodyBuilder().getBlock();
+    Connect(whenBufferFill, validReg, oneBitValue);
+    Connect(whenBufferFill, dataReg, inDataMemData);
 
     return module;
 }
