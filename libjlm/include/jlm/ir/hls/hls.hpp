@@ -68,8 +68,8 @@ namespace jlm {
 			virtual
 			~fork_op() {}
 
-			fork_op(size_t nalternatives, const jive::type &type)
-					: jive::simple_op({type}, std::vector<jive::port>(nalternatives, type)) {}
+			fork_op(size_t nalternatives, const jive::type &type, bool constant)
+					: jive::simple_op({type}, std::vector<jive::port>(nalternatives, type)), constant(constant){}
 
 			bool
 			operator==(const jive::operation &other) const noexcept override {
@@ -82,7 +82,7 @@ namespace jlm {
 
 			std::string
 			debug_string() const override {
-				return "HLS_FORK";
+				return constant?"HLS_CFORK":"HLS_FORK";
 			}
 
 			std::unique_ptr<jive::operation>
@@ -93,13 +93,15 @@ namespace jlm {
 			static std::vector<jive::output *>
 			create(
 					size_t nalternatives,
-					jive::output &value
+					jive::output &value,
+                    bool constant = false
 			) {
 
 				auto region = value.region();
-				fork_op op(nalternatives, value.type());
+				fork_op op(nalternatives, value.type(), constant);
 				return jive::simple_node::create_normalized(region, op, {&value});
 			}
+            bool constant;
 		};
 
 		class merge_op final : public jive::simple_op {

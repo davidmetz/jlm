@@ -6,6 +6,7 @@
 #include <jlm/ir/hls/hls.hpp>
 #include <jive/rvsdg/traverser.hpp>
 #include "jlm/backend/hls/rvsdg2rhls/add-forks.hpp"
+#include "jive/types/bitstring/constant.hpp"
 
 void
 jlm::hls::add_forks(jive::region *region) {
@@ -26,12 +27,13 @@ jlm::hls::add_forks(jive::region *region) {
 				add_forks(structnode->subregion(n));
 			}
 		}
+        bool constant = dynamic_cast<const jive::bitconstant_op*>(&node->operation()) ||
+                        dynamic_cast<const jive::ctlconstant_op*>(&node->operation());
 		for (size_t i = 0; i < node->noutputs(); ++i) {
 			auto out = node->output(i);
 			if (out->nusers() > 1) {
-				std::vector<jive::input *> users;
-				users.insert(users.begin(), out->begin(), out->end());
-				auto fork = hls::fork_op::create(out->nusers(), *out);
+                std::vector<jive::input *> users(out->begin(), out->end());
+				auto fork = hls::fork_op::create(out->nusers(), *out, constant);
 				for (size_t j = 0; j < users.size(); j++) {
 					users[j]->divert_to(fork[j]);
 				}
