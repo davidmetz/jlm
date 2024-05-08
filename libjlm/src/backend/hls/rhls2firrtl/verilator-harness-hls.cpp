@@ -272,6 +272,7 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "#ifdef HLS_MEM_DEBUG\n"
         "            std::cout << \"mem_"<<i<<" writing \" << data << \" to \" << addr << \"\\n\";\n"
         "#endif\n"
+        "            access_mem_store({addr, data, size, mem_access_ctr++});\n"
         "            switch (size) {\n"
         "                case 0:\n"
         "                    *(uint8_t *) addr = data;\n"
@@ -289,7 +290,6 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "                    assert(false);\n"
         "            }\n"
         "            mem_resp["<< i <<"]->back().data = 0xFFFFFFFF;\n"
-        "            access_mem_store({addr, data, size, mem_access_ctr++});\n"
         "        } else {\n";
         } else {
             cpp <<
