@@ -17,6 +17,8 @@
 
 namespace jlm {
 	namespace hls {
+        int JlmSize(const jive::type *type);
+
 		class branch_op final : public jive::simple_op {
 		private:
 			branch_op(size_t nalternatives, const jive::type &type, bool loop)
@@ -940,13 +942,11 @@ namespace jlm {
             static std::vector<jive::port>
             CreateInPorts(const std::vector<const jive::type *> &output_types)
             {
-                size_t max_width = 64;
-                //TODO: calculate size onece JlmSize is moved
-//                size_t max_width = 0;
-//                for (auto tp:output_types) {
-//                    auto sz = jlm::hls::BaseHLS::JlmSize(tp);
-//                    max_width = sz>max_width?sz:max_width;
-//                }
+                int max_width = 0;
+                for (auto tp:output_types) {
+                    auto sz = JlmSize(tp);
+                    max_width = sz>max_width?sz:max_width;
+                }
                 std::vector<jive::port> ports;
                 ports.emplace_back(get_mem_res_type(jive::bittype(max_width)));
                 ports.emplace_back(get_mem_res_type(jive::bittype(max_width)));
@@ -1031,17 +1031,15 @@ namespace jlm {
                     const std::vector<const PointerType *> &load_types,
                     const std::vector<const PointerType *> &store_types)
             {
-                size_t max_width = 64;
-                //TODO: fix once JlmSize is moved
-//                size_t max_width = 0;
-//                for (auto tp:load_types) {
-//                    auto sz = jlm::hls::BaseHLS::JlmSize(tp);
-//                    max_width = sz>max_width?sz:max_width;
-//                }
-//                for (auto tp:store_types) {
-//                    auto sz = jlm::hls::BaseHLS::JlmSize(tp);
-//                    max_width = sz>max_width?sz:max_width;
-//                }
+                int max_width = 0;
+                for (auto tp:load_types) {
+                    auto sz = JlmSize(tp);
+                    max_width = sz>max_width?sz:max_width;
+                }
+                for (auto tp:store_types) {
+                    auto sz = JlmSize(tp);
+                    max_width = sz>max_width?sz:max_width;
+                }
                 std::vector<jive::port> ports;
                 ports.emplace_back(get_mem_req_type(jlm::PointerType(jive::bittype(max_width)), !store_types.empty()));
                 ports.emplace_back(get_mem_req_type(jlm::PointerType(jive::bittype(max_width)), !store_types.empty()));

@@ -4,6 +4,7 @@
  */
 
 #include <jlm/ir/hls/hls.hpp>
+#include <cmath>
 
 size_t jlm::hls::pointer_bits = 16;
 jive::structural_output *jlm::hls::loop_node::add_loopvar(jive::output *origin, jive::output **buffer) {
@@ -126,4 +127,24 @@ std::unique_ptr<jlm::hls::bundletype> jlm::hls::get_mem_res_type(const jive::val
     elements->emplace_back("data", dataType.copy());
     elements->emplace_back("id", std::make_unique<jive::bittype>(8));
     return std::make_unique<bundletype>(elements);
+}
+
+int jlm::hls::JlmSize(const jive::type *type) {
+    if (auto bt = dynamic_cast<const jive::bittype *>(type)) {
+        return bt->nbits();
+    } else if (auto at = dynamic_cast<const jlm::arraytype *>(type)) {
+        return JlmSize(&at->element_type()) * at->nelements();
+    }  else if (auto vt = dynamic_cast<const jlm::vectortype *>(type)) {
+        return JlmSize(&vt->type()) * vt->size();
+    } else if (dynamic_cast<const jlm::PointerType *>(type)) {
+        return jlm::hls::pointer_bits;
+    } else if (auto ct = dynamic_cast<const jive::ctltype *>(type)) {
+        return ceil(log2(ct->nalternatives()));
+    } else if (dynamic_cast<const jive::statetype *>(type)) {
+        return 1;
+    }  else if (dynamic_cast<const jlm::hls::bundletype *>(type)) {
+        return 0; // TODO: fix this ugly hack needed for get_node_name
+    } else {
+        throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
+    }
 }

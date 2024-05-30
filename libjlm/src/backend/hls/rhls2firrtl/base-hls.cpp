@@ -85,21 +85,7 @@ jlm::hls::BaseHLS::get_port_name(jive::output *port) {
 
 int
 jlm::hls::BaseHLS::JlmSize(const jive::type *type) {
-	if (auto bt = dynamic_cast<const jive::bittype *>(type)) {
-		return bt->nbits();
-	} else if (auto at = dynamic_cast<const jlm::arraytype *>(type)) {
-		return JlmSize(&at->element_type()) * at->nelements();
-	} else if (dynamic_cast<const jlm::PointerType *>(type)) {
-		return jlm::hls::pointer_bits;
-	} else if (auto ct = dynamic_cast<const jive::ctltype *>(type)) {
-		return ceil(log2(ct->nalternatives()));
-	} else if (dynamic_cast<const jive::statetype *>(type)) {
-		return 1;
-	}  else if (dynamic_cast<const jlm::hls::bundletype *>(type)) {
-		return 0; // TODO: fix this ugly hack needed for get_node_name
-	} else {
-		throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
-	}
+    return jlm::hls::JlmSize(type);
 }
 
 void

@@ -573,6 +573,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
         auto memResBundle = GetSubfield(body, memRes, "data");
         auto memResId = GetSubfield(body, memResBundle, "id");
         auto memResData = GetSubfield(body, memResBundle, "data");
+        auto portWidth = memResData.result().getType().cast<circt::firrtl::IntType>().getWidth().getValue();
 
         auto elseBody = body;
         for (size_t i = 0; i < node->noutputs(); ++i) {
@@ -587,7 +588,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemResp(const jive::simple_node *node) {
             Connect(thenBody, outValid, oneBitValue);
             Connect(thenBody, memResReady, outReady);
             int nbits = JlmSize(&node->output(i)->type());
-            if(nbits == 64){
+            if(nbits == portWidth){
                 Connect(thenBody, outData, memResData);
             } else {
                 Connect(thenBody, outData, AddBitsOp(thenBody, memResData, nbits-1, 0));
@@ -709,14 +710,7 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
             Connect(thenBody, memReqId, loadIds[i]);
             // no data or write
             auto dataType = &dynamic_cast<const PointerType *>(loadAddrTypes[i])->GetElementType();
-            int bitWidth;
-            if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
-                bitWidth = bitType->nbits();
-            } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
-                bitWidth = 64;
-            } else {
-                throw jlm::error("unknown width for mem request");
-            }
+            int bitWidth = JlmSize(dataType);
             int log2Bytes = log2(bitWidth / 8);
             Connect(thenBody, memReqSize, GetConstant(thenBody, 3, log2Bytes));
             if (hasWrite) {
@@ -741,8 +735,9 @@ jlm::hls::MLIRGenImpl::MlirGenHlsMemReq(const jive::simple_node *node) {
             Connect(thenBody, storeDataReadys[i], memReqReady);
             Connect(thenBody, memReqValid, storeAddrValids[i]);
             Connect(thenBody, memReqAddr, storeAddrDatas[i]);
-            // TODO: pad
             Connect(thenBody, memReqData, storeDataDatas[i]);
+            // TODO: pad
+            auto portWidth = memReqData.getType().cast<circt::firrtl::IntType>().getWidth().getValue();
             Connect(thenBody, memReqId, storeIds[i]);
             // no data or write
             auto dataType = &dynamic_cast<const PointerType *>(storeAddrTypes[i])->GetElementType();
@@ -3600,14 +3595,7 @@ jlm::hls::MLIRGenImpl::GetModuleName(const jive::node *node) {
     if(auto op = dynamic_cast<const jlm::hls::mem_req_op *>(&node->operation())){
         for (size_t i = 0; i < op->get_nloads(); ++i) {
             auto dataType = &dynamic_cast<const PointerType*>(&node->input(i)->type())->GetElementType();
-            int bitWidth;
-            if (auto bitType = dynamic_cast<const jive::bittype *>(dataType)) {
-                bitWidth = bitType->nbits();
-            } else if (dynamic_cast<const jlm::PointerType *>(dataType)) {
-                bitWidth = jlm::hls::pointer_bits;
-            } else{
-                throw jlm::error("unknown width for mem request");
-            }
+            int bitWidth = JlmSize(dataType);
             append.append("_");
             append.append(std::to_string(bitWidth));
         }

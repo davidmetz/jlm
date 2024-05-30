@@ -482,7 +482,12 @@ void jlm::hls::generate_mem_port(const jlm::lambda::node * lambda,
         load_types.push_back(&jive::bit32);
     }
     // TODO: change type
-    auto mem_resp_type = get_mem_res_type(jive::bit64);
+    int max_width = 0;
+    for (auto tp:load_types) {
+        auto sz = JlmSize(tp);
+        max_width = sz>max_width?sz:max_width;
+    }
+    auto mem_resp_type = get_mem_res_type(jive::bittype(max_width));
     auto mem_resp_argument = jive::argument::create(lambda_region, nullptr, *mem_resp_type);
     auto mem_resp_argument2 = jive::argument::create(lambda_region, nullptr, *mem_resp_type);
     auto load_responses = mem_resp_op::create(*mem_resp_argument, *mem_resp_argument2, load_types);
