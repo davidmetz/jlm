@@ -621,7 +621,18 @@ jlm::hls::VerilatorHarnessHLS::convert_to_c_type(const jive::type *type) {
 		return convert_to_c_type(&t->GetElementType()) + "*";
 	} else if (auto t = dynamic_cast<const jlm::arraytype *>(type)) {
 		return convert_to_c_type(&t->element_type());
-	} else {
+	} else if (auto t = dynamic_cast<const jlm::vectortype *>(type)) {
+		return convert_to_c_type(&t->type()) + " __attribute__((vector_size("+std::to_string(JlmSize(type)/8)+")))";
+	} else if (auto ft = dynamic_cast<const jlm::fptype *>(type)) {
+        switch (ft->size()) {
+            case fpsize::flt:
+                return "float";
+            case fpsize::dbl:
+                return "double";
+            default:
+                throw std::logic_error(type->debug_string() + " not implemented!");
+        }
+    } else {
 		throw std::logic_error(type->debug_string() + " not implemented!");
 	}
 }

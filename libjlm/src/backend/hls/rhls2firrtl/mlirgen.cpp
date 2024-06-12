@@ -262,6 +262,34 @@ jlm::hls::MLIRGenImpl::MlirGenSimpleNode(const jive::simple_node *node) {
 		}
 		auto asUInt = AddAsUIntOp(body, result);
 		Connect(body, outData, AddBitsOp(body, asUInt, jlm::hls::pointer_bits-1, 0));
+	} else if (auto op = dynamic_cast<const jlm::extractelement_op *>(&(node->operation()))) {
+		// Start of with base pointer
+		auto input0 = GetSubfield(body, inBundles[0], "data");
+		auto input1 = GetSubfield(body, inBundles[1], "data");
+        auto vt = dynamic_cast<const vectortype*>(&op->argument(0).type());
+        auto vec = builder.create<circt::firrtl::WireOp>(
+            location,
+            circt::firrtl::FVectorType::get(GetFirrtlType(&vt->type()), vt->size()),
+            "vec"
+        );
+        auto elementBits = JlmSize(&vt->type());
+        body->push_back(vec);
+        for (size_t i = 0; i < vt->size(); ++i) {
+            auto subindexOp = builder.create<circt::firrtl::SubindexOp>(
+                    location,
+                    vec,
+                    i
+                    );
+            body->push_back(subindexOp);
+            Connect(body, subindexOp, AddBitsOp(body, input0, elementBits*(i+1)-1, elementBits*i));
+        }
+        auto subaccessOp = builder.create<circt::firrtl::SubaccessOp>(
+                location,
+                vec,
+                input1
+                );
+        body->push_back(subaccessOp);
+		Connect(body, outData, subaccessOp);
 	} else if (dynamic_cast<const jlm::UndefValueOperation *>(&(node->operation()))) {
 		Connect(body, outData, GetConstant(body, 1, 0));
 	} else {
