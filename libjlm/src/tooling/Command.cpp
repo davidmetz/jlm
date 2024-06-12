@@ -477,6 +477,7 @@ VerilatorCommand::ToString() const
 #else
     " --trace",
 #endif
+    " -y /home/david/git/chisel-template"
     " -Wno-WIDTH", //divisions otherwise cause errors
     " -j",
     " -Mdir ", TempFolder_.to_str(), "verilator/",

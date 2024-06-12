@@ -142,7 +142,18 @@ int jlm::hls::JlmSize(const jive::type *type) {
         return ceil(log2(ct->nalternatives()));
     } else if (dynamic_cast<const jive::statetype *>(type)) {
         return 1;
-    }  else if (dynamic_cast<const jlm::hls::bundletype *>(type)) {
+    }  else if (auto ft = dynamic_cast<const jlm::fptype *>(type)) {
+        switch (ft->size()) {
+            case fpsize::half:
+                return 16;
+            case fpsize::flt:
+                return 32;
+            case fpsize::dbl:
+                return 64;
+            default:
+                throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");
+        }
+    } else if (dynamic_cast<const jlm::hls::bundletype *>(type)) {
         return 0; // TODO: fix this ugly hack needed for get_node_name
     } else {
         throw std::logic_error("Size of '" + type->debug_string() + "' is not implemented!");

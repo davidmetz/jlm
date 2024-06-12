@@ -415,6 +415,18 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         if(dynamic_cast<const jlm::PointerType *>(&ln->type().ArgumentType(i))){
             cpp << "    base_ptrs.push_back((uint64_t) a" << i << ");\n";
             continue;
+        } else if (auto ft = dynamic_cast<const jlm::fptype *>(&ln->type().ArgumentType(i))) {
+            switch (ft->size()) {
+                case fpsize::flt:
+                    cpp << "    top->i_data_" << i << " = *(uint32_t*) &a" << i << ";\n";
+                    break;
+                case fpsize::dbl:
+                    cpp << "    top->i_data_" << i << " = *(uint64_t*) &a" << i << ";\n";
+                    break;
+                default:
+                    throw std::logic_error(ft->debug_string() + " not implemented!");
+            }
+            continue;
         }
 		cpp << "    top->i_data_" << i << " = (uint64_t) a" << i << ";\n";
 	}

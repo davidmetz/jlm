@@ -53,12 +53,12 @@ namespace jlm {
 			// We don't have any locations (i.e., the originating line in the
 			// source file) in RVSDG, so we set all operations to unkown
 			mlir::Location location = builder.getUnknownLoc();
-			std::unordered_map<std::string, circt::firrtl::FModuleOp> modules;
+			std::unordered_map<std::string, circt::firrtl::FModuleLike> modules;
 			// FIRRTL generating functions
 			std::unordered_map<jive::simple_node *, circt::firrtl::InstanceOp>
 			MlirGen(hls::loop_node *loopNode, mlir::Block *body, mlir::Block *circuitBody);
 			circt::firrtl::FModuleOp MlirGen(jive::region *subRegion, mlir::Block *circuitBody);
-			circt::firrtl::FModuleOp MlirGen(const jive::simple_node *node);
+			circt::firrtl::FModuleLike MlirGen(const jive::simple_node *node);
 			// Operations
 			circt::firrtl::FModuleOp MlirGenSink(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenLoopConstBuffer(const jive::simple_node *node);
@@ -80,6 +80,7 @@ namespace jlm {
 			circt::firrtl::FModuleOp MlirGenNDMux(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenBranch(const jive::simple_node *node);
 			circt::firrtl::FModuleOp MlirGenSimpleNode(const jive::simple_node *node);
+			circt::firrtl::FExtModuleOp MlirGenExtModule(const jive::simple_node *node);
 
 			// Helper functions
 			void AddClockPort(llvm::SmallVector<circt::firrtl::PortInfo> *ports);

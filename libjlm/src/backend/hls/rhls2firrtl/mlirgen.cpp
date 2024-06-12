@@ -2113,7 +2113,7 @@ jlm::hls::MLIRGenImpl::MlirGenBranch(const jive::simple_node *node) {
 	return module;
 }
 
-circt::firrtl::FModuleOp
+circt::firrtl::FModuleLike
 jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 	if (dynamic_cast<const hls::sink_op *>(&(node->operation()))) {
 		return MlirGenSink(node);
@@ -2167,6 +2167,16 @@ jlm::hls::MLIRGenImpl::MlirGen(const jive::simple_node *node) {
 		        return MlirGenNDMux(node);
 		}
 	}
+    bool is_float = false;
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+        is_float = is_float || dynamic_cast<const jlm::fptype *>(&node->input(i)->type());
+    }
+    for (size_t i = 0; i < node->noutputs(); ++i) {
+        is_float = is_float || dynamic_cast<const jlm::fptype *>(&node->output(i)->type());
+    }
+    if (is_float){
+        return MlirGenExtModule(node);
+    }
 	return MlirGenSimpleNode(node);
 }
 
@@ -3371,8 +3381,8 @@ jlm::hls::MLIRGenImpl::AddInstanceOp(mlir::Block *body, jive::simple_node *node)
 	if (!modules[name]) {
 		auto module = MlirGen(node);
         // stores violate these rules at the moment, but work fine
-        if(!dynamic_cast<const jlm::hls::store_op*>(&node->operation())){
-            check_module(module);
+        if(!dynamic_cast<const jlm::hls::store_op*>(&node->operation()) && llvm::isa<circt::firrtl::FModuleOp>(module)){
+            check_module(llvm::cast<circt::firrtl::FModuleOp>(module));
         }
 		modules[name] = module;
 		body->push_back(module);
@@ -3692,6 +3702,40 @@ jlm::hls::MLIRGenImpl::toString(const circt::firrtl::CircuitOp circuit) {
 		throw std::logic_error("Exporting of firrtl failed");
 
 	return outputString;
+}
+
+circt::firrtl::FExtModuleOp jlm::hls::MLIRGenImpl::MlirGenExtModule(const jive::simple_node *node) {
+    // Generate a vector with all inputs and outputs of the module
+    llvm::SmallVector<circt::firrtl::PortInfo> ports;
+
+    // Clock and reset ports
+    AddClockPort(&ports);
+    AddResetPort(&ports);
+    // Input bundle port
+    for (size_t i = 0; i < node->ninputs(); ++i) {
+        std::string name("i");
+        name.append(std::to_string(i));
+        AddBundlePort(
+                &ports,
+                circt::firrtl::Direction::In,
+                name,
+                GetFirrtlType(&node->input(i)->type()));
+    }
+    for (size_t i = 0; i < node->noutputs(); ++i) {
+        std::string name("o");
+        name.append(std::to_string(i));
+        AddBundlePort(
+                &ports,
+                circt::firrtl::Direction::Out,
+                name,
+                GetFirrtlType(&node->output(i)->type()));
+    }
+
+    // Creat a name for the module
+    auto nodeName = GetModuleName(node);
+    mlir::StringAttr name = builder.getStringAttr(nodeName);
+    // Create the module
+    return builder.create<circt::firrtl::FExtModuleOp>(location, name, ports);
 }
 
 #endif //CIRCT
