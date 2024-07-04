@@ -85,7 +85,9 @@ main(int argc, char ** argv)
 	}
 
 	if (commandLineOptions.OutputFormat_ == jlm::JlmHlsCommandLineOptions::OutputFormat::Firrtl) {
-        jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
+        if(commandLineOptions.InstrumentRef_){
+            jlm::hls::rvsdg2ref(*rvsdgModule, commandLineOptions.OutputFolder_.path() + "/jlm_hls_ref.ll");
+        }
         jlm::hls::rvsdg2rhls(*rvsdgModule);
 
 		std::string output;
@@ -100,7 +102,7 @@ main(int argc, char ** argv)
 			output,
       commandLineOptions.OutputFolder_.path() + "/jlm_hls.fir");
 
-		jlm::hls::VerilatorHarnessHLS vhls;
+		jlm::hls::VerilatorHarnessHLS vhls(commandLineOptions.InstrumentRef_);
 		stringToFile(
 			vhls.run(*rvsdgModule),
       commandLineOptions.OutputFolder_.path() + "/jlm_hls_harness.cpp");

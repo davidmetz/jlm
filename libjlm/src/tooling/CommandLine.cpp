@@ -652,6 +652,11 @@ JlmHlsCommandLineParser::ParseCommandLineArguments(int argc, char ** argv)
         "Output DOT graph")),
     cl::desc("Select output format"));
 
+  cl::opt<bool> instrumentRef(
+    "instrument-ref",
+    cl::ValueDisallowed,
+    cl::desc("Instrument and run C reference"));
+
   cl::ParseCommandLineOptions(argc, argv);
 
   if (outputFolder.empty())
@@ -666,6 +671,7 @@ JlmHlsCommandLineParser::ParseCommandLineArguments(int argc, char ** argv)
   CommandLineOptions_.ExtractHlsFunction_ = extractHlsFunction;
   CommandLineOptions_.UseCirct_ = useCirct;
   CommandLineOptions_.OutputFormat_ = format;
+  CommandLineOptions_.InstrumentRef_ = instrumentRef;
 
   return CommandLineOptions_;
 }
@@ -825,6 +831,11 @@ JhlsCommandLineParser::ParseCommandLineArguments(int argc, char **argv)
     cl::Prefix,
     cl::desc("Use CIRCT to generate FIRRTL"));
 
+  cl::opt<bool> instrumentRef(
+    "instrument-ref",
+    cl::ValueDisallowed,
+    cl::desc("Instrument and run C reference"));
+
   cl::ParseCommandLineOptions(argc, argv);
 
   /* Process parsed options */
@@ -904,6 +915,7 @@ JhlsCommandLineParser::ParseCommandLineArguments(int argc, char **argv)
   CommandLineOptions_.Md_ = mD;
   CommandLineOptions_.GenerateFirrtl_ = generateFirrtl;
   CommandLineOptions_.UseCirct_ = useCirct;
+  CommandLineOptions_.InstrumentRef_ = instrumentRef;
 
   for (auto & inputFile : inputFiles) {
     if (IsObjectFile(inputFile)) {

@@ -70,22 +70,28 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "std::map<void*, std::deque<mem_access>> store_map;\n"
         "\n"
         "void access_mem_load(mem_access access){\n"
-        "    hls_loads.push_back(access);\n"
-        "    auto find = load_map.find(access.addr);\n"
-        "    if(find == load_map.end()){\n"
-        "        throw std::logic_error(\"unexpected load address\");\n"
-        "    }\n"
-        "    if(find->second.empty()){\n"
-        "        throw std::logic_error(\"too many loads to address\");\n"
-        "    }\n"
-        "    if(!find->second.front().operator==(access)){\n"
-        "        throw std::logic_error(\"wrong type of load to address\");\n"
-        "    }\n"
-        "    find->second.pop_front();\n"
+        "    hls_loads.push_back(access);\n";
+    if(instrumentRef){
+        cpp <<
+            "    auto find = load_map.find(access.addr);\n"
+            "    if(find == load_map.end()){\n"
+            "        throw std::logic_error(\"unexpected load address\");\n"
+            "    }\n"
+            "    if(find->second.empty()){\n"
+            "        throw std::logic_error(\"too many loads to address\");\n"
+            "    }\n"
+            "    if(!find->second.front().operator==(access)){\n"
+            "        throw std::logic_error(\"wrong type of load to address\");\n"
+            "    }\n"
+            "    find->second.pop_front();\n";
+    }
+    cpp <<
         "}\n"
         "\n"
         "void access_mem_store(mem_access access){\n"
-        "    hls_stores.push_back(access);\n"
+        "    hls_stores.push_back(access);\n";
+    if(instrumentRef){
+        cpp <<
         "    auto find = store_map.find(access.addr);\n"
         "    if(find == store_map.end()){\n"
         "        throw std::logic_error(\"unexpected store address\");\n"
@@ -96,7 +102,9 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         "    if(!find->second.front().operator==(access)){\n"
         "        throw std::logic_error(\"wrong type of store to address\");\n"
         "    }\n"
-        "    find->second.pop_front();\n"
+        "    find->second.pop_front();\n";
+    }
+    cpp <<
         "}\n"
 		"// Current simulation time (64-bit unsigned)\n"
 		"vluint64_t main_time = 0;\n"
@@ -356,8 +364,10 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
         }
     }
 
-    get_function_header(cpp, ln, "instrumented_ref");
-    cpp << ";\n";
+    if(instrumentRef){
+        get_function_header(cpp, ln, "instrumented_ref");
+        cpp << ";\n";
+    }
     cpp << "bool in_alloca(void *addr){\n"
            "    for (auto a: ref_allocas) {\n"
            "        if(addr >= a.first && addr < ((uint8_t*)a.first)+a.second){\n"
@@ -499,63 +509,67 @@ jlm::hls::VerilatorHarnessHLS::get_text(jlm::RvsdgModule &rm) {
 	}
     cpp << "}\n";
 
-    get_function_header(cpp, ln, "run_ref");
-    cpp << " {\n";
-    cpp << "    int fd[2]; // channel 0 for reading and 1 for writing\n"
-           "    pipe(fd);\n"
-           "    int pid = fork();\n"
-           "    if(pid == 0) { // child\n"
-           "        close(fd[0]); // close fd[0] since child will only write\n"
-           "        ";
-    call_function(cpp, ln, "instrumented_ref");
-    cpp << "\n"
-           "        size_t cnt = ref_loads.size();\n"
-           "        write(fd[1], &cnt, sizeof(size_t));\n"
-           "        for (auto load:ref_loads) {\n"
-           "            write(fd[1], &load, sizeof(mem_access));\n"
-           "        }\n"
-           "        cnt = ref_stores.size();\n"
-           "        write(fd[1], &cnt, sizeof(size_t));\n"
-           "        for (auto store:ref_stores) {\n"
-           "            write(fd[1], &store, sizeof(mem_access));\n"
-           "        }\n"
-           "        close(fd[1]);\n"
-           "        exit(0);\n"
-           "    } else { // parent\n"
-           "        close(fd[1]); // close fd[1] since parent will only read\n"
-           "        size_t cnt;\n"
-           "        read(fd[0], &cnt, sizeof(size_t));\n"
-           "        for (size_t i = 0; i < cnt; ++i) {\n"
-           "            mem_access load;\n"
-           "            read(fd[0], &load, sizeof(mem_access));\n"
-           "            ref_loads.push_back(load);\n"
-           "            if(load_map.find(load.addr) == load_map.end()){\n"
-           "                load_map.emplace(load.addr, std::deque<mem_access>());\n"
-           "            }\n"
-           "            load_map.find(load.addr)->second.push_back(load);\n"
-           "        }\n"
-           "        read(fd[0], &cnt, sizeof(size_t));\n"
-           "        for (size_t i = 0; i < cnt; ++i) {\n"
-           "            mem_access store;\n"
-           "            read(fd[0], &store, sizeof(mem_access));\n"
-           "            ref_stores.push_back(store);\n"
-           "            if(store_map.find(store.addr) == store_map.end()){\n"
-           "                store_map.emplace(store.addr, std::deque<mem_access>());\n"
-           "            }\n"
-           "            store_map.find(store.addr)->second.push_back(store);\n"
-           "        }\n"
-           "        close(fd[0]);\n"
-           "    }\n";
+    if(instrumentRef) {
+        get_function_header(cpp, ln, "run_ref");
+        cpp << " {\n";
+        cpp << "    int fd[2]; // channel 0 for reading and 1 for writing\n"
+               "    pipe(fd);\n"
+               "    int pid = fork();\n"
+               "    if(pid == 0) { // child\n"
+               "        close(fd[0]); // close fd[0] since child will only write\n"
+               "        ";
+        call_function(cpp, ln, "instrumented_ref");
+        cpp << "\n"
+               "        size_t cnt = ref_loads.size();\n"
+               "        write(fd[1], &cnt, sizeof(size_t));\n"
+               "        for (auto load:ref_loads) {\n"
+               "            write(fd[1], &load, sizeof(mem_access));\n"
+               "        }\n"
+               "        cnt = ref_stores.size();\n"
+               "        write(fd[1], &cnt, sizeof(size_t));\n"
+               "        for (auto store:ref_stores) {\n"
+               "            write(fd[1], &store, sizeof(mem_access));\n"
+               "        }\n"
+               "        close(fd[1]);\n"
+               "        exit(0);\n"
+               "    } else { // parent\n"
+               "        close(fd[1]); // close fd[1] since parent will only read\n"
+               "        size_t cnt;\n"
+               "        read(fd[0], &cnt, sizeof(size_t));\n"
+               "        for (size_t i = 0; i < cnt; ++i) {\n"
+               "            mem_access load;\n"
+               "            read(fd[0], &load, sizeof(mem_access));\n"
+               "            ref_loads.push_back(load);\n"
+               "            if(load_map.find(load.addr) == load_map.end()){\n"
+               "                load_map.emplace(load.addr, std::deque<mem_access>());\n"
+               "            }\n"
+               "            load_map.find(load.addr)->second.push_back(load);\n"
+               "        }\n"
+               "        read(fd[0], &cnt, sizeof(size_t));\n"
+               "        for (size_t i = 0; i < cnt; ++i) {\n"
+               "            mem_access store;\n"
+               "            read(fd[0], &store, sizeof(mem_access));\n"
+               "            ref_stores.push_back(store);\n"
+               "            if(store_map.find(store.addr) == store_map.end()){\n"
+               "                store_map.emplace(store.addr, std::deque<mem_access>());\n"
+               "            }\n"
+               "            store_map.find(store.addr)->second.push_back(store);\n"
+               "        }\n"
+               "        close(fd[0]);\n"
+               "    }\n";
 
-    if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
-        cpp << "    return 0;\n";
+        if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
+            cpp << "    return 0;\n";
+        }
+        cpp << "}\n";
     }
-    cpp << "}\n";
     get_function_header(cpp, ln, function_name);
-    cpp << " {\n"
-           "    ";
-    call_function(cpp, ln, "run_ref");
-    cpp << "\n";
+    cpp << " {\n";
+    if(instrumentRef) {
+        cpp << "    ";
+        call_function(cpp, ln, "run_ref");
+        cpp << "\n";
+    }
     if (ln->type().NumResults() && !dynamic_cast<const jive::statetype *>(&ln->type().ResultType(0))) {
         cpp << "    return ";
     } else {

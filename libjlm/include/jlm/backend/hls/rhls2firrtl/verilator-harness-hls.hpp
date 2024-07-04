@@ -21,6 +21,11 @@ namespace jlm {
 			std::string
 			get_text(jlm::RvsdgModule &rm) override;
 
+        public:
+            VerilatorHarnessHLS(bool instrumentedRef):instrumentRef(instrumentedRef){
+
+            }
+
 		private:
 			std::string
 			convert_to_c_type(const jive::type* type);
@@ -31,6 +36,8 @@ namespace jlm {
             void get_function_header(std::ostringstream &cpp, const lambda::node *ln, const std::string &function_name);
 
             void call_function(std::ostringstream &cpp, const lambda::node *ln, const std::string &function_name);
+
+            bool instrumentRef;
         };
 	}
 }

@@ -232,6 +232,7 @@ public:
     , OutputFormat_(OutputFormat::Firrtl)
     , ExtractHlsFunction_(false)
     , UseCirct_(false)
+    , InstrumentRef_(false)
   {}
 
   void
@@ -243,6 +244,7 @@ public:
   std::string HlsFunction_;
   bool ExtractHlsFunction_;
   bool UseCirct_;
+  bool InstrumentRef_;
 };
 
 /**
@@ -283,6 +285,7 @@ public:
     , UseCirct_(false)
     , Hls_(false)
     , Md_(false)
+    , InstrumentRef_(false)
     , OptimizationLevel_(OptimizationLevel::O0)
     , LanguageStandard_(LanguageStandard::None)
     , OutputFile_("a.out")
@@ -300,6 +303,7 @@ public:
   bool GenerateFirrtl_;
   bool UseCirct_;
   bool Hls_;
+  bool InstrumentRef_;
 
   bool Md_;
 

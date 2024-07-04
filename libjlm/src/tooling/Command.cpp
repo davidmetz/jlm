@@ -378,6 +378,7 @@ JlmHlsCommand::ToString() const
     "jlm-hls ",
     "-o ", OutputFolder_.to_str(), " ",
     UseCirct_ ? "--circt " : "",
+    InstrumentRef_ ? "--instrument-ref " : "",
     InputFile_.to_str());
 }
 

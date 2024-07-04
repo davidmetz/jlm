@@ -552,10 +552,12 @@ public:
   JlmHlsCommand(
     filepath inputFile,
     filepath outputFolder,
-    bool useCirct)
+    bool useCirct,
+    bool instrumentRef)
     : InputFile_(std::move(inputFile))
     , OutputFolder_(std::move(outputFolder))
     , UseCirct_(useCirct)
+    , InstrumentRef_(instrumentRef)
   {}
 
   [[nodiscard]] std::string
@@ -599,12 +601,14 @@ public:
     CommandGraph & commandGraph,
     const filepath & inputFile,
     const filepath & outputFolder,
-    bool useCirct)
+    bool useCirct,
+    bool instrumentRef)
   {
     std::unique_ptr<JlmHlsCommand> command(new JlmHlsCommand(
       inputFile,
       outputFolder,
-      useCirct));
+      useCirct,
+      instrumentRef));
     return CommandGraph::Node::Create(commandGraph, std::move(command));
   }
 
@@ -612,6 +616,7 @@ private:
   filepath InputFile_;
   filepath OutputFolder_;
   bool UseCirct_;
+  bool InstrumentRef_;
 };
 
 /**
